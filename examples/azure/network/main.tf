@@ -48,7 +48,7 @@ resource "azurerm_network_security_group" "public" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "443"
-    source_address_prefix      = "*"
+    source_address_prefixes    = var.allowed_ip_ranges[*]
     destination_address_prefix = "*"
   }
 

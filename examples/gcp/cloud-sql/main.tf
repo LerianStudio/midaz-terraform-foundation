@@ -40,6 +40,26 @@ module "postgresql" {
     {
       name  = "max_connections"
       value = "100"
+    },
+    {
+      name  = "log_checkpoints"
+      value = "on"
+    },
+    {
+      name  = "log_connections"
+      value = "on"
+    },
+    {
+      name  = "log_disconnections"
+      value = "on"
+    },
+    {
+      name  = "log_lock_waits"
+      value = "on"
+    },
+    {
+      name  = "log_temp_files"
+      value = "0"
     }
   ]
 

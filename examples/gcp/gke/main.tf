@@ -2,9 +2,15 @@ module "gke" {
   source  = "terraform-google-modules/kubernetes-engine/google//modules/beta-private-cluster"
   version = "~> 25.0"
 
-  project_id        = var.project_id
-  name              = var.cluster_name
-  region            = var.region
+  project_id = var.project_id
+  name       = var.cluster_name
+  region     = var.region
+
+  // Resource labels
+  cluster_resource_labels = {
+    environment = var.environment
+    managed_by  = "terraform"
+  }
   zones             = var.zones
   network           = var.network_name
   subnetwork        = var.subnet_name
@@ -17,7 +23,18 @@ module "gke" {
   master_ipv4_cidr_block  = var.master_ipv4_cidr_block
 
   // Master authorized networks
-  master_authorized_networks = var.master_authorized_networks
+  master_authorized_networks = [
+    {
+      cidr_block   = "10.0.0.0/8"
+      display_name = "internal-vpc"
+    }
+  ]
+
+  // Security configurations
+  enable_pod_security_policy = true
+
+  // Network policy
+  network_policy = true
 
   // Node pools
   node_pools = [

@@ -50,6 +50,12 @@ variable "private_db_subnet_prefixes" {
   ]
 }
 
+variable "allowed_ip_ranges" {
+  description = "List of IP CIDR ranges allowed to access resources"
+  type        = list(string)
+  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # Private IP ranges only
+}
+
 variable "environment" {
   description = "Environment name for resource tags"
   type        = string

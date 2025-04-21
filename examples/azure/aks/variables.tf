@@ -22,6 +22,12 @@ variable "kubernetes_version" {
   default     = "1.26.0"
 }
 
+variable "api_server_access_cidrs" {
+  description = "List of IP CIDR ranges that are allowed to access the AKS API server"
+  type        = list(string)
+  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # Private IP ranges only
+}
+
 variable "node_count" {
   description = "Number of nodes in the default node pool"
   type        = number

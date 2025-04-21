@@ -25,10 +25,6 @@ jobs:
     - name: Setup TFLint
       uses: terraform-linters/setup-tflint@v3
 
-    - name: Install tfsec
-      run: |
-        curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-
     - name: Verify Conventional Commits
       uses: wagoid/commitlint-github-action@v5
 
@@ -70,7 +66,7 @@ jobs:
         done
 
     - name: Run tfsec
-      run: tfsec .
+      uses: aquasecurity/tfsec-action@v1.0.0
 
   release:
     needs: validate
