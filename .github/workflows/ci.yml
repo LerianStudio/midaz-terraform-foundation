@@ -5,6 +5,11 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
 
 jobs:
   validate:
