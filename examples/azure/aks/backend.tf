@@ -1,10 +1,8 @@
 terraform {
-  required_version = ">= 1.0.0"
-
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
-    }
+  backend "azurerm" {
+    resource_group_name  = "<PUT-YOUR-RESOURCE-GROUP-NAME-HERE>"
+    storage_account_name = "<PUT-YOUR-STORAGE-ACCOUNT-NAME-HERE>"
+    container_name       = "terraform-state"
+    key                  = "azure/aks/terraform.tfstate"
   }
 }
