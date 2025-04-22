@@ -21,10 +21,20 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-    # Checkout repository code
-    - uses: actions/checkout@v4
+    # Checkout repository code in PR
+    - name: Checkout in PR
+      uses: actions/checkout@v4
+      if: github.event_name == 'pull_request'
       with:
-        fetch-depth: 0  # Full history for commitlint
+        ref: ${{ github.event.pull_request.head.ref }}
+        fetch-depth: 0
+
+    # Checkout repository code in push
+    - name: Checkout in push
+      uses: actions/checkout@v4
+      if: github.event_name == 'push'
+      with:
+        fetch-depth: 0
 
     # Setup Node.js environment for commitlint
     - name: Set up Node.js
