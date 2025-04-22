@@ -3,13 +3,10 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "db" {
-  name     = "rg-db-example"
-  location = "eastus2"
+  name     = var.resource_group_name
+  location = var.location
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }
 
 resource "azurerm_storage_account" "audit" {
@@ -20,10 +17,7 @@ resource "azurerm_storage_account" "audit" {
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }
 
 resource "random_string" "suffix" {
@@ -33,19 +27,16 @@ resource "random_string" "suffix" {
 }
 
 resource "azurerm_mssql_server" "example" {
-  name                          = "sql-server-example"
+  name                          = var.server_name
   resource_group_name           = azurerm_resource_group.db.name
   location                      = azurerm_resource_group.db.location
   version                       = "12.0"
-  administrator_login           = "sqladmin"
+  administrator_login           = var.administrator_login
   administrator_login_password  = var.administrator_password
   minimum_tls_version           = "1.2"
   public_network_access_enabled = false
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }
 
 resource "azurerm_mssql_server_extended_auditing_policy" "example" {
@@ -57,15 +48,12 @@ resource "azurerm_mssql_server_extended_auditing_policy" "example" {
 }
 
 resource "azurerm_mssql_database" "example" {
-  name         = "example-db"
+  name         = var.database_name
   server_id    = azurerm_mssql_server.example.id
   collation    = "SQL_Latin1_General_CP1_CI_AS"
   license_type = "LicenseIncluded"
-  max_size_gb  = 2
-  sku_name     = "Basic"
+  max_size_gb  = var.max_size_gb
+  sku_name     = var.database_sku
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }

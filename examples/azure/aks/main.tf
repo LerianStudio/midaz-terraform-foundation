@@ -9,28 +9,22 @@ resource "azurerm_log_analytics_workspace" "aks" {
   sku                 = "PerGB2018"
   retention_in_days   = 30
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }
 
 resource "azurerm_resource_group" "aks" {
-  name     = "rg-aks-example"
-  location = "eastus2"
+  name     = var.resource_group_name
+  location = var.location
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                = "aks-cluster-example"
+  name                = var.cluster_name
   location            = azurerm_resource_group.aks.location
   resource_group_name = azurerm_resource_group.aks.name
   dns_prefix          = "aks-example"
-  kubernetes_version  = "1.26.0"
+  kubernetes_version  = var.kubernetes_version
 
   role_based_access_control_enabled = true
 
@@ -49,8 +43,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   default_node_pool {
     name       = "default"
-    node_count = 2
-    vm_size    = "Standard_D2s_v3"
+    node_count = var.node_count
+    vm_size    = var.node_vm_size
   }
 
   identity {
@@ -61,8 +55,5 @@ resource "azurerm_kubernetes_cluster" "aks" {
     log_analytics_workspace_id = azurerm_log_analytics_workspace.aks.id
   }
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }

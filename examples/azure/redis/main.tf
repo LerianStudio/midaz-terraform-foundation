@@ -3,32 +3,27 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "redis" {
-  name     = "rg-redis-example"
-  location = "eastus2"
+  name     = var.resource_group_name
+  location = var.location
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }
 
 resource "azurerm_redis_cache" "example" {
-  name                = "redis-cache-example"
+  name                = var.redis_name
   location            = azurerm_resource_group.redis.location
   resource_group_name = azurerm_resource_group.redis.name
-  capacity            = 1
-  family              = "C"
-  sku_name            = "Basic"
+  capacity            = var.capacity
+  family              = var.family
+  sku_name            = var.sku
+  enable_non_ssl_port = var.enable_non_ssl_port
   minimum_tls_version = "1.2"
 
   redis_configuration {
-    maxmemory_reserved = 50
-    maxmemory_delta    = 50
-    maxmemory_policy   = "allkeys-lru"
+    maxmemory_reserved = var.maxmemory_reserved
+    maxmemory_delta    = var.maxmemory_delta
+    maxmemory_policy   = var.maxmemory_policy
   }
 
-  tags = {
-    Environment = "Example"
-    Terraform   = "true"
-  }
+  tags = var.tags
 }

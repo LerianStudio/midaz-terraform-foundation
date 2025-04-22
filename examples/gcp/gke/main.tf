@@ -23,12 +23,7 @@ module "gke" {
   master_ipv4_cidr_block  = var.master_ipv4_cidr_block
 
   // Master authorized networks
-  master_authorized_networks = [
-    {
-      cidr_block   = "10.0.0.0/8"
-      display_name = "internal-vpc"
-    }
-  ]
+  master_authorized_networks = var.master_authorized_networks
 
   // Security configurations
   enable_pod_security_policy = true
