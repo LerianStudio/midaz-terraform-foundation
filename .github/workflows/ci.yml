@@ -133,7 +133,7 @@ jobs:
   release:
     needs: validate  # Only run after validation succeeds
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'  # Only on main branch pushes
+    if: github.event_name == 'push'
     steps:
     # Create GitHub App token for better rate limits
     - uses: actions/create-github-app-token@v1
