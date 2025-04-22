@@ -18,7 +18,3 @@ output "current_location_id" {
   value       = module.memorystore.current_location_id
 }
 
-output "env_vars" {
-  description = "Environment variables for Redis connection"
-  value       = module.memorystore.env_vars
-}
