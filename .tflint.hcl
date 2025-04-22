@@ -16,8 +16,7 @@ plugin "google" {
 }
 
 config {
-  module = true
-  force = false
+  force                = false
   disabled_by_default = false
 }
 
@@ -31,6 +30,6 @@ rule "terraform_required_version" {
 
 # Ignore false positives for modules that properly declare provider versions
 rule "terraform_required_providers" {
-  enabled = false
-  module = true
+  enabled          = false
+  call_module_type = "all"
 }
