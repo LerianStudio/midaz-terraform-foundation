@@ -106,7 +106,7 @@ jobs:
         # Loop through each directory and run tflint using root config
         for dir in $dirs; do
           echo "Linting $dir"
-          tflint --chdir="$dir" --config=.tflint.hcl
+          tflint --chdir="$dir" --config="${{ github.workspace }}/.tflint.hcl"
         done
 
     # Security scan Terraform code
