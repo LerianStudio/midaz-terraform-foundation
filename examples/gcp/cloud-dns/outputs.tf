@@ -3,12 +3,12 @@ output "dns_zone_name" {
   value       = module.dns-private-zone.name
 }
 
-output "dns_zone_id" {
-  description = "The ID of the DNS zone"
-  value       = module.dns-private-zone.id
+output "dns_zone_domain" {
+  description = "The domain name of the DNS zone"
+  value       = module.dns-private-zone.domain
 }
 
-output "domain_name" {
-  description = "The domain name of the DNS zone"
-  value       = var.dns_domain
+output "name_servers" {
+  description = "The DNS zone name servers"
+  value       = module.dns-private-zone.name_servers
 }

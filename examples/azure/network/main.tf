@@ -1,3 +1,16 @@
+locals {
+  all_subnet_prefixes = concat(
+    var.public_subnet_prefixes,
+    var.private_aks_subnet_prefixes,
+    var.private_db_subnet_prefixes
+  )
+  all_subnet_names = concat(
+    [for i in range(length(var.public_subnet_prefixes)) : "public-subnet-${i + 1}"],
+    [for i in range(length(var.private_aks_subnet_prefixes)) : "private-aks-subnet-${i + 1}"],
+    [for i in range(length(var.private_db_subnet_prefixes)) : "private-db-subnet-${i + 1}"]
+  )
+}
+
 module "vnet" {
   source       = "Azure/network/azurerm"
   version      = "~> 5.0"
@@ -5,27 +18,13 @@ module "vnet" {
 
   resource_group_name = var.resource_group_name
   vnet_name           = var.vnet_name
-  address_space       = var.address_space[*]
-  subnet_prefixes = concat(
-    var.public_subnet_prefixes,
-    var.private_aks_subnet_prefixes,
-    var.private_db_subnet_prefixes
-  )
-  subnet_names = concat(
-    [for i in range(length(var.public_subnet_prefixes)) : "public-subnet-${i + 1}"],
-    [for i in range(length(var.private_aks_subnet_prefixes)) : "private-aks-subnet-${i + 1}"],
-    [for i in range(length(var.private_db_subnet_prefixes)) : "private-db-subnet-${i + 1}"]
-  )
+  address_space       = var.address_space
+  address_spaces      = var.address_spaces
+  subnet_prefixes     = local.all_subnet_prefixes
+  subnet_names        = local.all_subnet_names
 
   subnet_service_endpoints = {
-    for name, prefix in zip(
-      subnet_names,
-      concat(
-        var.public_subnet_prefixes,
-        var.private_aks_subnet_prefixes,
-        var.private_db_subnet_prefixes
-      )
-    ) : name => ["Microsoft.Sql", "Microsoft.Storage"]
+    for name in local.all_subnet_names : name => ["Microsoft.Sql", "Microsoft.Storage"]
   }
 
   tags = {
@@ -71,7 +70,7 @@ resource "azurerm_network_security_group" "private" {
     protocol                   = "*"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefixes    = var.address_space
+    source_address_prefix      = var.address_space
     destination_address_prefix = "*"
   }
 

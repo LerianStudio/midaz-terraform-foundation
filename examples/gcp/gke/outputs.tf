@@ -17,12 +17,12 @@ output "cluster_ca_certificate" {
 
 output "service_account" {
   description = "The service account used for the cluster"
-  value       = var.service_account
+  value       = module.gke.service_account
 }
 
-output "network_tags" {
-  description = "Network tags for the GKE nodes"
-  value       = module.gke.node_pools_tags
+output "node_pools_names" {
+  description = "List of node pool names"
+  value       = module.gke.node_pools_names
 }
 
 output "cluster_location" {

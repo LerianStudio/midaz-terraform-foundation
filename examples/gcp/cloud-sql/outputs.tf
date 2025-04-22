@@ -15,6 +15,6 @@ output "connection_name" {
 
 output "server_ca_cert" {
   description = "The CA certificate information used to connect to the SQL instance via SSL"
-  value       = module.postgresql.server_ca_cert
+  value       = module.postgresql.instance_server_ca_cert
   sensitive   = true
 }
