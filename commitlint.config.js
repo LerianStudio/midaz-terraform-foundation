@@ -32,5 +32,6 @@ module.exports = {
         'test',
       ],
     ],
+    'scope-enum': [2, 'always', ['release']],
   },
 };
