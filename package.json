@@ -1,0 +1,25 @@
+{
+  "name": "terraform-midaz-foundation",
+  "version": "0.0.0-development",
+  "private": true,
+  "description": "Terraform templates for deploying Midaz infrastructure",
+  "scripts": {
+    "commit": "git-cz",
+    "semantic-release": "semantic-release"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^17.8.1",
+    "@commitlint/config-conventional": "^17.8.1",
+    "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/git": "^10.0.0",
+    "commitizen": "^4.2.4",
+    "conventional-changelog-conventionalcommits": "^5.0.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "semantic-release": "^21.0.1"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}
