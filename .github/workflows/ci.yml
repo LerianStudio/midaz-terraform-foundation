@@ -99,11 +99,32 @@ jobs:
         GITHUB_TOKEN: ${{ github.token }}
 
     - name: Run TFLint
-      run: tflint -f compact
+      run: |
+        find . -type f -name "*.tf" -exec dirname {} \; | sort -u | while read dir; do
+          echo "Linting $dir"
+          (cd "$dir" && tflint)
+        done
 
     # Security scan Terraform code
     - name: Run tfsec
       uses: aquasecurity/tfsec-action@v1.0.0
+
+    # Preview next semantic-release version
+    - name: Preview Next Release
+      uses: cycjimmy/semantic-release-action@v4
+      with:
+        ci: false
+        dry_run: true
+        semantic_version: 23.0.8
+        extra_plugins: |
+          conventional-changelog-conventionalcommits@v7.0.2
+          @saithodev/semantic-release-backmerge
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GIT_AUTHOR_NAME: ${{ secrets.LERIAN_CI_CD_USER_NAME }}
+        GIT_AUTHOR_EMAIL: ${{ secrets.LERIAN_CI_CD_USER_EMAIL }}
+        GIT_COMMITTER_NAME: ${{ secrets.LERIAN_CI_CD_USER_NAME }}
+        GIT_COMMITTER_EMAIL: ${{ secrets.LERIAN_CI_CD_USER_EMAIL }}
 
   release:
     needs: validate  # Only run after validation succeeds
