@@ -100,8 +100,8 @@ jobs:
 
     - name: Run TFLint
       run: |
-        # Find all .tf files recursively and get their unique directories
-        dirs=$(find . -type f -name "*.tf" -exec dirname {} \; | sort -u)
+        # Find all .tf files recursively, excluding .terraform directories, and get unique directories
+        dirs=$(find . -type f -name "*.tf" -not -path "*/.terraform/*" -exec dirname {} \; | sort -u)
 
         # Loop through each directory and run tflint using root config
         for dir in $dirs; do
