@@ -48,7 +48,13 @@ jobs:
 
     # Install TFLint for Terraform linting
     - name: Setup TFLint
-      uses: terraform-linters/setup-tflint@v3
+      uses: terraform-linters/setup-tflint@v4
+
+    - name: Cache plugin dir
+      uses: actions/cache@v4
+      with:
+        path: ~/.tflint.d/plugins
+        key: ${{ matrix.os }}-tflint-${{ hashFiles('.tflint.hcl') }}
 
     # Ensure commits follow conventional commits specification
     - name: Verify Conventional Commits
@@ -87,13 +93,13 @@ jobs:
         cd ../aks && terraform validate
 
     # Run TFLint on all Terraform files
+    - name: Init TFLint
+      run: tflint --init
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
     - name: Run TFLint
-      run: |
-        tflint --init
-        find . -type f -name "*.tf" -exec dirname {} \; | sort -u | while read dir; do
-          echo "Linting $dir"
-          (cd "$dir" && tflint)
-        done
+      run: tflint -f compact
 
     # Security scan Terraform code
     - name: Run tfsec
