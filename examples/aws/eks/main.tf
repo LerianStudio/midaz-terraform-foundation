@@ -113,13 +113,4 @@ data "aws_vpc" "selected" {
   id = var.vpc_id
 }
 
-# Get AWS managed prefix lists for ECR
-data "aws_ec2_managed_prefix_list" "ecr_api" {
-  name = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
-}
-
-data "aws_ec2_managed_prefix_list" "ecr_dkr" {
-  name = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
-}
-
 data "aws_region" "current" {}
