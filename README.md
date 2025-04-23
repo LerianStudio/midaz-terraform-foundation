@@ -133,21 +133,6 @@ The script includes error handling that will:
 - Exit if any Terraform command fails
 - Provide clear error messages with the component and step that failed
 
-## How to Contribute
-
-**IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.
-
-### Required Dependencies
-
-Before starting development, ensure you have the following tools installed:
-- `terraform` >= 1.0.0 - Infrastructure as Code tool
-- `nodejs` and `npm` - Required for git hooks
-- `tfsec` - Security scanner for Terraform code
-- Cloud provider CLI tools for testing:
-  - `aws` for AWS resources
-  - `az` for Azure resources
-  - `gcloud` for GCP resources
-
 ## Installing Midaz
 
 After deploying the foundation infrastructure, you can install Midaz using Helm. The Helm charts are available in the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
@@ -215,6 +200,8 @@ For detailed configuration options and advanced setup, please refer to the [Mida
 - Follow the principle of least privilege for service accounts
 
 ## Contributing
+
+**IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.
 
 Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
