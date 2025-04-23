@@ -10,12 +10,6 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "vpc_id" {
   description = "VPC ID where ElastiCache cluster will be created"
   type        = string
