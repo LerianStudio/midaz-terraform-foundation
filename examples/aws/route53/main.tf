@@ -1,7 +1,6 @@
 locals {
   environment = lower(var.environment)
   name        = var.name
-  region      = var.region
   tags = merge({
     Name        = "route53-${local.name}-${local.environment}"
     Environment = local.environment

@@ -10,12 +10,6 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "private_domain_name" {
   description = "Domain name for the private hosted zone"
   type        = string

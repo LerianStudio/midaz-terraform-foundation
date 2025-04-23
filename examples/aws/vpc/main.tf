@@ -13,7 +13,8 @@ locals {
 }
 
 module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
 
   name = local.name
   cidr = local.vpc_cidr
@@ -46,8 +47,9 @@ module "vpc" {
 
 
 module "vpc_endpoints" {
-  count  = local.vpc_endpoint_enabled ? 1 : 0
-  source = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+  count   = local.vpc_endpoint_enabled ? 1 : 0
+  source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+  version = "~> 5.0"
 
   vpc_id                     = module.vpc.vpc_id
   create_security_group      = true
