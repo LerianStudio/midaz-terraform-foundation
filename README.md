@@ -175,7 +175,18 @@ After deploying the foundation infrastructure, you can install Midaz using Helm.
 
 For detailed configuration options and advanced setup, please refer to the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
 
-### Development Workflow
+## Security Considerations
+
+- All Kubernetes clusters (EKS, GKE, AKS) are public by default with IP whitelisting, but we strongly recommend:
+  - Using private clusters
+  - Accessing Kubernetes API via VPN
+  - Implementing proper RBAC
+- All sensitive data should be stored in cloud provider secret management services
+- Follow the principle of least privilege for service accounts
+
+## Contributing
+
+**IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.
 
 1. First, install git hooks (required):
    ```bash
@@ -189,19 +200,6 @@ For detailed configuration options and advanced setup, please refer to the [Mida
 3. Make changes and commit following [conventional commits](https://www.conventionalcommits.org/)
 4. Create a PR to the `develop` branch
 5. After testing, changes will be merged to `main`
-
-## Security Considerations
-
-- All Kubernetes clusters (EKS, GKE, AKS) are public by default with IP whitelisting, but we strongly recommend:
-  - Using private clusters
-  - Accessing Kubernetes API via VPN
-  - Implementing proper RBAC
-- All sensitive data should be stored in cloud provider secret management services
-- Follow the principle of least privilege for service accounts
-
-## Contributing
-
-**IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.
 
 Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
