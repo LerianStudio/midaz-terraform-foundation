@@ -1,7 +1,6 @@
 locals {
   environment = lower(var.environment)
   name        = var.name
-  region      = var.region
   tags = merge({
     Name        = "elasticache-${local.name}-${local.environment}"
     Environment = local.environment
