@@ -148,6 +148,48 @@ Before starting development, ensure you have the following tools installed:
   - `az` for Azure resources
   - `gcloud` for GCP resources
 
+## Installing Midaz
+
+After deploying the foundation infrastructure, you can install Midaz using Helm. The Helm charts are available in the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
+
+### Prerequisites
+
+- Kubernetes cluster (EKS, GKE, or AKS) up and running
+- `kubectl` configured to access your cluster
+- Helm v3.x installed
+- Access to Midaz Helm repository
+
+### Installation Steps
+
+1. Add the Midaz Helm repository:
+   ```bash
+   helm repo add midaz https://lerianstudio.github.io/helm
+   helm repo update
+   ```
+
+2. Create a values file (`values.yaml`) with your configuration:
+   ```yaml
+   # Example values.yaml
+   database:
+     host: "db.midaz.internal"  # Route53 DNS record created by RDS module
+     port: 5432
+     name: "midaz"
+     username: "midaz"
+     # Use a secret for the password
+
+   redis:
+     host: "redis.midaz.internal"  # Route53 DNS record created by ElastiCache module
+     port: 6379
+     # Use a secret for the password
+   ```
+
+3. Install Midaz:
+   ```bash
+   helm install midaz midaz/midaz -f values.yaml
+   ```
+
+For detailed configuration options and advanced setup, please refer to the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
+
 ### Development Workflow
 
 1. First, install git hooks (required):
