@@ -7,7 +7,7 @@ variable "address_space" {
 variable "address_spaces" {
   description = "Additional address spaces for the virtual network"
   type        = list(string)
-  default     = []
+  default     = ["10.0.0.0/16"]
 }
 
 variable "resource_group_name" {
