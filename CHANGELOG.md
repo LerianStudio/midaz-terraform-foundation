@@ -1,3 +1,10 @@
+# [1.1.0-develop.2](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.1.0-develop.1...v1.1.0-develop.2) (2025-04-24)
+
+
+### Bug Fixes
+
+* change body-max-line-length to 600 characters ([973e483](https://github.com/LerianStudio/terraform-midaz-foundation/commit/973e483e4b9f977cdc93ab224d78c2dde82bc47e))
+
 # [1.1.0-develop.1](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.0.0...v1.1.0-develop.1) (2025-04-24)
 
 
