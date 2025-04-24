@@ -1,3 +1,10 @@
+# [1.1.0-develop.1](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.0.0...v1.1.0-develop.1) (2025-04-24)
+
+
+### Features
+
+* aws infrastructure and documentation updates ([92d1a93](https://github.com/LerianStudio/terraform-midaz-foundation/commit/92d1a931c40dbd0a53ea1d87ccaf3ba57d618200))
+
 # 1.0.0 (2025-04-22)
 
 
