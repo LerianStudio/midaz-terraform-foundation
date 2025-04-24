@@ -133,22 +133,60 @@ The script includes error handling that will:
 - Exit if any Terraform command fails
 - Provide clear error messages with the component and step that failed
 
-## How to Contribute
+## Installing Midaz
+
+After deploying the foundation infrastructure, you can install Midaz using Helm. The Helm charts are available in the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
+
+### Prerequisites
+
+- Kubernetes cluster (EKS, GKE, or AKS) up and running
+- `kubectl` configured to access your cluster
+- Helm v3.x installed
+- Access to Midaz Helm repository
+
+### Installation Steps
+
+1. Add the Midaz Helm repository:
+   ```bash
+   helm repo add midaz https://lerianstudio.github.io/helm
+   helm repo update
+   ```
+
+2. Create a values file (`values.yaml`) with your configuration:
+   ```yaml
+   # Example values.yaml
+   database:
+     host: "db.midaz.internal"  # Route53 DNS record created by RDS module
+     port: 5432
+     name: "midaz"
+     username: "midaz"
+     # Use a secret for the password
+
+   redis:
+     host: "redis.midaz.internal"  # Route53 DNS record created by ElastiCache module
+     port: 6379
+     # Use a secret for the password
+   ```
+
+3. Install Midaz:
+   ```bash
+   helm install midaz midaz/midaz -f values.yaml
+   ```
+
+For detailed configuration options and advanced setup, please refer to the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
+
+## Security Considerations
+
+- All Kubernetes clusters (EKS, GKE, AKS) are public by default with IP whitelisting, but we strongly recommend:
+  - Using private clusters
+  - Accessing Kubernetes API via VPN
+  - Implementing proper RBAC
+- All sensitive data should be stored in cloud provider secret management services
+- Follow the principle of least privilege for service accounts
+
+## Contributing
 
 **IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.
-
-### Required Dependencies
-
-Before starting development, ensure you have the following tools installed:
-- `terraform` >= 1.0.0 - Infrastructure as Code tool
-- `nodejs` and `npm` - Required for git hooks
-- `tfsec` - Security scanner for Terraform code
-- Cloud provider CLI tools for testing:
-  - `aws` for AWS resources
-  - `az` for Azure resources
-  - `gcloud` for GCP resources
-
-### Development Workflow
 
 1. First, install git hooks (required):
    ```bash
@@ -162,17 +200,6 @@ Before starting development, ensure you have the following tools installed:
 3. Make changes and commit following [conventional commits](https://www.conventionalcommits.org/)
 4. Create a PR to the `develop` branch
 5. After testing, changes will be merged to `main`
-
-## Security Considerations
-
-- All Kubernetes clusters (EKS, GKE, AKS) are public by default with IP whitelisting, but we strongly recommend:
-  - Using private clusters
-  - Accessing Kubernetes API via VPN
-  - Implementing proper RBAC
-- All sensitive data should be stored in cloud provider secret management services
-- Follow the principle of least privilege for service accounts
-
-## Contributing
 
 Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
