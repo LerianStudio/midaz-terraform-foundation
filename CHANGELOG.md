@@ -1,3 +1,19 @@
+# [1.0.0-develop.2](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.0.0-develop.1...v1.0.0-develop.2) (2025-04-24)
+
+
+### Bug Fixes
+
+* remove data region that is not used in aws/eks terraform files ([30ab12c](https://github.com/LerianStudio/terraform-midaz-foundation/commit/30ab12cf97a4fdf2429f8cf6ac936fc897226ab9))
+* remove data sources not used in aws/eks terraform files ([7bfaf1f](https://github.com/LerianStudio/terraform-midaz-foundation/commit/7bfaf1ffcc8c14084122c5f9c58b48826ca29eb4))
+* remove var.region that is not used in aws components ([52a0edc](https://github.com/LerianStudio/terraform-midaz-foundation/commit/52a0edcb3d6439caa2524bd86f1d25e35bb5defd))
+* remove var.region that is not used in aws/elasticache terraform files ([7cfb2e1](https://github.com/LerianStudio/terraform-midaz-foundation/commit/7cfb2e156c6b3854dbf26cb473520f3f1afe02da))
+* remove var.region that is not used in aws/elasticache terraform files ([387a39e](https://github.com/LerianStudio/terraform-midaz-foundation/commit/387a39ee5a4b75b6af05d5cc5fe91da080124959))
+
+
+### Features
+
+* aws infrastructure and documentation updates ([220013e](https://github.com/LerianStudio/terraform-midaz-foundation/commit/220013e96bf868195e7461915dfc78cd8b97584b))
+
 # 1.0.0-develop.1 (2025-04-22)
 
 
