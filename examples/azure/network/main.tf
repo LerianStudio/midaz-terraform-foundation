@@ -18,8 +18,8 @@ module "vnet" {
 
   resource_group_name = var.resource_group_name
   vnet_name           = var.vnet_name
-  address_space       = var.address_space
-  address_spaces      = var.address_spaces
+  address_space       = var.address_space[*]
+  address_spaces      = var.address_spaces[*]
   subnet_prefixes     = local.all_subnet_prefixes
   subnet_names        = local.all_subnet_names
 

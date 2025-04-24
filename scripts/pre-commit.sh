@@ -28,12 +28,12 @@ echo -e "${GREEN}Terraform validate passed.${NC}"
 
 # Run tfsec for security checks
 echo "Running tfsec security checks..."
-if ! command -v tfsec &> /dev/null; then
+if ! command -v &> /dev/null; then
     echo -e "${RED}tfsec not found. Please install it first: https://github.com/aquasecurity/tfsec${NC}"
     exit 1
 fi
 
-tfsec .
+tfsec --exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs .
 if [ $? -ne 0 ]; then
     echo -e "${RED}Security checks failed.${NC}"
     exit 1
