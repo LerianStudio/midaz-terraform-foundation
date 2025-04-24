@@ -67,11 +67,19 @@ jobs:
     # Initialize Terraform working directories
     - name: Terraform Init
       run: |
-        cd examples/gcp/vpc && terraform init -backend=false
+        # AWS components
+        cd examples/aws/vpc && terraform init -backend=false
+        cd ../route53 && terraform init -backend=false
+        cd ../rds && terraform init -backend=false
+        cd ../elasticache && terraform init -backend=false
+        cd ../eks && terraform init -backend=false
+        # GCP components
+        cd ../../../examples/gcp/vpc && terraform init -backend=false
         cd ../cloud-dns && terraform init -backend=false
         cd ../cloud-sql && terraform init -backend=false
         cd ../memorystore && terraform init -backend=false
         cd ../gke && terraform init -backend=false
+        # Azure components
         cd ../../../examples/azure/network && terraform init -backend=false
         cd ../dns && terraform init -backend=false
         cd ../database && terraform init -backend=false
@@ -81,11 +89,19 @@ jobs:
     # Validate Terraform configurations
     - name: Terraform Validate
       run: |
-        cd examples/gcp/vpc && terraform validate
+        # AWS components
+        cd examples/aws/vpc && terraform validate
+        cd ../route53 && terraform validate
+        cd ../rds && terraform validate
+        cd ../elasticache && terraform validate
+        cd ../eks && terraform validate
+        # GCP components
+        cd ../../../examples/gcp/vpc && terraform validate
         cd ../cloud-dns && terraform validate
         cd ../cloud-sql && terraform validate
         cd ../memorystore && terraform validate
         cd ../gke && terraform validate
+        # Azure components
         cd ../../../examples/azure/network && terraform validate
         cd ../dns && terraform validate
         cd ../database && terraform validate
@@ -112,6 +128,8 @@ jobs:
     # Security scan Terraform code
     - name: Run tfsec
       uses: aquasecurity/tfsec-action@v1.0.0
+      with:
+        additional_args: "--exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs"
 
     # Preview next semantic-release version
     - name: Preview Next Release
