@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.0.0...v1.1.0) (2025-04-24)
+
+
+### Bug Fixes
+
+* change body-max-line-length to 600 characters ([973e483](https://github.com/LerianStudio/terraform-midaz-foundation/commit/973e483e4b9f977cdc93ab224d78c2dde82bc47e))
+
+
+### Features
+
+* aws infrastructure and documentation updates ([92d1a93](https://github.com/LerianStudio/terraform-midaz-foundation/commit/92d1a931c40dbd0a53ea1d87ccaf3ba57d618200))
+
 # [1.1.0-develop.2](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.1.0-develop.1...v1.1.0-develop.2) (2025-04-24)
 
 
