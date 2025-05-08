@@ -18,8 +18,8 @@ module "vnet" {
 
   resource_group_name = var.resource_group_name
   vnet_name           = var.vnet_name
-  address_space       = var.address_space[*]
-  address_spaces      = var.address_spaces[*]
+  address_space       = var.address_space  # Corrigi aqui
+  address_spaces      = var.address_spaces  # Corrigi aqui
   subnet_prefixes     = local.all_subnet_prefixes
   subnet_names        = local.all_subnet_names
 
@@ -47,7 +47,7 @@ resource "azurerm_network_security_group" "public" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "443"
-    source_address_prefixes    = var.allowed_ip_ranges[*]
+    source_address_prefixes    = var.allowed_ip_ranges
     destination_address_prefix = "*"
   }
 
@@ -70,7 +70,7 @@ resource "azurerm_network_security_group" "private" {
     protocol                   = "*"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefix      = var.address_space
+    source_address_prefix      = var.address_space  # Corrigi aqui
     destination_address_prefix = "*"
   }
 

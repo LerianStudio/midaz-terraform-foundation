@@ -32,7 +32,7 @@ variable "administrator_password" {
   description = "SQL Server administrator password"
   type        = string
   sensitive   = true
-  default     = "<PUT-YOUR-PASSWORD-HERE>" # Change this in production
+  default     = "L3rian@2024!" # Change this in production
 }
 
 variable "database_sku" {

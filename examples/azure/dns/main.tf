@@ -85,8 +85,9 @@ resource "azurerm_private_dns_txt_record" "records" {
   resource_group_name = var.resource_group_name
   ttl                 = each.value.ttl
 
+  # Correção aqui: Usei join para concatenar a lista de strings em uma única string
   record {
-    value = each.value.records
+    value = join(" ", each.value.records)  # Juntando as strings da lista com um espaço
   }
 
   tags = {

@@ -13,11 +13,13 @@ variable "address_spaces" {
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
+  default     = "lerian-terraform-rg"
 }
 
 variable "location" {
   description = "Azure region"
   type        = string
+  default     = "East US"  # Definido como 'East US' por padrão
 }
 
 variable "vnet_name" {
