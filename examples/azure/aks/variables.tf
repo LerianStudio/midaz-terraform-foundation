@@ -7,19 +7,19 @@ variable "location" {
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
-  default     = "rg-aks-example"
+  default     = "rg-aks-lerian"
 }
 
 variable "cluster_name" {
   description = "Name of the AKS cluster"
   type        = string
-  default     = "aks-cluster-example"
+  default     = "aks-cluster-lerian"
 }
 
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use"
   type        = string
-  default     = "1.26.0"
+  default     = "1.30.0"
 }
 
 variable "api_server_access_cidrs" {
