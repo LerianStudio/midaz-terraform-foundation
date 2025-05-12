@@ -32,7 +32,7 @@ variable "administrator_password" {
   description = "SQL Server administrator password"
   type        = string
   sensitive   = true
-   default     = "L3rian@2024!" # Change for your password
+  default     = "L3rian@2024!" # Change for your password
 }
 
 variable "database_sku" {

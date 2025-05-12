@@ -1,6 +1,6 @@
 provider "azurerm" {
   features {}
-  subscription_id = "d4c48709-7f36-448a-a558-4a0f5229a119"  # Change for your subscription_id
+  subscription_id = "d4c48709-7f36-448a-a558-4a0f5229a119" # Change for your subscription_id
 }
 
 resource "azurerm_resource_group" "tf_backend_rg" {

@@ -37,7 +37,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   private_cluster_public_fqdn_enabled = false
   private_dns_zone_id                 = "System"
 
-  
+
   default_node_pool {
     name       = "default"
     node_count = var.node_count
