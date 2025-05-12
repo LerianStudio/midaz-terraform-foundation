@@ -27,7 +27,6 @@ variable "administrator_login" {
   type        = string
   default     = "sqladmin" # Change for your admin login
 }
-}
 
 variable "administrator_password" {
   description = "SQL Server administrator password"
