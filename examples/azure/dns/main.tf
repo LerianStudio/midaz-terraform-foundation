@@ -85,8 +85,10 @@ resource "azurerm_private_dns_txt_record" "records" {
   resource_group_name = var.resource_group_name
   ttl                 = each.value.ttl
 
+  # Azure expects each TXT record value to be a single string.
+  # To ensure compatibility, we join the list into one string with spaces in between.
   record {
-    value = each.value.records
+    value = join(" ", each.value.records)
   }
 
   tags = {

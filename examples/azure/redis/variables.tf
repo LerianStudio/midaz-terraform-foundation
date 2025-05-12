@@ -7,13 +7,13 @@ variable "location" {
 variable "resource_group_name" {
   description = "Name of the resource group"
   type        = string
-  default     = "rg-redis-example"
+  default     = "rg-redis-lerian" # Change for your resource group name desired
 }
 
 variable "redis_name" {
   description = "Name of the Redis Cache instance"
   type        = string
-  default     = "redis-cache-example"
+  default     = "redis-cache-lerian" # Change for your Redis Cache name desired
 }
 
 variable "capacity" {

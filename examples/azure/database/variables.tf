@@ -19,20 +19,21 @@ variable "server_name" {
 variable "database_name" {
   description = "Name of the SQL Database"
   type        = string
-  default     = "example-db"
+  default     = "lerian-db" # Change for your database name
 }
 
 variable "administrator_login" {
   description = "SQL Server administrator login"
   type        = string
-  default     = "sqladmin"
+  default     = "sqladmin" # Change for your admin login
+}
 }
 
 variable "administrator_password" {
   description = "SQL Server administrator password"
   type        = string
   sensitive   = true
-  default     = "<PUT-YOUR-PASSWORD-HERE>" # Change this in production
+   default     = "L3rian@2024!" # Change for your password
 }
 
 variable "database_sku" {

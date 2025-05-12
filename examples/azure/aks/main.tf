@@ -37,10 +37,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
   private_cluster_public_fqdn_enabled = false
   private_dns_zone_id                 = "System"
 
-  api_server_access_profile {
-    authorized_ip_ranges = var.api_server_access_cidrs
-  }
-
+  
   default_node_pool {
     name       = "default"
     node_count = var.node_count
