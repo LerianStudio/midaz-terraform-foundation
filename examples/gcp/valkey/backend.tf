@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
     bucket = "<YOUR-TERRAFORM-STATE-BUCKET>"
-    prefix = "gcp/cloud-sql"
+    prefix = "gcp/valkey"
   }
 }

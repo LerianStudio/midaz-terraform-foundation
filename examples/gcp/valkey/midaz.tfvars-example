@@ -1,0 +1,38 @@
+# Project and instance configuration
+project_id    = "<PUT-YOUR-PROJECT-ID>"
+instance_name = "midaz-valkey"
+region        = "us-east1"
+
+# Memory and replication settings
+memory_size_gb = 5
+replica_count  = 0
+
+# Network configuration
+vpc_self_link = "midaz-network"
+subnet_name   = "midaz-network-subnet"
+
+# Security configuration
+auth_enabled                = true
+connect_mode                = "PRIVATE_SERVICE_ACCESS"
+authorization_mode          = "IAM_AUTH"
+deletion_protection_enabled = false
+
+# Valkey specific configuration
+shard_count    = 3
+node_type      = "HIGHMEM_MEDIUM"
+engine_version = "VALKEY_8_0"
+
+
+maxmemory_policy = "allkeys-lru"
+replication_mode = "true"
+
+# Persistence configuration
+snapshot_period_seconds = 43200
+
+# Maintenance window
+maintenance_policy_day    = "SUNDAY"
+maintenance_policy_hour   = 23
+maintenance_policy_minute = 0
+
+# Environment
+environment = "devops"

@@ -1,0 +1,40 @@
+# Existing values
+project_id        = "<PUT-YOUR-PROJECT-ID>"
+instance_name     = "midaz-postgresql"
+region            = "us-east1"
+zone              = "us-east1-b"
+instance_tier     = "db-custom-2-8192" # 2 vCPUs, 8GB RAM
+disk_size         = 50                 # GB
+high_availability = false              # Set to true for production
+backup_location   = "us-east1"
+vpc_self_link     = "projects/<PUT-YOUR-PROJECT-ID>/global/networks/midaz-network"
+
+# Database configuration
+db_version   = "POSTGRES_17"
+db_charset   = "UTF8"
+db_collation = "en_US.UTF8"
+
+# Disk configuration
+disk_type             = "PD_SSD"
+disk_autoresize       = true
+disk_autoresize_limit = 0
+
+# Backup configuration
+backup_start_time     = "23:00"
+backup_retention_unit = "COUNT"
+
+# Database flags
+max_connections    = "100"
+log_checkpoints    = "on"
+log_connections    = "on"
+log_disconnections = "on"
+log_lock_waits     = "on"
+log_temp_files     = "0"
+
+# Maintenance window
+maintenance_window_day          = 7  # Sunday
+maintenance_window_hour         = 23 # 11 PM
+maintenance_window_update_track = "stable"
+
+# Protection
+deletion_protection = false # Recommended for production
