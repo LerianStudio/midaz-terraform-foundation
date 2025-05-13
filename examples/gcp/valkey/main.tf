@@ -5,7 +5,8 @@ data "google_dns_managed_zone" "private_zone" {
 }
 
 module "memorystore_valkey" {
-  source = "terraform-google-modules/memorystore/google//modules/valkey"
+  source  = "terraform-google-modules/memorystore/google//modules/valkey"
+  version = "~> 14.0"
 
   project_id  = var.project_id
   instance_id = var.instance_name
