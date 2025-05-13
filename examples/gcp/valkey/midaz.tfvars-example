@@ -18,7 +18,6 @@ deletion_protection_enabled = false
 shard_count    = 3
 node_type      = "HIGHMEM_MEDIUM"
 engine_version = "VALKEY_8_0"
-replication_mode = "true"
 
 # Persistence configuration
 snapshot_period_seconds = 43200

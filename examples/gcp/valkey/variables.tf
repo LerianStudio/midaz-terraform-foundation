@@ -14,12 +14,6 @@ variable "region" {
   type        = string
 }
 
-variable "replication_mode" {
-  description = "Enable or disable replication mode"
-  type        = string
-  default     = "true"
-}
-
 variable "vpc_self_link" {
   description = "The self link of the VPC network"
   type        = string
