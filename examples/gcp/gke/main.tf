@@ -1,6 +1,6 @@
 module "gke" {
   source  = "terraform-google-modules/kubernetes-engine/google//modules/beta-private-cluster"
-  version = "~> 25.0"
+  version = "~> 36.0"
 
   project_id = var.project_id
   name       = var.cluster_name
@@ -14,8 +14,8 @@ module "gke" {
   zones             = var.zones
   network           = var.network_name
   subnetwork        = var.subnet_name
-  ip_range_pods     = "pods"
-  ip_range_services = "services"
+  ip_range_pods     = var.ip_range_pods
+  ip_range_services = var.ip_range_services
 
   // Private cluster configuration
   enable_private_endpoint = var.enable_private_endpoint
@@ -25,11 +25,15 @@ module "gke" {
   // Master authorized networks
   master_authorized_networks = var.master_authorized_networks
 
-  // Security configurations
-  enable_pod_security_policy = true
-
   // Network policy
-  network_policy = true
+  network_policy = var.network_policy_enabled
+
+  // Pod Security Configuration
+  enable_pod_security_policy = var.pod_security_policy_enabled
+
+  // Enable Pod Security Standards
+  datapath_provider = var.datapath_provider
+  release_channel   = var.release_channel # Required for Pod Security Standards
 
   // Node pools
   node_pools = [
@@ -39,12 +43,11 @@ module "gke" {
       min_count          = var.min_node_count
       max_count          = var.max_node_count
       disk_size_gb       = var.disk_size_gb
-      disk_type          = "pd-ssd"
-      image_type         = "COS_CONTAINERD"
-      auto_repair        = true
-      auto_upgrade       = true
-      service_account    = var.service_account
-      preemptible        = false
+      disk_type          = var.node_disk_type
+      image_type         = var.node_image_type
+      auto_repair        = var.node_auto_repair
+      auto_upgrade       = var.node_auto_upgrade
+      preemptible        = var.node_preemptible
       initial_node_count = var.initial_node_count
     }
   ]
@@ -68,9 +71,5 @@ module "gke" {
     all = {
       disable-legacy-endpoints = "true"
     }
-  }
-
-  node_pools_tags = {
-    all = ["gke-${var.cluster_name}"]
   }
 }

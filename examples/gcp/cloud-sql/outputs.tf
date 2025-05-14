@@ -13,8 +13,12 @@ output "connection_name" {
   value       = module.postgresql.instance_connection_name
 }
 
-output "server_ca_cert" {
-  description = "The CA certificate information used to connect to the SQL instance via SSL"
-  value       = module.postgresql.instance_server_ca_cert
-  sensitive   = true
+output "dns_record" {
+  description = "The DNS record for PostgreSQL instance"
+  value       = google_dns_record_set.database.name
+}
+
+output "replica_dns_record" {
+  description = "The DNS record for PostgreSQL read replica instance"
+  value       = var.high_availability ? google_dns_record_set.database_replica[0].name : null
 }
