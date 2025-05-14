@@ -1,5 +1,5 @@
 {
-  "name": "terraform-midaz-foundation",
+  "name": "midaz-terraform-foundation",
   "version": "0.0.0-development",
   "private": true,
   "description": "Terraform templates for deploying Midaz infrastructure",
