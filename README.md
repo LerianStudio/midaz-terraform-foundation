@@ -1,4 +1,4 @@
-# Terraform Midaz Foundation
+# Midaz Terraform Foundation
 
 This repository provides Terraform examples for clients and open-source users to deploy foundation infrastructure on major cloud providers (AWS, GCP, and Azure). Each resource includes comprehensive Terraform documentation and state files. The templates follow cloud provider best practices and use official Terraform modules whenever available.
 
@@ -211,5 +211,5 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 For support, please:
 1. Check the component-specific README
-2. Search existing [issues](https://github.com/LerianStudio/terraform-midaz-foundation/issues)
+2. Search existing [issues](https://github.com/LerianStudio/midaz-terraform-foundation/issues)
 3. Create a new issue if needed

@@ -1,6 +1,6 @@
-# Contributing to terraform-midaz-foundation
+# Contributing to midaz-terraform-foundation
 
-Thank you for your interest in contributing to terraform-midaz-foundation! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to midaz-terraform-foundation! This document provides guidelines and instructions for contributing.
 
 ## Development Workflow
 
