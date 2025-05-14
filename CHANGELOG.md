@@ -1,3 +1,16 @@
+# [1.2.0-develop.1](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.1.0...v1.2.0-develop.1) (2025-05-14)
+
+
+### Bug Fixes
+
+* remove not used variables for gcp/valkey ([0a5b0e6](https://github.com/LerianStudio/terraform-midaz-foundation/commit/0a5b0e64fd4142db45853ea1cb74c21b7ed11a3e))
+* remove not used variables for gcp/valkey ([05dd322](https://github.com/LerianStudio/terraform-midaz-foundation/commit/05dd3220ff3565c0d35e00fd987c224ada2f7309))
+
+
+### Features
+
+* add GCP infrastructure examples and enhance security ([1fb7f13](https://github.com/LerianStudio/terraform-midaz-foundation/commit/1fb7f13018c3349c349af26f3d398874b66968a3))
+
 # [1.1.0](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.0.0...v1.1.0) (2025-04-24)
 
 
