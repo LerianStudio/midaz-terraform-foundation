@@ -1,4 +1,4 @@
-# Terraform Midaz Foundation
+# Midaz Terraform Foundation
 
 This repository provides Terraform examples for clients and open-source users to deploy foundation infrastructure on major cloud providers (AWS, GCP, and Azure). Each resource includes comprehensive Terraform documentation and state files. The templates follow cloud provider best practices and use official Terraform modules whenever available.
 
@@ -108,6 +108,61 @@ A deployment helper script (`deploy.sh`) is provided to simplify the infrastruct
 - Executes Terraform commands in the correct order for each component
 - Provides clear, color-coded output for better visibility
 
+## Production Credentials & Deployment
+
+When deploying infrastructure in production environments, proper credential management is crucial for security. Here's how to handle credentials securely:
+
+### Cloud Provider Authentication
+
+When using the deploy script locally, we strongly recommend using cloud provider CLI authentication tools instead of raw credentials. This approach is more secure as it handles credential rotation, MFA, and token refresh automatically:
+
+```bash
+# AWS: Use AWS CLI to assume a role
+aws sso login --profile your-profile
+# or
+aws sts assume-role --role-arn arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME --role-session-name terraform
+
+# GCP: Use gcloud authentication
+gcloud auth application-default login
+# For service accounts
+gcloud auth activate-service-account --key-file=path/to/service-account.json
+
+# Azure: Use Azure CLI
+az login
+# For service principals
+az login --service-principal
+```
+
+This approach provides several benefits:
+- Automatic token refresh
+- Integration with SSO and MFA
+- Credential rotation handling
+- Secure credential storage
+- Audit trail of authentication events
+
+### CI/CD Integration
+
+If you have an existing Terraform CI/CD pipeline:
+1. Do not use the deploy script
+2. Copy the relevant examples to your private Infrastructure as Code repository
+3. Integrate the Terraform configurations with your existing pipeline
+4. Use your CI/CD platform's secure secret management features
+
+### Best Practices Documentation
+
+Follow these official guides for credential management best practices:
+- AWS: [Best practices for managing AWS access keys](https://docs.aws.amazon.com/general/latest/gr/aws-access-keys-best-practices.html)
+- GCP: [Best practices for managing service account keys](https://cloud.google.com/iam/docs/best-practices-for-managing-service-account-keys)
+- Azure: [Azure identity management security best practices](https://learn.microsoft.com/en-us/azure/security/fundamentals/identity-management-best-practices)
+
+Key recommendations:
+- Rotate credentials regularly
+- Use role-based access control (RBAC)
+- Enable MFA for user accounts
+- Use temporary credentials when possible
+- Monitor and audit credential usage
+- Never commit credentials to version control
+
 ### Using the Script
 
 1. Make sure you have completed all prerequisites and created the state storage
@@ -211,5 +266,5 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 For support, please:
 1. Check the component-specific README
-2. Search existing [issues](https://github.com/LerianStudio/terraform-midaz-foundation/issues)
+2. Search existing [issues](https://github.com/LerianStudio/midaz-terraform-foundation/issues)
 3. Create a new issue if needed

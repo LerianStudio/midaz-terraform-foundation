@@ -98,7 +98,7 @@ module "eks" {
 
       labels = {
         Environment = local.environment
-        GithubRepo  = "terraform-midaz-foundation"
+        GithubRepo  = "midaz-terraform-foundation"
       }
 
       tags = local.tags
