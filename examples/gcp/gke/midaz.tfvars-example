@@ -4,8 +4,9 @@ region     = "us-east1"
 zones      = ["us-east1-b", "us-east1-c", "us-east1-d"]
 
 # Cluster configuration
-cluster_name = "midaz-cluster"
-environment  = "devops"
+cluster_name        = "midaz-cluster"
+environment         = "devops"
+deletion_protection = true
 
 # Network configuration
 network_name = "midaz-network"
