@@ -11,11 +11,13 @@ module "gke" {
     environment = var.environment
     managed_by  = "terraform"
   }
-  zones             = var.zones
-  network           = var.network_name
-  subnetwork        = var.subnet_name
-  ip_range_pods     = var.ip_range_pods
-  ip_range_services = var.ip_range_services
+
+  deletion_protection = var.deletion_protection
+  zones               = var.zones
+  network             = var.network_name
+  subnetwork          = var.subnet_name
+  ip_range_pods       = var.ip_range_pods
+  ip_range_services   = var.ip_range_services
 
   // Private cluster configuration
   enable_private_endpoint = var.enable_private_endpoint

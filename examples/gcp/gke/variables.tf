@@ -14,6 +14,12 @@ variable "region" {
   type        = string
 }
 
+variable "deletion_protection" {
+  description = "Whether to enable deletion protection for the cluster"
+  type        = bool
+  default     = true
+}
+
 variable "zones" {
   description = "The zones for the GKE cluster"
   type        = list(string)

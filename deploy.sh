@@ -18,7 +18,7 @@ print_message() {
 # Function to check placeholders in backend files
 check_placeholders() {
     local provider=$1
-    local components=("network" "dns" "database" "redis" "kubernetes")
+    local components=("network" "dns" "database" "valkey" "kubernetes")
     local has_placeholders=false
 
     for component in "${components[@]}"; do
@@ -29,7 +29,7 @@ check_placeholders() {
                     "network") backend_file="examples/aws/vpc/backend.tf" ;;
                     "dns") backend_file="examples/aws/route53/backend.tf" ;;
                     "database") backend_file="examples/aws/rds/backend.tf" ;;
-                    "redis") backend_file="examples/aws/elasticache/backend.tf" ;;
+                    "valkey") backend_file="examples/aws/elasticache/backend.tf" ;;
                     "kubernetes") backend_file="examples/aws/eks/backend.tf" ;;
                 esac
                 ;;
@@ -38,7 +38,7 @@ check_placeholders() {
                     "network") backend_file="examples/azure/network/backend.tf" ;;
                     "dns") backend_file="examples/azure/dns/backend.tf" ;;
                     "database") backend_file="examples/azure/database/backend.tf" ;;
-                    "redis") backend_file="examples/azure/redis/backend.tf" ;;
+                    "valkey") backend_file="examples/azure/valkey/backend.tf" ;;
                     "kubernetes") backend_file="examples/azure/aks/backend.tf" ;;
                 esac
                 ;;
@@ -47,7 +47,7 @@ check_placeholders() {
                     "network") backend_file="examples/gcp/vpc/backend.tf" ;;
                     "dns") backend_file="examples/gcp/cloud-dns/backend.tf" ;;
                     "database") backend_file="examples/gcp/cloud-sql/backend.tf" ;;
-                    "redis") backend_file="examples/gcp/memorystore/backend.tf" ;;
+                    "valkey") backend_file="examples/gcp/valkey/backend.tf" ;;
                     "kubernetes") backend_file="examples/gcp/gke/backend.tf" ;;
                 esac
                 ;;
@@ -67,8 +67,8 @@ check_placeholders() {
     fi
 }
 
-# Function to deploy a component
-deploy_component() {
+# Function to get component path
+get_component_path() {
     local provider=$1
     local component=$2
     local component_path=""
@@ -79,7 +79,7 @@ deploy_component() {
                 "network") component_path="examples/aws/vpc" ;;
                 "dns") component_path="examples/aws/route53" ;;
                 "database") component_path="examples/aws/rds" ;;
-                "redis") component_path="examples/aws/elasticache" ;;
+                "valkey") component_path="examples/aws/elasticache" ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -88,7 +88,7 @@ deploy_component() {
                 "network") component_path="examples/azure/network" ;;
                 "dns") component_path="examples/azure/dns" ;;
                 "database") component_path="examples/azure/database" ;;
-                "redis") component_path="examples/azure/redis" ;;
+                "valkey") component_path="examples/azure/valkey" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
             esac
             ;;
@@ -97,25 +97,34 @@ deploy_component() {
                 "network") component_path="examples/gcp/vpc" ;;
                 "dns") component_path="examples/gcp/cloud-dns" ;;
                 "database") component_path="examples/gcp/cloud-sql" ;;
-                "redis") component_path="examples/gcp/memorystore" ;;
+                "valkey") component_path="examples/gcp/valkey" ;;
                 "kubernetes") component_path="examples/gcp/gke" ;;
             esac
             ;;
     esac
 
+    echo "$component_path"
+}
+
+# Function to deploy a component
+deploy_component() {
+    local provider=$1
+    local component=$2
+    local component_path=$(get_component_path "$provider" "$component")
+
     if [ -d "$component_path" ]; then
         print_message "$YELLOW" "\nDeploying $component in $provider..."
         cd "$component_path"
-        
+
         print_message "$YELLOW" "Running terraform init..."
         terraform init
-        
+
         print_message "$YELLOW" "Running terraform plan..."
-        terraform plan -out=tfplan
-        
+        terraform plan -out=tfplan -var-file=midaz.tfvars
+
         print_message "$YELLOW" "Running terraform apply..."
         terraform apply tfplan
-        
+
         cd - > /dev/null
         print_message "$GREEN" "$component deployment completed successfully!"
     else
@@ -124,8 +133,38 @@ deploy_component() {
     fi
 }
 
+# Function to destroy a component
+destroy_component() {
+    local provider=$1
+    local component=$2
+    local component_path=$(get_component_path "$provider" "$component")
+
+    if [ -d "$component_path" ]; then
+        print_message "$YELLOW" "\nDestroying $component in $provider..."
+        cd "$component_path"
+
+        print_message "$YELLOW" "Running terraform init..."
+        terraform init
+
+        print_message "$YELLOW" "Running terraform destroy..."
+        terraform destroy -auto-approve -var-file=midaz.tfvars
+
+        cd - > /dev/null
+        print_message "$GREEN" "$component destruction completed successfully!"
+    else
+        print_message "$RED" "Component path $component_path not found!"
+        exit 1
+    fi
+}
+
 # Main script
-print_message "$GREEN" "Welcome to the Infrastructure Deployment Helper!"
+print_message "$GREEN" "Welcome to the Midaz terraform foundation helper!"
+print_message "$YELLOW" "\nAvailable actions:"
+print_message "$NC" "1) Deploy infrastructure"
+print_message "$RED" "2) Destroy infrastructure (BE CAREFUL)"
+
+read -p "Select an action (1-2): " action_choice
+
 print_message "$YELLOW" "\nAvailable cloud providers:"
 print_message "$NC" "1) AWS"
 print_message "$NC" "2) Azure"
@@ -138,7 +177,7 @@ case $provider_choice in
     2) provider="azure" ;;
     3) provider="gcp" ;;
     *)
-        print_message "$RED" "Invalid choice!"
+        print_message "$RED" "Invalid provider choice!"
         exit 1
         ;;
 esac
@@ -147,10 +186,25 @@ esac
 print_message "$YELLOW" "\nChecking for placeholders in backend configurations..."
 check_placeholders "$provider"
 
-# Deploy components in order
-components=("network" "dns" "database" "redis" "kubernetes")
-for component in "${components[@]}"; do
-    deploy_component "$provider" "$component"
-done
+components=("network" "dns" "database" "valkey" "kubernetes")
 
-print_message "$GREEN" "\nInfrastructure deployment completed successfully!"
+case $action_choice in
+    1)
+        # Deploy components in order
+        for component in "${components[@]}"; do
+            deploy_component "$provider" "$component"
+        done
+        print_message "$GREEN" "\nMidaz terraform foundation deployment completed successfully!"
+        ;;
+    2)
+        # Destroy components in reverse order
+        for (( idx=${#components[@]}-1 ; idx>=0 ; idx-- )) ; do
+            destroy_component "$provider" "${components[idx]}"
+        done
+        print_message "$GREEN" "\nMidaz terraform foundation destruction completed successfully!"
+        ;;
+    *)
+        print_message "$RED" "Invalid action choice!"
+        exit 1
+        ;;
+esac
