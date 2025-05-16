@@ -1,3 +1,10 @@
+# [1.2.0-develop.2](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.2.0-develop.1...v1.2.0-develop.2) (2025-05-16)
+
+
+### Features
+
+* add infrastructure destroy capability ([ecc965d](https://github.com/LerianStudio/midaz-terraform-foundation/commit/ecc965dde20740a23bc98cc72337e4dc7f9ccacf))
+
 # [1.2.0-develop.1](https://github.com/LerianStudio/terraform-midaz-foundation/compare/v1.1.0...v1.2.0-develop.1) (2025-05-14)
 
 
