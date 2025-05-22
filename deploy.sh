@@ -56,6 +56,7 @@ check_placeholders() {
                     "database") backend_file="examples/azure/database/backend.tf" ;;
                     "redis") backend_file="examples/azure/redis/backend.tf" ;;
                     "kubernetes") backend_file="examples/azure/aks/backend.tf" ;;
+                    "bastion") backend_file="examples/azure/bastion/backend.tf" ;;
                 esac
                 ;;
             "gcp")
@@ -106,6 +107,7 @@ deploy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "redis") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
+                "bastion") backend_file="examples/azure/bastion/backend.tf" ;;
             esac
             ;;
         "gcp")
@@ -163,6 +165,8 @@ destroy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "redis") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
+                "bastion") component_path="examples/azure/bastion" ;;
+                
             esac
             ;;
         "gcp")
