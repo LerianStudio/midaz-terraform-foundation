@@ -47,6 +47,7 @@ resource "azurerm_redis_cache" "example" {
   shard_count         = var.shard_count
 
   public_network_access_enabled = false
+  #enable_non_ssl_port           = var.enable_non_ssl_port #Only Available for Basic and Standard SKUs
 
   redis_configuration {
     maxmemory_reserved = var.maxmemory_reserved
