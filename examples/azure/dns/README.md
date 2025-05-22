@@ -1,65 +1,55 @@
-# Private DNS
+# 🧭 `private-dns` Module
 
 This Terraform module provisions a Private DNS Zone in Azure, links it to an existing Virtual Network, and configures multiple DNS record types including A, CNAME, MX, and TXT records.
 
-## 📦 Features
+---
 
-- Creates a **Private DNS Zone** in a specified Resource Group.
-- Links the DNS zone to an existing **Virtual Network**.
-- Supports the creation of:
-  - A records
-  - CNAME records
-  - MX records
-  - TXT records
-- Tags resources with environment and management metadata.
+## 📁 Module File Structure
 
-## 📁 Files Overview
+### `main.tf`
 
-| File            | Purpose                                                      |
-|-----------------|--------------------------------------------------------------|
-| `main.tf`       | Main infrastructure logic for DNS zone and records           |
-| `variables.tf`  | Input variable definitions                                    |
-| `outputs.tf`    | Output values for the created resources                       |
-| `midaz.tfvars`  | Example values for variables used to run this module          |
+Main infrastructure logic for DNS zone and records:
+- Creates a **Private DNS Zone** in the specified Resource Group.
+- Links it to a specified **Virtual Network**.
+- Creates DNS records (A, CNAME, MX, TXT).
+- Tags all resources with metadata (e.g., environment).
 
-## 🔧 Requirements
+### `variables.tf`
 
-- Terraform >= 1.0.0
-- Azure CLI authenticated or Service Principal with required permissions
+Defines input variables used to configure the module:
 
-## 📥 Input Variables
+#### Required
+- `dns_zone_name`: Name of the private DNS zone.
+- `resource_group_name`: Name of the Azure Resource Group.
 
-### Required
+#### Optional
+- `environment`: Resource tag (default = `"production"`).
+- `a_records`: List of A records.
+- `cname_records`: List of CNAME records.
+- `mx_records`: List of MX records.
+- `txt_records`: List of TXT records.
 
-| Variable             | Description                          | Type   |
-|----------------------|--------------------------------------|--------|
-| `dns_zone_name`      | Name of the private DNS zone         | string |
-| `resource_group_name`| Name of the resource group           | string |
+### `outputs.tf`
 
-### Optional
+Exposes outputs to be used by other modules or for reference:
 
-| Variable    | Description                            | Type    | Default      |
-|-------------|----------------------------------------|---------|--------------|
-| `environment` | Environment tag (for resource tagging) | string  | `"production"` |
-| `a_records`   | List of A records to create           | list    | See below     |
-| `cname_records` | List of CNAME records to create    | list    | See below     |
-| `mx_records`   | List of MX records to create        | list    | See below     |
-| `txt_records`  | List of TXT records to create       | list    | See below     |
+- `dns_zone_id`: ID of the created Private DNS Zone.
+- `dns_zone_name`: Name of the DNS Zone.
+- `vnet_link_id`: ID of the DNS zone virtual network link.
+- `a_records`: Map of created A records with their FQDNs.
+- `cname_records`: Map of created CNAME records with their FQDNs.
+- `mx_records`: Map of created MX records with their FQDNs.
+- `txt_records`: Map of created TXT records with their FQDNs.
 
-#### Example values from `midaz.tfvars`
+### `midaz.tfvars`
+
+A sample `tfvars` configuration file for this module:
 
 ```hcl
 dns_zone_name        = "lerian.internal"
 resource_group_name  = "lerian-terraform-rg"
 environment          = "production"
 
-## 🛠️ Example Record Definitions
-
-These are default values included in `variables.tf`, which can be overridden via `.tfvars`.
-
-### 🔹 A Record
-
-```hcl
 a_records = [
   {
     name    = "www"
@@ -101,115 +91,40 @@ txt_records = [
   }
 ]
 
-## 🛠️ Example Record Definitions
+## 🚀 Usage
 
-These are default values included in `variables.tf`, which can be overridden via `.tfvars`.
+The script will ask you to:
 
-### 🔹 A Record
+**Select a cloud provider:**
 
-```hcl
-a_records = [
-  {
-    name    = "www"
-    ttl     = 3600
-    records = ["10.0.1.4", "10.0.1.5"]
-  }
-]
+- `1` for AWS  
+- `2` for Azure  
+- `3` for GCP  
 
-### 🔹 CNAME Record
-hcl
-Copy
-Edit
-cname_records = [
-  {
-    name   = "app"
-    ttl    = 3600
-    record = "app.lerian.io"
-  }
-]
+**Select an action:**
 
-### 🔹 MX Record
+- `1` to deploy all components  
+- `2` to destroy all components  
 
-mx_records = [
-  {
-    name = "mail"
-    ttl  = 3600
-    records = [
-      {
-        preference = 10
-        exchange   = "mail.lerian.io"
-      },
-      {
-        preference = 20
-        exchange   = "backup-mail.lerian.io"
-      }
-    ]
-  }
-]
+It will then automatically deploy or destroy the following components in order:
 
-### 🔹 TXT Record
+- network  
+- dns  
+- database  
+- redis  
+- kubernetes  
 
-txt_records = [
-  {
-    name    = "spf"
-    ttl     = 3600
-    records = ["v=spf1 include:spf.lerian.io ~all"]
-  }
-]
-
-## 📤 Outputs
-
-| Output Name     | Description                                      |
-|------------------|--------------------------------------------------|
-| `dns_zone_id`    | ID of the created Private DNS Zone               |
-| `dns_zone_name`  | Name of the Private DNS Zone                     |
-| `vnet_link_id`   | ID of the DNS zone virtual network link          |
-| `a_records`      | Map of created A records with their FQDNs        |
-| `cname_records`  | Map of created CNAME records with their FQDNs    |
-| `mx_records`     | Map of created MX records with their FQDNs       |
-| `txt_records`    | Map of created TXT records with their FQDNs      |
+> **Note:** During deployment, the script validates that backend configuration files do not contain any placeholder values (`<...>`). If placeholders are found, deployment will stop and ask you to fix them.
 
 ---
 
-## 🚀 How to Use
+### Manual Terraform execution (alternative)
 
-### 1. Initialize Terraform
+If you prefer, you can manually initialize and apply Terraform in any module folder:
 
 ```bash
 terraform init
-```
-
-### 2. Apply the plan
-
-```bash
 terraform apply -var-file="midaz.tfvars"
-```
-
-Once applied, confirm the outputs and validate that the DNS records were created as expected.
-
----
-
-## 🏷️ Tags
-
-All resources include the following tags:
-
-```hcl
-tags = {
-  environment = var.environment
-  managed_by  = "terraform"
-}
-```
-
----
-
-## 🧼 Cleanup
-
-To destroy all provisioned resources:
-
-```bash
-terraform destroy -var-file="midaz.tfvars"
-```
-
 
 
 
