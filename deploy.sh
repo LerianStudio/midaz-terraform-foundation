@@ -15,6 +15,22 @@ print_message() {
     echo -e "${color}${message}${NC}"
 }
 
+# Print table header
+print_table_header() {
+    printf "\n%-15s %-10s %-20s %-10s\n" "Component" "Action" "Status" "Duration"
+    printf "%-15s %-10s %-20s %-10s\n" "---------" "------" "------" "--------"
+}
+
+# Print a row in the table with color on status
+print_table_row() {
+    local component=$1
+    local action=$2
+    local status=$3
+    local color=$4
+    local duration=$5
+    printf "%-15s %-10s ${color}%-20s${NC} %-10s\n" "$component" "$action" "$status" "$duration"
+}
+
 # Function to check placeholders in backend files
 check_placeholders() {
     local provider=$1
@@ -67,7 +83,7 @@ check_placeholders() {
     fi
 }
 
-# Function to deploy a component
+# Function to deploy a component with timing
 deploy_component() {
     local provider=$1
     local component=$2
@@ -106,18 +122,74 @@ deploy_component() {
     if [ -d "$component_path" ]; then
         print_message "$YELLOW" "\nDeploying $component in $provider..."
         cd "$component_path"
-        
-        print_message "$YELLOW" "Running terraform init..."
-        terraform init
-        
-        print_message "$YELLOW" "Running terraform plan..."
-        terraform plan -out=tfplan
-        
-        print_message "$YELLOW" "Running terraform apply..."
-        terraform apply tfplan
-        
+
+        start_time=$(date +%s)
+
+        terraform init -input=false -no-color > /dev/null
+        terraform plan -var-file="midaz.tfvars" -out=tfplan -input=false -no-color > /dev/null
+        terraform apply -input=false -auto-approve -no-color tfplan > /dev/null
+
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))s
+
         cd - > /dev/null
-        print_message "$GREEN" "$component deployment completed successfully!"
+        print_table_row "$component" "Deploy" "Success" "$GREEN" "$duration"
+    else
+        print_message "$RED" "Component path $component_path not found!"
+        exit 1
+    fi
+}
+
+# Function to destroy a component with timing
+destroy_component() {
+    local provider=$1
+    local component=$2
+    local component_path=""
+
+    case $provider in
+        "aws")
+            case $component in
+                "network") component_path="examples/aws/vpc" ;;
+                "dns") component_path="examples/aws/route53" ;;
+                "database") component_path="examples/aws/rds" ;;
+                "redis") component_path="examples/aws/elasticache" ;;
+                "kubernetes") component_path="examples/aws/eks" ;;
+            esac
+            ;;
+        "azure")
+            case $component in
+                "network") component_path="examples/azure/network" ;;
+                "dns") component_path="examples/azure/dns" ;;
+                "database") component_path="examples/azure/database" ;;
+                "redis") component_path="examples/azure/redis" ;;
+                "kubernetes") component_path="examples/azure/aks" ;;
+            esac
+            ;;
+        "gcp")
+            case $component in
+                "network") component_path="examples/gcp/vpc" ;;
+                "dns") component_path="examples/gcp/cloud-dns" ;;
+                "database") component_path="examples/gcp/cloud-sql" ;;
+                "redis") component_path="examples/gcp/memorystore" ;;
+                "kubernetes") component_path="examples/gcp/gke" ;;
+            esac
+            ;;
+    esac
+
+    if [ -d "$component_path" ]; then
+        print_message "$YELLOW" "\nDestroying $component in $provider..."
+        cd "$component_path"
+
+        start_time=$(date +%s)
+
+        terraform init -input=false -no-color > /dev/null
+        terraform destroy -var-file="midaz.tfvars" -auto-approve -input=false -no-color > /dev/null
+
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))s
+
+        cd - > /dev/null
+        print_table_row "$component" "Destroy" "Success" "$GREEN" "$duration"
     else
         print_message "$RED" "Component path $component_path not found!"
         exit 1
@@ -143,14 +215,36 @@ case $provider_choice in
         ;;
 esac
 
+print_message "$YELLOW" "\nWhat do you want to do?"
+print_message "$NC" "1) Deploy"
+print_message "$NC" "2) Destroy"
+
+read -p "Select an action (1-2): " action_choice
+
 # Check for placeholders
 print_message "$YELLOW" "\nChecking for placeholders in backend configurations..."
 check_placeholders "$provider"
 
-# Deploy components in order
 components=("network" "dns" "database" "redis" "kubernetes")
-for component in "${components[@]}"; do
-    deploy_component "$provider" "$component"
-done
 
-print_message "$GREEN" "\nInfrastructure deployment completed successfully!"
+print_table_header
+
+case $action_choice in
+    1)
+        for component in "${components[@]}"; do
+            deploy_component "$provider" "$component"
+        done
+        ;;
+    2)
+        # Destroy in reverse order
+        for (( idx=${#components[@]}-1 ; idx>=0 ; idx-- )); do
+            destroy_component "$provider" "${components[$idx]}"
+        done
+        ;;
+    *)
+        print_message "$RED" "Invalid action!"
+        exit 1
+        ;;
+esac
+
+print_message "$GREEN" "\nAll operations completed successfully!"

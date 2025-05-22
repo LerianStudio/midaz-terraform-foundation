@@ -5,46 +5,31 @@ variable "location" {
 }
 
 variable "resource_group_name" {
-  description = "Name of the resource group"
+  description = "Name of existing the resource group"
   type        = string
-  default     = "rg-db-example"
 }
 
-variable "server_name" {
-  description = "Name of the SQL Server"
+variable "pgsql_primary_name" {
+  description = "Name of the primary PostgreSQL server"
   type        = string
-  default     = "sql-server-example"
 }
 
-variable "database_name" {
-  description = "Name of the SQL Database"
+variable "pgsql_admin_login" {
+  description = "PostgreSQL administrator login"
   type        = string
-  default     = "example-db"
+  default     = "pgsqladmin"
 }
 
-variable "administrator_login" {
-  description = "SQL Server administrator login"
+variable "pgsql_sku" {
+  description = "SKU name for the PostgreSQL servers"
   type        = string
-  default     = "sqladmin"
+  default     = "GP_Standard_D2s_v3"
 }
 
-variable "administrator_password" {
-  description = "SQL Server administrator password"
-  type        = string
-  sensitive   = true
-  default     = "L3rian@2024!" # Change this in production
-}
-
-variable "database_sku" {
-  description = "SKU name for the database"
-  type        = string
-  default     = "Basic"
-}
-
-variable "max_size_gb" {
-  description = "Maximum size of the database in gigabytes"
+variable "pgsql_storage_mb" {
+  description = "Storage size for the PostgreSQL server in MB"
   type        = number
-  default     = 2
+  default     = 131072 # 128 GB storage
 }
 
 variable "tags" {
@@ -54,4 +39,39 @@ variable "tags" {
     Environment = "Example"
     Terraform   = "true"
   }
+}
+
+variable "key_vault_access_policies" {
+  description = "List of access policies for the Key Vault"
+  type = list(object({
+    object_id          = string
+    secret_permissions = list(string)
+  }))
+  default = [
+    {
+      object_id          = "ec5f4491-a949-4432-804b-b82d03c15b3e"  ## Atualize com o object_id do executor Terraform
+      secret_permissions = ["Get", "List", "Set", "Delete", "Purge"]
+    }
+  ]
+}
+
+variable "key_vault_name" {
+  description = "Name of the Key Vault"
+  type        = string
+  default     = "kv-db-midaz"
+}
+
+variable "dns_zone_name" {
+  description = "Nome da Private DNS Zone para o PostgreSQL"
+  type        = string
+}
+variable "enable_pgsql_replica" {
+  description = "Enable PostgreSQL read replica"
+  type        = bool
+  default     = false
+}
+variable "zone_redundant_enabled" {
+  description = "Enable zone redundant HA for PostgreSQL Flexible Server"
+  type        = bool
+  default     = true
 }

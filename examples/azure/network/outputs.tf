@@ -20,12 +20,26 @@ output "public_subnet_ids" {
 
 output "private_aks_subnet_ids" {
   description = "The IDs of the private AKS subnets"
-  value       = slice(module.vnet.vnet_subnets, length(var.public_subnet_prefixes), length(var.public_subnet_prefixes) + length(var.private_aks_subnet_prefixes))
+  value = slice(
+    module.vnet.vnet_subnets,
+    length(var.public_subnet_prefixes),
+    min(
+      length(module.vnet.vnet_subnets),
+      length(var.public_subnet_prefixes) + length(var.private_aks_subnet_prefixes)
+    )
+  )
 }
 
 output "private_db_subnet_ids" {
   description = "The IDs of the private database subnets"
-  value       = slice(module.vnet.vnet_subnets, length(var.public_subnet_prefixes) + length(var.private_aks_subnet_prefixes), length(var.public_subnet_prefixes) + length(var.private_aks_subnet_prefixes) + length(var.private_db_subnet_prefixes))
+  value = slice(
+    module.vnet.vnet_subnets,
+    length(var.public_subnet_prefixes) + length(var.private_aks_subnet_prefixes),
+    min(
+      length(module.vnet.vnet_subnets),
+      length(var.public_subnet_prefixes) + length(var.private_aks_subnet_prefixes) + length(var.private_db_subnet_prefixes)
+    )
+  )
 }
 
 output "public_nsg_id" {

@@ -1,13 +1,11 @@
 variable "dns_zone_name" {
   description = "The name of the DNS zone"
   type        = string
-  default     = "lerian.local"
 }
 
 variable "resource_group_name" {
   description = "The name of the resource group"
   type        = string
-  default     = "lerian-terraform-rg"
 }
 
 variable "environment" {
@@ -19,7 +17,6 @@ variable "environment" {
 variable "vnet_id" {
   description = "ID of the Virtual Network to link with DNS zone"
   type        = string
-  default     = "/subscriptions/d4c48709-7f36-448a-a558-4a0f5229a119/resourceGroups/lerian-terraform-rg/providers/Microsoft.Network/virtualNetworks/midaz-vnet" # Alterar para o ID correto
 }
 
 variable "a_records" {

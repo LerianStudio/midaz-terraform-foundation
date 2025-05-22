@@ -1,19 +1,19 @@
 variable "location" {
   description = "Azure region where resources will be created"
   type        = string
-  default     = "eastus2"
+  default     = "northcentralus"  # default alinhado com seu tfvars
 }
 
 variable "resource_group_name" {
-  description = "Name of the resource group"
+  description = "Name of existing the resource group"
   type        = string
-  default     = "rg-redis-example"
+  # sem default, obrigatório passar
 }
 
 variable "redis_name" {
   description = "Name of the Redis Cache instance"
   type        = string
-  default     = "redis-cache-example"
+  # obrigatório passar
 }
 
 variable "capacity" {
@@ -25,13 +25,13 @@ variable "capacity" {
 variable "family" {
   description = "Redis Cache family (C for Basic/Standard, P for Premium)"
   type        = string
-  default     = "C"
+  default     = "P" # Premium por padrão
 }
 
 variable "sku" {
   description = "Redis Cache SKU (Basic, Standard, Premium)"
   type        = string
-  default     = "Basic"
+  default     = "Premium"
 }
 
 variable "enable_non_ssl_port" {
@@ -62,7 +62,22 @@ variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
   default = {
-    Environment = "Example"
+    Environment = "Production"
     Terraform   = "true"
   }
+}
+
+variable "shard_count" {
+  description = "Number of shards for Redis Cluster (only Premium)"
+  type        = number
+  default     = 2
+  validation {
+  condition     = !(var.sku != "Premium" && var.shard_count > 1)
+  error_message = "Sharding (shard_count > 1) is only allowed for Premium SKU."
+}
+}
+variable "zone_redundant_enabled" {
+  description = "Enable zone redundant HA for PostgreSQL Flexible Server"
+  type        = bool
+  default     = true
 }

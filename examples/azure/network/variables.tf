@@ -11,25 +11,23 @@ variable "address_spaces" {
 }
 
 variable "resource_group_name" {
-  description = "Name of the resource group"
+  description = "Name of the Azure resource group"
   type        = string
-  default     = "lerian-terraform-rg"
 }
 
 variable "location" {
-  description = "Azure region"
+  description = "Azure region for resource deployment"
   type        = string
-  default     = "East US"  # Definido como 'East US' por padrão
+  default     = "eastus2"
 }
 
 variable "vnet_name" {
   description = "Name of the virtual network"
   type        = string
-  default     = "midaz-vnet"
 }
 
 variable "public_subnet_prefixes" {
-  description = "Address prefixes for public subnets"
+  description = "List of address prefixes for public subnets"
   type        = list(string)
   default = [
     "10.0.1.0/24",
@@ -39,7 +37,7 @@ variable "public_subnet_prefixes" {
 }
 
 variable "private_aks_subnet_prefixes" {
-  description = "Address prefixes for private AKS subnets"
+  description = "List of address prefixes for private AKS subnets"
   type        = list(string)
   default = [
     "10.0.4.0/24",
@@ -49,7 +47,7 @@ variable "private_aks_subnet_prefixes" {
 }
 
 variable "private_db_subnet_prefixes" {
-  description = "Address prefixes for private database subnets"
+  description = "List of address prefixes for private database subnets"
   type        = list(string)
   default = [
     "10.0.7.0/24",
@@ -58,14 +56,22 @@ variable "private_db_subnet_prefixes" {
   ]
 }
 
-variable "allowed_ip_ranges" {
-  description = "List of IP CIDR ranges allowed to access resources"
+variable "private_redis_subnet_prefixes" {
+  description = "List of address prefixes for private Redis subnets"
   type        = list(string)
-  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"] # Private IP ranges only
+  default = [
+    "10.0.10.0/24",
+    "10.0.11.0/24"
+  ]
+}
+
+variable "allowed_ip_ranges" {
+  description = "List of IP CIDR ranges allowed to access resources (usually private IP ranges)"
+  type        = list(string)
+  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 }
 
 variable "environment" {
-  description = "Environment name for resource tags"
+  description = "Environment name used for tagging resources"
   type        = string
-  default     = "production"
 }

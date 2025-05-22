@@ -1,20 +1,17 @@
-output "server_id" {
-  description = "The ID of the SQL Server"
-  value       = azurerm_mssql_server.example.id
+output "primary_postgresql_server_id" {
+  description = "The resource ID of the primary PostgreSQL Flexible Server"
+  value       = azurerm_postgresql_flexible_server.primary.id
 }
 
-output "server_fqdn" {
-  description = "The fully qualified domain name of the SQL Server"
-  value       = azurerm_mssql_server.example.fully_qualified_domain_name
+output "primary_postgresql_server_fqdn" {
+  description = "The fully qualified domain name (FQDN) of the primary PostgreSQL server"
+  value       = azurerm_postgresql_flexible_server.primary.fqdn
 }
 
-output "database_id" {
-  description = "The ID of the SQL Database"
-  value       = azurerm_mssql_database.example.id
+output "postgresql_read_replica_id" {
+  value = length(azurerm_postgresql_flexible_server.replica) > 0 ? azurerm_postgresql_flexible_server.replica[0].id : ""
 }
 
-output "database_connection_string" {
-  description = "Connection string for the Azure SQL Database"
-  value       = "Server=tcp:${azurerm_mssql_server.example.fully_qualified_domain_name},1433;Initial Catalog=${azurerm_mssql_database.example.name};Persist Security Info=False;User ID=${azurerm_mssql_server.example.administrator_login};Password=<your_password>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
-  sensitive   = true
+output "postgresql_read_replica_fqdn" {
+  value = length(azurerm_postgresql_flexible_server.replica) > 0 ? azurerm_postgresql_flexible_server.replica[0].fqdn : ""
 }

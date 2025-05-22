@@ -1,3 +1,11 @@
+provider "azurerm" {
+  features {}
+}
+
+data "azurerm_resource_group" "dns" {
+  name = var.resource_group_name
+}
+
 resource "azurerm_private_dns_zone" "main" {
   name                = var.dns_zone_name
   resource_group_name = var.resource_group_name
