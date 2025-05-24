@@ -27,7 +27,6 @@ data "azurerm_resource_group" "aks" {
   name = "lerian-terraform-rg"
 }
 
-
 ############################################
 # LOG ANALYTICS WORKSPACE FOR MONITORING  #
 ############################################
@@ -55,19 +54,24 @@ resource "azurerm_kubernetes_cluster" "aks" {
   role_based_access_control_enabled = true
 
   network_profile {
-  network_plugin    = "azure"
-  network_policy    = "calico"
-  
-  # Defina o service CIDR para uma faixa que não colida
-  service_cidr      = "10.240.0.0/16"  # Exemplo de faixa que provavelmente não colide
+    network_plugin = "azure"
+    network_policy = "calico"
 
-  # Opcional: o DNS CIDR do cluster — pode ajustar se precisar
-  dns_service_ip    = "10.240.0.10"
-}
-  
-  private_cluster_enabled              = true
-  private_cluster_public_fqdn_enabled  = false
-  private_dns_zone_id                  = "System"
+    # Define the service CIDR to avoid IP conflicts
+    service_cidr   = "10.240.0.0/16"
+
+    # Optional: DNS service IP, adjust if needed
+    dns_service_ip = "10.240.0.10"
+  }
+
+  # Use this to toggle between private and public cluster
+  # For tests, keep this false to allow public access to API server
+  private_cluster_enabled = false
+
+  # Control API server access by specifying authorized IP ranges
+  api_server_access_profile {
+    authorized_ip_ranges = var.authorized_ip_ranges
+  }
 
   # Main node pool in subnet 1
   default_node_pool {
@@ -77,7 +81,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
     vnet_subnet_id = data.azurerm_subnet.subnet_aks_1.id
   }
 
-  # System-assigned managed identity for access to ACR, Key Vault, etc.
   identity {
     type = "SystemAssigned"
   }

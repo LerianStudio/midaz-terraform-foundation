@@ -1,0 +1,3 @@
+dns_zone_name        = "lerian.internal"
+resource_group_name  = "lerian-terraform-rg"
+environment          = "production"

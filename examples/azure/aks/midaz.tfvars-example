@@ -1,0 +1,11 @@
+resource_group_name = "lerian-terraform-rg"
+cluster_name        = "aks-cluster-lerian"
+kubernetes_version  = "1.30.0"
+location           = "northcentralus"
+tags = {
+  Environment = "Production"
+  Terraform   = "true"
+}
+authorized_ip_ranges = [
+  "177.189.110.127/32"  # My public IP
+]

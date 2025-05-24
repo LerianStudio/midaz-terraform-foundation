@@ -14,11 +14,6 @@ variable "environment" {
   default     = "production"
 }
 
-variable "vnet_id" {
-  description = "ID of the Virtual Network to link with DNS zone"
-  type        = string
-}
-
 variable "a_records" {
   description = "List of A records to create"
   type = list(object({

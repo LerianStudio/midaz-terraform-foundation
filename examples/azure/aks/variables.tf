@@ -67,3 +67,8 @@ variable "tags" {
     Terraform   = "true"
   }
 }
+variable "authorized_ip_ranges" {
+  description = "List of IP addresses allowed to access the AKS API server"
+  type        = list(string)
+  default     = []  # empty by default; set in terraform.tfvars
+}

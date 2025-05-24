@@ -1,0 +1,8 @@
+pgsql_primary_name = "lerian-postgresql"
+resource_group_name = "lerian-terraform-rg"
+location           = "northcentralus"
+dns_zone_name       = "lerian.internal"
+
+#HA Configurations
+zone_redundant_enabled = false # enable HA only if you use zone_redundant region/location enabled
+enable_pgsql_replica = true # If you want to create a read replica of the primary server
