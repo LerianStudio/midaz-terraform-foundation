@@ -1,52 +1,55 @@
-# 🧭 `azure-postgresql-flexible-server` Module
+# 🐘 `azure-postgresql-flexible-server` Terraform Module
 
-This Terraform module provisions an Azure PostgreSQL Flexible Server instance with private network access and optional read replica for high availability. It configures Private DNS for internal hostname resolution and integrates with Azure Key Vault for secure password management.
+This Terraform module provisions an **Azure PostgreSQL Flexible Server** with private access and secure credentials. It supports optional read replica deployment, integrates with **Azure Key Vault** for password management, and configures **Private DNS** for internal hostname resolution.
 
 ---
 
-## 📁 Module File Structure
+## 📦 Module Structure
 
 ### `main.tf`
 
-- Imports existing virtual network, subnets, and private DNS zone.
-- Creates an **Azure PostgreSQL Flexible Server** with customizable SKU, storage, and zone redundancy.
-- Generates and stores a secure PostgreSQL administrator password in Azure Key Vault.
-- Creates an optional **read replica** PostgreSQL Flexible Server.
-- Creates private DNS zone records and links the DNS zone to the virtual network.
-- Applies tags for resource organization and management.
+- Imports existing **Virtual Network**, subnets, and **Private DNS Zone**.
+- Creates the **Primary PostgreSQL Flexible Server** with customizable:
+  - SKU and storage.
+  - Zone redundancy.
+  - Private access only (no public IP).
+- Generates a secure admin password and stores it in **Azure Key Vault**.
+- Optionally creates a **Read Replica** for high availability and scale-out reads.
+- Creates **Private DNS A Records** for FQDN resolution.
+- Applies tagging to all resources.
 
 ### `variables.tf`
 
-Defines input variables to customize the module:
+#### 🔹 Required
 
-#### Required
-- `resource_group_name`: Name of the existing resource group.
+- `resource_group_name`: Existing resource group name.
 - `pgsql_primary_name`: Name of the primary PostgreSQL server.
 - `dns_zone_name`: Private DNS zone name for hostname resolution.
 
-#### Optional (with defaults)
-- `location`: Azure region.
-- `pgsql_admin_login`: PostgreSQL admin username.
-- `pgsql_sku`: Server SKU name.
-- `pgsql_storage_mb`: Storage size in MB.
-- `key_vault_name`: Name of the Key Vault storing the admin password.
-- `key_vault_access_policies`: Access policies for Key Vault.
-- `enable_pgsql_replica`: Enable read replica server.
-- `zone_redundant_enabled`: Enable zone redundancy for high availability.
-- `tags`: Tags applied to all resources.
+#### 🔸 Optional (with defaults)
+
+- `location`: Azure region for resource provisioning.
+- `pgsql_admin_login`: Admin username (default: `pgsqladmin`).
+- `pgsql_sku`: SKU name (e.g., `GP_Standard_D2s_v3`).
+- `pgsql_storage_mb`: Storage size in MB (e.g., `131072` for 128 GB).
+- `key_vault_name`: Name of the Azure Key Vault to store the password.
+- `key_vault_access_policies`: List of access policies to assign.
+- `enable_pgsql_replica`: Whether to create a read replica (default: `false`).
+- `zone_redundant_enabled`: Enable zone redundancy (default: `false`).
+- `tags`: Tags for all resources (e.g., `Environment`, `Owner`, etc.).
 
 ### `outputs.tf`
 
-Exposes outputs for consumption by other modules or users:
+Exposes key values:
 
-- `primary_postgresql_server_id`: ID of the primary PostgreSQL server.
-- `primary_postgresql_server_fqdn`: FQDN of the primary PostgreSQL server.
-- `postgresql_read_replica_id`: ID of the read replica server (if enabled).
-- `postgresql_read_replica_fqdn`: FQDN of the read replica (if enabled).
+- `primary_postgresql_server_id`
+- `primary_postgresql_server_fqdn`
+- `postgresql_read_replica_id` (if enabled)
+- `postgresql_read_replica_fqdn` (if enabled)
 
 ---
 
-## `midaz.tfvars` Example
+## 🧪 Example: `midaz.tfvars`
 
 ```hcl
 location                = "northcentralus"
@@ -63,38 +66,54 @@ tags = {
   Environment = "Production"
   Terraform   = "true"
 }
+```
 
-## 🚀 Usage
+---
+
+## 🚀 Usage & ⚠️ Notes
 
 1. Clone this module repository.
 
-2. Customize variables in a `.tfvars` file (e.g., `midaz.tfvars`).
+2. Define a `.tfvars` file (e.g., `midaz.tfvars`) with your custom values.
 
 3. Initialize Terraform:
 
 ```bash
 terraform init
+```
 
-4. Review the plan:
+4. Review the execution plan:
 
 ```bash
 terraform plan -var-file="midaz.tfvars"
+```
 
-5. Apply the configuration
+5. Apply the configuration:
+
 ```bash
 terraform apply -var-file="midaz.tfvars"
+```
 
+---
 
-## ⚠️ Important Notes
+**Important Notes:**
 
-- The module expects existing Virtual Network, subnets, Resource Group, and Key Vault.
+- The module assumes pre-existing resources:
+  - Virtual Network and subnets.
+  - Resource Group.
+  - Azure Key Vault.
 
-- Private network access is enforced (public network access is disabled).
+- The PostgreSQL server is deployed **without public access** — all traffic occurs over private endpoints.
 
-- Administrator password is automatically generated and stored securely in Azure Key Vault.
+- The **admin password is generated** and stored securely in **Azure Key Vault**.
 
-- Read replica creation is optional and recommended for read scalability and high availability.
+- A **read replica** is optional and useful for **read scalability** and **high availability**.
 
-- Zone redundancy should be enabled only if supported by your Azure region.
+- **Zone redundancy** improves resiliency but is not available in all Azure regions.
 
-- Ensure the virtual network and subnets have sufficient capacity and proper permissions for private endpoints and DNS linkage.
+- Ensure your subnets have:
+  - Proper **delegation for Microsoft.DBforPostgreSQL**.
+  - Sufficient IP capacity.
+  - Compatible **NSGs** to allow private endpoint traffic.
+
+- This module automatically links the **Private DNS Zone** to the VNet and configures DNS A records for internal resolution of PostgreSQL hostnames.
