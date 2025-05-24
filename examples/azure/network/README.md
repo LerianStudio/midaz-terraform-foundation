@@ -69,7 +69,7 @@ To deploy only the network stack:
    ```bash
    cd network
    terraform init
-   terraform apply -var-file=midaz.tfvars
+   terraform apply -var-file=midaz.tfvars-example
 
 🔁 **Integrated Execution with Script**
 

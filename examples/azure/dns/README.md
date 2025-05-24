@@ -103,7 +103,7 @@ Navigate to the module directory:
    terraform init
    terraform apply -var-file=midaz.tfvars-example
 
-🔁 **Integrated Execution with Script
+🔁 **Integrated Execution with Script**
 
 Alternatively, you can run the entire infrastructure pipeline using the deploy.sh script located at the root of the repository. This script provides an interactive terminal experience where you choose the cloud provider (AWS, Azure, or GCP) and the action (Deploy or Destroy). Based on your choices, it sequentially initializes, plans, and applies (or destroys) each infrastructure module in the correct order.
 
