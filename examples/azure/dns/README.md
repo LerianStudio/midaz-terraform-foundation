@@ -36,7 +36,9 @@ Exposes critical output values for inter-module dependencies, such as:
 - `vnet_link_id`: ID of the DNS zone virtual network link.
 - `a_records`, `cname_records`, `mx_records`, `txt_records`: Maps of created records with their FQDNs.
 
-### `midaz.tfvars`
+---
+
+## `midaz.tfvars`
 
 A sample `tfvars` configuration file for this module:
 
@@ -85,27 +87,29 @@ txt_records = [
     records = ["v=spf1 include:spf.lerian.io ~all"]
   }
 ]
+```
+
+---
 
 ## 🚀 Usage
 
 You can deploy this module in two distinct ways depending on your workflow.
 
-
 ### ✅ Standalone Execution
 
 To deploy only the DNS stack:
 
-Navigate to the module directory:
-
 1. Navigate to the module directory:
-   ```bash
-   cd network
-   terraform init
-   terraform apply -var-file=midaz.tfvars-example
 
-🔁 **Integrated Execution with Script**
+```bash
+cd network
+terraform init
+terraform apply -var-file=midaz.tfvars-example
+```
 
-Alternatively, you can run the entire infrastructure pipeline using the deploy.sh script located at the root of the repository. This script provides an interactive terminal experience where you choose the cloud provider (AWS, Azure, or GCP) and the action (Deploy or Destroy). Based on your choices, it sequentially initializes, plans, and applies (or destroys) each infrastructure module in the correct order.
+### 🔁 Integrated Execution with Script
+
+Alternatively, you can run the entire infrastructure pipeline using the `deploy.sh` script located at the root of the repository. This script provides an interactive terminal experience where you choose the cloud provider (AWS, Azure, or GCP) and the action (Deploy or Destroy). Based on your choices, it sequentially initializes, plans, and applies (or destroys) each infrastructure module in the correct order.
 
 ```bash
 ./deploy.sh
@@ -113,12 +117,12 @@ Alternatively, you can run the entire infrastructure pipeline using the deploy.s
 
 This approach ensures all modules are executed consistently and that dependencies between them (e.g., private-dns depending on network) are resolved automatically. It also validates backend configuration files and presents a colored summary table showing the status and duration of each operation.
 
-🧩 **Considerations & Interdependencies**
+---
 
-**Prerequisite:** The target Azure Resource Group must exist prior to applying this module. The associated Virtual Network must also exist and be passed into this module for linking.
+## 🧩 Considerations & Interdependencies
 
-**Record Management:**
-This module supports creating multiple record types. Ensure that record definitions are accurate and that DNS names do not overlap or conflict with existing zones.
+- **Prerequisite:** The target Azure Resource Group must exist prior to applying this module. The associated Virtual Network must also exist and be passed into this module for linking.
 
-**Security Model:**
-Although the DNS zone itself is private, the records it contains may expose internal services. Keep sensitive internal FQDNs consistent with internal naming policies.
+- **Record Management:** This module supports creating multiple record types. Ensure that record definitions are accurate and that DNS names do not overlap or conflict with existing zones.
+
+- **Security Model:** Although the DNS zone itself is private, the records it contains may expose internal services. Keep sensitive internal FQDNs consistent with internal naming policies.
