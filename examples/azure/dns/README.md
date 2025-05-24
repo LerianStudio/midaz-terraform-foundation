@@ -113,7 +113,7 @@ Alternatively, you can run the entire infrastructure pipeline using the deploy.s
 
 This approach ensures all modules are executed consistently and that dependencies between them (e.g., private-dns depending on network) are resolved automatically. It also validates backend configuration files and presents a colored summary table showing the status and duration of each operation.
 
-🧩 **Considerations & Interdependencies
+🧩 **Considerations & Interdependencies**
 
 **Prerequisite:** The target Azure Resource Group must exist prior to applying this module. The associated Virtual Network must also exist and be passed into this module for linking.
 
