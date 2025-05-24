@@ -1,6 +1,6 @@
-# 🧭 `azure-aks-cluster` Module
+# ☸️ `azure-aks-cluster` Module
 
-This Terraform module provisions an Azure Kubernetes Service (AKS) cluster with private network access, a default system node pool, and an optional user node pool. It integrates with Log Analytics for monitoring and uses existing Virtual Network and Subnets.
+This Terraform module provisions an **Azure Kubernetes Service (AKS)** cluster with private network access, a default system node pool, and an optional user (infra) node pool. It integrates with **Log Analytics** for monitoring and uses existing **Virtual Network** and **Subnets**.
 
 ---
 
@@ -10,26 +10,26 @@ This Terraform module provisions an Azure Kubernetes Service (AKS) cluster with 
 
 - Imports existing **Virtual Network**, **Subnets**, and **Resource Group**.
 - Creates an **Azure Log Analytics Workspace** for AKS monitoring.
-- Provisions an **Azure Kubernetes Service (AKS)** cluster with:
-  - Private cluster configuration.
+- Provisions an **AKS Cluster** with:
+  - Private cluster access configuration.
   - System-assigned managed identity.
   - Monitoring agent integration.
   - Calico network policy.
-  - Custom service CIDR and DNS IP range.
+  - Custom service CIDR and DNS IP ranges.
 - Defines a **default node pool** in a selected subnet.
-- Adds an optional **user node pool** for infrastructure workloads in another subnet.
-- Applies custom tags to all resources.
+- Adds an optional **infra node pool** for infrastructure workloads in another subnet.
+- Applies custom **tags** to all resources.
 
 ### `variables.tf`
 
-Defines input variables to customize the module:
-
 #### Required
+
 - `resource_group_name`: Name of the existing resource group.
 - `cluster_name`: Name of the AKS cluster.
 - `kubernetes_version`: Kubernetes version to deploy.
 
 #### Optional (with defaults)
+
 - `location`: Azure region where resources will be deployed.
 - `api_server_access_cidrs`: List of CIDR ranges allowed to access the AKS API server.
 - `node_count`: Number of nodes in the system node pool.
@@ -49,7 +49,7 @@ Exposes outputs for consumption by other modules or users:
 
 ---
 
-## `midaz.tfvars` Example
+## 🔧 `midaz.tfvars` Example
 
 ```hcl
 location                    = "eastus"
@@ -65,28 +65,37 @@ tags = {
   Environment = "Production"
   Terraform   = "true"
 }
+```
 
-### 🚀 Usage
+---
+
+## 🚀 Usage
 
 1. Clone this module repository.
 
-2. Customize variables in a `.tfvars` file (e.g., `midaz.tfvars`).
+2. Customize variables in a `.tfvars` file (e.g., `midaz.tfvars-example`).
 
 3. Initialize Terraform:
 
 ```bash
 terraform init
+```
 
 4. Review the plan:
 
 ```bash
-terraform plan -var-file="midaz.tfvars"
+terraform plan -var-file="midaz.tfvars-example"
+```
 
-5. Apply the configuration
+5. Apply the configuration:
+
 ```bash
-terraform apply -var-file="midaz.tfvars"
+terraform apply -var-file="midaz.tfvars-example"
+```
 
-### ⚠️ Important Notes
+---
+
+## ⚠️ Important Notes
 
 - The module expects existing **Virtual Network**, **Subnets**, and **Resource Group**.
 - The AKS cluster is **private by default** (API server accessible only through specified CIDRs or private endpoints).
