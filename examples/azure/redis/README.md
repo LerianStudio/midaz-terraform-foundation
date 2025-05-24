@@ -1,6 +1,6 @@
 # 🧭 `azure-redis-cache` Module
 
-This Terraform module provisions an Azure Redis Cache Premium instance with high availability using Private Endpoints in private subnets. It also configures Private DNS for internal name resolution.
+This Terraform module provisions an **Azure Redis Cache Premium** instance with high availability using **Private Endpoints** in private subnets and integrates it with **Private DNS** for internal name resolution.
 
 ---
 
@@ -8,90 +8,98 @@ This Terraform module provisions an Azure Redis Cache Premium instance with high
 
 ### `main.tf`
 
-- Imports existing subnets and private DNS zone into the virtual network.
-- Creates an **Azure Redis Cache Premium** instance with customizable settings (capacity, sharding, memory policies, etc.).
-- Creates **two Private Endpoints** connected to Redis in distinct private subnets to ensure high availability.
-- Creates a private A record DNS entry pointing to the Private Endpoint IP.
-- Ensures the private DNS zone is linked to the virtual network.
-- Applies tags for resource identification and management.
+This file performs the core infrastructure tasks:
+
+- **Creates an Azure Redis Cache Premium** instance with configurable performance settings.
+- **Creates two Private Endpoints** across different subnets for high availability.
+- **Imports existing private subnets** and **links the private DNS zone** to the virtual network.
+- **Creates private A records** for name resolution via the Private DNS Zone.
+- **Applies tags** to all provisioned resources for traceability and environment control.
 
 ### `variables.tf`
 
-Defines input variables to customize the module:
+Defines the module’s input parameters.
 
 #### Required
-- `resource_group_name`: Name of the existing resource group.
-- `redis_name`: Name of the Redis Cache instance.
+
+- `resource_group_name`: Name of the existing Azure Resource Group.
+- `redis_name`: Unique name of the Redis instance.
 
 #### Optional (with defaults)
-- `location`: Azure region.
-- `capacity`: Instance capacity (0-6 for Basic/Standard, 1-4 for Premium).
-- `family`: Instance family (C for Basic/Standard, P for Premium).
-- `sku`: Redis SKU (Basic, Standard, Premium).
-- `shard_count`: Number of shards (Premium only).
-- `maxmemory_reserved`, `maxmemory_delta`, `maxmemory_policy`: Redis memory configuration options.
-- `enable_non_ssl_port`: Enable non-SSL port 6379.
-- `tags`: Tags applied to all resources.
+
+- `location`: Azure region (default based on provider).
+- `capacity`: Redis capacity (0–6 for Basic/Standard, 1–4 for Premium).
+- `family`: Redis family (`C` for Basic/Standard, `P` for Premium).
+- `sku`: SKU tier (`Basic`, `Standard`, `Premium`).
+- `shard_count`: Number of shards for Redis clustering (Premium only).
+- `maxmemory_reserved`, `maxmemory_delta`, `maxmemory_policy`: Memory tuning options.
+- `enable_non_ssl_port`: Enables port 6379 (not recommended in production).
+- `zone_redundant_enabled`: Enables zone redundancy for Redis Premium.
+- `tags`: Custom tags for resource identification.
 
 ### `outputs.tf`
 
-Exposes useful outputs for consumption by other modules or for reference:
+Exposes key outputs for use in other modules or external systems:
 
-- `redis_id`: ID of the Redis instance.
-- `redis_hostname`: Hostname of the Redis instance.
-- `redis_ssl_port`: SSL port for connecting.
-- `redis_connection_string`: Primary connection string (sensitive).
-- `redis_primary_key`: Primary access key (sensitive).
+- `redis_id`: ID of the Redis Cache resource.
+- `redis_hostname`: Internal DNS name for Redis access.
+- `redis_ssl_port`: SSL port number for secure connections.
+- `redis_connection_string`: Primary Redis connection string (**sensitive**).
+- `redis_primary_key`: Primary access key (**sensitive**).
 
 ---
-# `midaz.tfvars` Example
 
-An example variables file for module usage:
+## 🔧 `midaz.tfvars` Example
 
 ```hcl
-location              = "northcentralus"
-resource_group_name   = "lerian-terraform-rg"
-redis_name            = "midaz-redis-cache"
-capacity              = 1
-family                = "P"
-sku                   = "Premium"
-maxmemory_reserved    = 50
-maxmemory_delta       = 50
-maxmemory_policy      = "allkeys-lru"
+location                = "northcentralus"
+resource_group_name     = "lerian-terraform-rg"
+redis_name              = "midaz-redis-cache"
+capacity                = 1
+family                  = "P"
+sku                     = "Premium"
+maxmemory_reserved      = 50
+maxmemory_delta         = 50
+maxmemory_policy        = "allkeys-lru"
+shard_count             = 2
+enable_non_ssl_port     = true
+zone_redundant_enabled  = false
+
 tags = {
   Environment = "Production"
   Terraform   = "true"
 }
-shard_count           = 2
-enable_non_ssl_port   = true
-zone_redundant_enabled = false
 
-## 🚀 Usage
+🚀 Usage
+You can deploy this module in two ways:
 
-1. Clone the module repository.
-
-2. Adjust variables in a `.tfvars` file (e.g., `midaz.tfvars`).
-
-3. Run Terraform commands:
+✅ Standalone Execution
+Run the module in isolation:
 
 ```bash
 terraform init
-terraform apply -var-file="midaz.tfvars"
+terraform apply -var-file="midaz.tfvars-example"
+```
 
-## ⚠️ Important Notes
+🔁 Integrated Execution with Script
+Alternatively, run the complete infrastructure pipeline using the deploy.sh script in the root of the repository:
 
-- The module assumes the pre-existence of a Virtual Network, subnets, and a Resource Group.
+```bash
+deploy.sh
+```
 
-- Private Endpoints are configured in private subnets for security and high availability.
+This script allows you to interactively choose the cloud provider and action (Deploy/Destroy), and it executes all modules in sequence while handling dependencies like networking and DNS automatically.
 
-- Sharding (`shard_count > 1`) is only supported for the Premium SKU.
+🧩 Considerations & Interdependencies
+Dependencies: The target Virtual Network, subnets, and Resource Group must be pre-created.
 
-- The non-SSL port (6379) can be enabled only for Basic and Standard SKUs.
+Private DNS: Internal DNS resolution is enabled by linking the DNS zone to the VNet and creating A records for the Redis hostnames.
 
-- The module configures Private DNS for internal resolution of the Redis hostname.
+High Availability: Redis Premium with Private Endpoints across subnets ensures redundancy.
 
-- Ensure that the subnets have sufficient capacity and proper Network Security Groups (NSGs) to support Private Endpoints.
+Security: Make sure subnets allow traffic via appropriate NSGs for Private Endpoint support.
 
+Sharding Support: Only available for Premium SKU (shard_count > 1).
 
-
+Non-SSL Port: Enabling enable_non_ssl_port = true is allowed for non-production workloads.
 
