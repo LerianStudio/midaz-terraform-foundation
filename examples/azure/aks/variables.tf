@@ -55,7 +55,7 @@ variable "infra_node_vm_size" {
 variable "infra_node_count" {
   description = "Number of nodes in the user (infra) node pool"
   type        = number
-  default     = 1
+  default     = 3
 }
 
 # Tags to be applied to all resources
