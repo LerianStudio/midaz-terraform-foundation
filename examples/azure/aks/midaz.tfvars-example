@@ -7,5 +7,5 @@ tags = {
   Terraform   = "true"
 }
 authorized_ip_ranges = [
-  "177.189.110.127/32"  # My public IP
+  "177.189.119.119/32"  # My public IP
 ]

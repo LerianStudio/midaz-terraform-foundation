@@ -96,14 +96,23 @@ resource "azurerm_kubernetes_cluster" "aks" {
 #     SECOND USER NODE POOL      #
 ##################################
 
-resource "azurerm_kubernetes_cluster_node_pool" "infra" {
-  name                  = "infra"
+resource "azurerm_kubernetes_cluster_node_pool" "armnp" {
+  name                  = "armnp"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.aks.id
-  vm_size               = var.infra_node_vm_size
-  node_count            = var.infra_node_count
-  vnet_subnet_id        = data.azurerm_subnet.subnet_aks_2.id
+  vm_size               = "Standard_D4ps_v5"  # ARM-based
+  os_type               = "Linux"
   orchestrator_version  = var.kubernetes_version
-  mode                  = "User"
+  node_count            = 1
+  enable_auto_scaling   = true
+  min_count             = 1
+  max_count             = 3
+  vnet_subnet_id        = data.azurerm_subnet.subnet_aks_2.id
 
+  mode = "User"
+
+  node_labels = {
+    "architecture" = "arm64"
+  }
   tags = var.tags
 }
+

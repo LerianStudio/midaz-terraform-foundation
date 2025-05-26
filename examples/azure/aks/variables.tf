@@ -37,25 +37,11 @@ variable "node_count" {
   default     = 2
 }
 
-# Size of the VMs used in the default node pool
+# Size of the VMs used in the default node pool (system pool)
 variable "node_vm_size" {
   description = "Size of the VM for nodes"
   type        = string
   default     = "Standard_D2s_v3"
-}
-
-# Optional: VM size for the user node pool (infra)
-variable "infra_node_vm_size" {
-  description = "VM size for the user (infra) node pool"
-  type        = string
-  default     = "Standard_D4s_v3"
-}
-
-# Optional: Number of nodes for the user node pool
-variable "infra_node_count" {
-  description = "Number of nodes in the user (infra) node pool"
-  type        = number
-  default     = 3
 }
 
 # Tags to be applied to all resources
