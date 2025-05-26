@@ -5,7 +5,7 @@ data "aws_caller_identity" "current" {}
 data "aws_vpc" "selected" {
   filter {
     name   = "tag:Name"
-    values = ["${var.vpc_name}"]
+    values = [var.vpc_name]
   }
 }
 
