@@ -50,7 +50,8 @@ resource "aws_iam_role" "developer_role" {
 
 # IAM role for EBS CSI Driver
 module "ebs_csi_irsa_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.33"
 
   role_name             = "${var.name}-ebs-csi"
   attach_ebs_csi_policy = true
@@ -71,8 +72,9 @@ module "ebs_csi_irsa_role" {
 
 # IAM role for Cluster Autoscaler
 module "cluster_autoscaler_irsa_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  count  = var.create_autoscaler_role ? 1 : 0
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.33"
+  count   = var.create_autoscaler_role ? 1 : 0
 
   role_name = "${var.name}-cluster-autoscaler"
 
@@ -94,8 +96,9 @@ module "cluster_autoscaler_irsa_role" {
 
 # IAM role for AWS Load Balancer Controller
 module "aws_load_balancer_controller_irsa_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  count  = var.create_load_balancer_controller_role ? 1 : 0
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.33"
+  count   = var.create_load_balancer_controller_role ? 1 : 0
 
   role_name = "${var.name}-aws-load-balancer-controller"
 
