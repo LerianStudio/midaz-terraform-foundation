@@ -25,13 +25,13 @@ This repository provides Terraform examples for deploying foundation infrastruct
     │   ├── vpc/
     │   ├── route53/
     │   ├── rds/
-    │   ├── elasticache/
+    │   ├── valkey/
     │   └── eks/
     ├── gcp/
     │   ├── vpc/
     │   ├── cloud-dns/
     │   ├── cloud-sql/
-    │   ├── memorystore/
+    │   ├── valkey/
     │   └── gke/
     └── azure/
         ├── network/
@@ -45,7 +45,7 @@ This repository provides Terraform examples for deploying foundation infrastruct
 1. VPC/Network
 2. DNS
 3. Database
-4. Redis
+4. Valkey
 5. Kubernetes Cluster
 
 ## Creating State Storage
@@ -76,6 +76,19 @@ aws s3api put-public-access-block \
     --bucket UNIQUE_BUCKET_NAME \
     --public-access-block-configuration \
     '{"BlockPublicAcls":true,"IgnorePublicAcls":true,"BlockPublicPolicy":true,"RestrictPublicBuckets":true}'
+
+# Create DynamoDB table for state locking
+aws dynamodb create-table \
+    --table-name terraform-state-lock \
+    --billing-mode PAY_PER_REQUEST \
+    --attribute-definitions AttributeName=LockID,AttributeType=S \
+    --key-schema AttributeName=LockID,KeyType=HASH \
+    --region REGION
+
+# Add tags to DynamoDB table
+aws dynamodb tag-resource \
+    --resource-arn arn:aws:dynamodb:REGION:ACCOUNT_ID:table/terraform-state-lock \
+    --tags Key=Name,Value=terraform-state-lock Key=Environment,Value=shared Key=Project,Value=midaz
 ```
 
 ### Google Cloud Platform

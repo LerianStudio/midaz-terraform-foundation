@@ -1,0 +1,60 @@
+# Common Variables
+name        = "midaz-foundation"
+environment = "dev"
+
+# RDS Configuration
+vpc_name              = "midaz-network"
+engine                = "postgres"
+engine_version        = "17.5"
+family                = "postgres17"
+major_engine_version  = "17"
+instance_class        = "db.t3.medium"
+allocated_storage     = 20
+max_allocated_storage = 100
+database_name         = "midaz"
+username              = "postgres"
+port                  = 5432
+deletion_protection   = true
+
+# Database Parameters
+parameters = [
+  {
+    name         = "max_connections"
+    value        = "100"
+    apply_method = "pending-reboot" # Required for static parameters
+  }
+]
+
+# Maintenance and Backup Windows
+maintenance_window = "Mon:00:00-Mon:03:00"
+backup_window      = "03:00-06:00"
+
+# Monitoring and Logging Configuration
+monitoring_interval            = 30 # Enhanced monitoring interval in seconds
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+create_cloudwatch_log_group    = true
+create_monitoring_role         = true
+
+# Performance Insights
+performance_insights_enabled          = true
+performance_insights_retention_period = 7 # Days to retain performance insights data
+
+# Backup Configuration
+backup_retention_period = 7    # Days to retain automated backups
+skip_final_snapshot     = true # Create a final snapshot when destroying the instance
+
+# Read Replica Configuration
+create_read_replica         = true
+read_replica_instance_class = "db.m7g.large"
+read_replica_multi_az       = true
+
+# DNS Configuration
+dns_zone_name = "midaz.internal"
+
+# Additional Tags
+additional_tags = {
+  "ManagedBy" = "terraform"
+  "Project"   = "midaz"
+  "Owner"     = "devops"
+  "Type"      = "database"
+}

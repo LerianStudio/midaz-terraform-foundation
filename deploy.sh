@@ -29,7 +29,7 @@ check_placeholders() {
                     "network") backend_file="examples/aws/vpc/backend.tf" ;;
                     "dns") backend_file="examples/aws/route53/backend.tf" ;;
                     "database") backend_file="examples/aws/rds/backend.tf" ;;
-                    "valkey") backend_file="examples/aws/elasticache/backend.tf" ;;
+                    "valkey") backend_file="examples/aws/valkey/backend.tf" ;;
                     "kubernetes") backend_file="examples/aws/eks/backend.tf" ;;
                 esac
                 ;;
@@ -79,7 +79,7 @@ get_component_path() {
                 "network") component_path="examples/aws/vpc" ;;
                 "dns") component_path="examples/aws/route53" ;;
                 "database") component_path="examples/aws/rds" ;;
-                "valkey") component_path="examples/aws/elasticache" ;;
+                "valkey") component_path="examples/aws/valkey" ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;

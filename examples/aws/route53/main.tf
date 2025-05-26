@@ -1,11 +1,9 @@
-locals {
-  environment = lower(var.environment)
-  name        = var.name
-  tags = merge({
-    Name        = "route53-${local.name}-${local.environment}"
-    Environment = local.environment
-    ManagedBy   = "Terraform"
-  }, var.additional_tags)
+# Get VPC by filter
+data "aws_vpc" "selected" {
+  filter {
+    name   = "tag:Name"
+    values = ["${var.vpc_name}"]
+  }
 }
 
 # Private Hosted Zone
@@ -13,10 +11,14 @@ resource "aws_route53_zone" "private" {
   name = var.private_domain_name
 
   vpc {
-    vpc_id = var.vpc_id
+    vpc_id = data.aws_vpc.selected.id
   }
 
-  tags = local.tags
+  tags = merge({
+    Name        = var.name
+    Environment = lower(var.environment)
+    ManagedBy   = "Terraform"
+  }, var.additional_tags)
 }
 
 # VPC Association for Private Zone

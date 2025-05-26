@@ -1,0 +1,45 @@
+# Core Configuration
+name        = "midaz-foundation" # Name identifier for the EKS cluster
+environment = "dev"              # Environment identifier
+
+# EKS Cluster Configuration
+cluster_version                 = "1.32"
+cluster_endpoint_public_access  = true # Required to access the API from external IPs
+cluster_endpoint_private_access = true # Enable private endpoint access within VPC
+
+# Security Configuration
+allowed_api_access_cidrs = [
+  "203.0.113.0/24",  # Example: Office IP range
+  "198.51.100.10/32" # Example: VPN IP
+]
+
+enable_cluster_creator_admin_permissions = true # Grant admin permissions to cluster creator
+
+# Node Group Configuration
+instance_types = ["c7g.large"] # List of instance types for the node group
+min_size       = 3             # Minimum number of nodes
+max_size       = 15            # Maximum number of nodes
+desired_size   = 3             # Desired number of nodes
+capacity_type  = "ON_DEMAND"   # ON_DEMAND or SPOT instances
+
+# AMI Configuration
+ami_type = "AL2_ARM_64"
+
+# Network Configuration
+vpc_name = "midaz-vpc" # Name of the VPC where EKS cluster will be created
+
+# Security Group Configuration
+attach_cluster_primary_security_group = true  # Attach to cluster's primary security group
+create_security_group                 = false # Create dedicated security group for node group
+
+# Additional Tags
+additional_tags = {
+  Project     = "midaz"
+  Environment = "dev"
+  Owner       = "devops"
+  ManagedBy   = "terraform"
+}
+
+# Addons IAM roles
+create_autoscaler_role               = true
+create_load_balancer_controller_role = true
