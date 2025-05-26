@@ -38,9 +38,17 @@ jobs:
 
     # Setup Node.js environment for commitlint
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '22'
+
+    - run: npm install
+    # Run the commitlint action, considering its own dependencies and yours as well 🚀
+    # `github.workspace` is the path to your repository.
+    # Ensure commits follow conventional commits specification
+    - uses: wagoid/commitlint-github-action@v6
+      env:
+        NODE_PATH: ${{ github.workspace }}/node_modules
 
     # Install Terraform CLI
     - name: Setup Terraform
@@ -55,10 +63,6 @@ jobs:
       with:
         path: ~/.tflint.d/plugins
         key: ${{ matrix.os }}-tflint-${{ hashFiles('.tflint.hcl') }}
-
-    # Ensure commits follow conventional commits specification
-    - name: Verify Conventional Commits
-      uses: wagoid/commitlint-github-action@v5
 
     # Check Terraform files formatting
     - name: Terraform Format Check
