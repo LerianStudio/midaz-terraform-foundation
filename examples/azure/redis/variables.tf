@@ -1,19 +1,17 @@
 variable "location" {
   description = "Azure region where resources will be created"
   type        = string
-  default     = "northcentralus" # default alinhado com seu tfvars
+  default     = "northcentralus"
 }
 
 variable "resource_group_name" {
-  description = "Name of existing the resource group"
+  description = "Name of the existing resource group"
   type        = string
-  # sem default, obrigatório passar
 }
 
 variable "redis_name" {
   description = "Name of the Redis Cache instance"
   type        = string
-  # obrigatório passar
 }
 
 variable "capacity" {
@@ -25,13 +23,25 @@ variable "capacity" {
 variable "family" {
   description = "Redis Cache family (C for Basic/Standard, P for Premium)"
   type        = string
-  default     = "P" # Premium por padrão
+  default     = "P"
 }
 
 variable "sku" {
   description = "Redis Cache SKU (Basic, Standard, Premium)"
   type        = string
   default     = "Premium"
+}
+
+variable "minimum_tls_version" {
+  description = "Minimum TLS version for Redis"
+  type        = string
+  default     = "1.2"
+}
+
+variable "public_network_access_enabled" {
+  description = "Enable public network access for Redis"
+  type        = bool
+  default     = false
 }
 
 variable "enable_non_ssl_port" {
@@ -58,15 +68,6 @@ variable "maxmemory_policy" {
   default     = "allkeys-lru"
 }
 
-variable "tags" {
-  description = "Tags to apply to all resources"
-  type        = map(string)
-  default = {
-    Environment = "Production"
-    Terraform   = "true"
-  }
-}
-
 variable "shard_count" {
   description = "Number of shards for Redis Cluster (only Premium)"
   type        = number
@@ -76,8 +77,48 @@ variable "shard_count" {
     error_message = "Sharding (shard_count > 1) is only allowed for Premium SKU."
   }
 }
-variable "zone_redundant_enabled" {
-  description = "Enable zone redundant HA for PostgreSQL Flexible Server"
-  type        = bool
-  default     = true
+
+variable "tags" {
+  description = "Tags to apply to all resources"
+  type        = map(string)
+  default = {
+    Environment = "Production"
+    Terraform   = "true"
+  }
+}
+
+variable "pe_1_name" {
+  description = "Name of the first Redis Private Endpoint"
+  type        = string
+  default     = "redis-pe-1"
+}
+
+variable "pe_2_name" {
+  description = "Name of the second Redis Private Endpoint"
+  type        = string
+  default     = "redis-pe-2"
+}
+
+variable "psc_1_name" {
+  description = "Name of the first Redis Private Service Connection"
+  type        = string
+  default     = "redis-psc-1"
+}
+
+variable "psc_2_name" {
+  description = "Name of the second Redis Private Service Connection"
+  type        = string
+  default     = "redis-psc-2"
+}
+
+variable "dns_zone_link_name" {
+  description = "Name of the Private DNS Zone VNet link"
+  type        = string
+  default     = "redis-dns-zone-link"
+}
+
+variable "redis_dns_ttl" {
+  description = "TTL for the Redis private DNS A record"
+  type        = number
+  default     = 300
 }

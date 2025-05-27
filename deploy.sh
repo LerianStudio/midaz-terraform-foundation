@@ -217,7 +217,7 @@ esac
 
 print_message "$YELLOW" "\nWhat do you want to do?"
 print_message "$GREEN" "1) Deploy"
-print_message "$RED" "2) Destroy"
+print_message "$RED" "2) Destroy (BE CAREFUL)"
 
 read -p "Select an action (1-2): " action_choice
 

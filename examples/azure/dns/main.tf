@@ -2,19 +2,6 @@ provider "azurerm" {
   features {}
 }
 
-#######################################################
-# IMPORT EXISTING SUBNETS/RG/DNS ZONE (VNet required) #
-#######################################################
-
-data "azurerm_virtual_network" "vnet" {
-  name                = "midaz-vnet"
-  resource_group_name = "lerian-terraform-rg"
-}
-
-data "azurerm_resource_group" "dns" {
-  name = var.resource_group_name
-}
-
 resource "azurerm_private_dns_zone" "main" {
   name                = var.dns_zone_name
   resource_group_name = var.resource_group_name
@@ -102,9 +89,8 @@ resource "azurerm_private_dns_txt_record" "records" {
   resource_group_name = var.resource_group_name
   ttl                 = each.value.ttl
 
-  # Correção aqui: Usei join para concatenar a lista de strings em uma única string
   record {
-    value = join(" ", each.value.records) # Juntando as strings da lista com um espaço
+    value = join(" ", each.value.records)
   }
 
   tags = {

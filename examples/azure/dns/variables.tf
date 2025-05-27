@@ -11,7 +11,6 @@ variable "resource_group_name" {
 variable "environment" {
   description = "Environment name for tagging"
   type        = string
-  default     = "production"
 }
 
 variable "a_records" {

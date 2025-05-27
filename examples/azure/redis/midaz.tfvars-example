@@ -1,16 +1,21 @@
-location           = "northcentralus"
+location            = "northcentralus"
 resource_group_name = "lerian-terraform-rg"
-redis_name         = "midaz-redis-cache"
-capacity           = 1
-family             = "P"
-sku                = "Premium"
+redis_name          = "midaz-redis-cache"
+
+capacity = 1
+family   = "P"
+sku      = "Premium"
+
 maxmemory_reserved = 50
 maxmemory_delta    = 50
 maxmemory_policy   = "allkeys-lru"
+
+shard_count = 2
+
+enable_non_ssl_port      = true
+zone_redundant_enabled   = false # Enable HA only if you have a Premium SKU
+
 tags = {
   Environment = "Production"
   Terraform   = "true"
 }
-shard_count = 2
-enable_non_ssl_port = true
-zone_redundant_enabled = false #Enable HA only if you have a Premium SKU
