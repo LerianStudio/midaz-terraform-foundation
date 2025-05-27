@@ -111,12 +111,6 @@ variable "psc_2_name" {
   default     = "redis-psc-2"
 }
 
-variable "dns_zone_link_name" {
-  description = "Name of the Private DNS Zone VNet link"
-  type        = string
-  default     = "redis-dns-zone-link"
-}
-
 variable "redis_dns_ttl" {
   description = "TTL for the Redis private DNS A record"
   type        = number
