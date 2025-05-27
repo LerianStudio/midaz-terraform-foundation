@@ -19,7 +19,7 @@ module "vnet" {
   version      = "~> 5.0"
   use_for_each = true
 
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.network.name
   vnet_name           = var.vnet_name
   address_space       = var.address_space
   subnet_prefixes     = local.module_subnet_prefixes
@@ -40,7 +40,7 @@ module "vnet" {
 resource "azurerm_network_security_group" "public" {
   name                = "${var.vnet_name}-public-nsg"
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.network.name
 
   security_rule {
     name                       = "allow-https"
@@ -64,7 +64,7 @@ resource "azurerm_network_security_group" "public" {
 resource "azurerm_network_security_group" "private" {
   name                = "${var.vnet_name}-private-nsg"
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.network.name
 
   security_rule {
     name                       = "allow-internal"
