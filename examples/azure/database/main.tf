@@ -14,9 +14,16 @@ resource "azurerm_key_vault" "kv-db-midaz" {
   location                   = var.location
   sku_name                   = var.key_vault_sku
   tenant_id                  = data.azurerm_client_config.current.tenant_id
-  purge_protection_enabled   = var.kv_purge_protection_enabled
+  purge_protection_enabled   = true
   soft_delete_retention_days = var.kv_soft_delete_retention_days
   tags                       = var.tags
+
+  network_acls {
+    default_action             = "Deny"
+    bypass                     = "AzureServices"
+    ip_rules                   = var.key_vault_allowed_ips
+    virtual_network_subnet_ids = var.key_vault_allowed_subnets
+  }
 }
 
 resource "azurerm_key_vault_access_policy" "kv_access_policy" {
@@ -41,6 +48,9 @@ resource "azurerm_key_vault_secret" "postgres_admin_password" {
   name         = var.pgsql_secret_name
   value        = random_password.postgres_admin_password.result
   key_vault_id = azurerm_key_vault.kv-db-midaz.id
+
+  content_type = "postgresql-admin-password"
+  expiration_date = timeadd(timestamp(), "8760h") # expires in 1 year
 
   depends_on = [azurerm_key_vault_access_policy.kv_access_policy]
 }

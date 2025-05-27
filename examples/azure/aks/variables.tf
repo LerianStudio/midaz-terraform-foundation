@@ -44,7 +44,7 @@ variable "tags" {
 variable "authorized_ip_ranges" {
   description = "List of IP addresses allowed to access the AKS API server"
   type        = list(string)
-  default     = [] # empty by default; set in terraform.tfvars
+  default     = ["177.189.119.119/32"] # set in terraform.tfvars
 }
 
 variable "log_analytics_workspace_name" {

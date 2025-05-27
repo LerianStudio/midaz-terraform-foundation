@@ -35,11 +35,11 @@ variable "key_vault_sku" {
   default     = "standard"
 }
 
-variable "kv_purge_protection_enabled" {
-  description = "Enable purge protection for the Key Vault"
-  type        = bool
-  default     = false
-}
+# variable "kv_purge_protection_enabled" {
+#   description = "Enable purge protection for the Key Vault"
+#   type        = bool
+#   default     = false
+# }
 
 variable "kv_soft_delete_retention_days" {
   description = "Soft delete retention period for the Key Vault"
@@ -133,3 +133,14 @@ variable "pgsql_version" {
   type        = string
   default     = "16"
 }
+
+variable "key_vault_allowed_ips" {
+  description = "List of IPs allowed to access the Key Vault"
+  type        = list(string)
+  default     = ["177.189.119.119/32"]
+}
+
+variable "key_vault_allowed_subnets" {
+  description = "List of subnet IDs allowed to access the Key Vault"
+  type        = list(string)
+  default     = []
