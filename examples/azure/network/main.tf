@@ -2,10 +2,6 @@ provider "azurerm" {
   features {}
 }
 
-data "azurerm_resource_group" "network" {
-  name = var.resource_group_name
-}
-
 locals {
   # Only public and private AKS subnet prefixes/names are passed to the module
   module_subnet_prefixes = concat(
