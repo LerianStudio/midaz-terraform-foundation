@@ -10,7 +10,7 @@ backup_location   = "us-east1"
 vpc_self_link     = "projects/<PUT-YOUR-PROJECT-ID>/global/networks/midaz-network"
 
 # Database configuration
-db_version   = "POSTGRES_17"
+db_version   = "POSTGRES_16"
 db_charset   = "UTF8"
 db_collation = "en_US.UTF8"
 

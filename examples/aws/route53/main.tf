@@ -1,12 +1,3 @@
-# Get VPC by filter
-data "aws_vpc" "selected" {
-  filter {
-    name   = "tag:Name"
-    values = [var.vpc_name]
-  }
-}
-
-# Private Hosted Zone
 resource "aws_route53_zone" "private" {
   name = var.private_domain_name
 

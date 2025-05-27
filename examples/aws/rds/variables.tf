@@ -28,19 +28,19 @@ variable "engine" {
 variable "engine_version" {
   description = "Database engine version"
   type        = string
-  default     = "17.5"
+  default     = "16.3"
 }
 
 variable "family" {
   description = "Database parameter group family"
   type        = string
-  default     = "postgres17"
+  default     = "postgres16"
 }
 
 variable "major_engine_version" {
   description = "Database major engine version"
   type        = string
-  default     = "17"
+  default     = "16"
 }
 
 variable "instance_class" {
@@ -105,7 +105,7 @@ variable "backup_retention_period" {
 variable "skip_final_snapshot" {
   description = "Whether to skip final snapshot when destroying the RDS instance"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "create_read_replica" {

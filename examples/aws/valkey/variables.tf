@@ -74,6 +74,7 @@ variable "dns_zone_name" {
   default     = "midaz.internal"
 }
 
+# transit_encryption_mode and auth_token will be used once Midaz accepts TLS certificates configuration
 # variable "transit_encryption_mode" {
 #   description = "Transit encryption mode for Valkey cluster. Valid values are preferred and required"
 #   type        = string

@@ -5,9 +5,9 @@ environment = "dev"
 # RDS Configuration
 vpc_name              = "midaz-network"
 engine                = "postgres"
-engine_version        = "17.5"
-family                = "postgres17"
-major_engine_version  = "17"
+engine_version        = "16.3"
+family                = "postgres16"
+major_engine_version  = "16"
 instance_class        = "db.t3.medium"
 allocated_storage     = 20
 max_allocated_storage = 100
@@ -41,7 +41,7 @@ performance_insights_retention_period = 7 # Days to retain performance insights 
 
 # Backup Configuration
 backup_retention_period = 7    # Days to retain automated backups
-skip_final_snapshot     = true # Create a final snapshot when destroying the instance
+skip_final_snapshot     = false # Create a final snapshot when destroying the instance
 
 # Read Replica Configuration
 create_read_replica         = true
