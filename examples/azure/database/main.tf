@@ -6,35 +6,20 @@ provider "azurerm" {
 # KEY VAULT FOR POSTGRES    #
 ##############################
 
-data "azurerm_client_config" "current" {}
-
-data "azurerm_virtual_network" "vnet" {
-  name                = var.vnet_name
-  resource_group_name = var.resource_group_name
-}
-
-data "azurerm_subnet" "subnet_db_1" {
-  name                 = var.subnet_db_1_name
-  virtual_network_name = data.azurerm_virtual_network.vnet.name
-  resource_group_name  = var.resource_group_name
-}
-
-data "azurerm_subnet" "subnet_db_2" {
-  name                 = var.subnet_db_2_name
-  virtual_network_name = data.azurerm_virtual_network.vnet.name
-  resource_group_name  = var.resource_group_name
-}
-
 resource "azurerm_key_vault" "kv-db-midaz" {
   name                       = var.key_vault_name
   resource_group_name        = var.resource_group_name
   location                   = var.location
-  sku_name                   = var.key_vault_sku
+  sku_name                   = "standard"
   tenant_id                  = data.azurerm_client_config.current.tenant_id
-  purge_protection_enabled   = var.kv_purge_protection_enabled
-  soft_delete_retention_days = var.kv_soft_delete_retention_days
+  purge_protection_enabled   = false
+  soft_delete_retention_days = 7
   tags                       = var.tags
 }
+
+##############################
+# KEY VAULT ACCESS POLICY    #
+##############################
 
 resource "azurerm_key_vault_access_policy" "kv_access_policy" {
   for_each = { for policy in var.key_vault_access_policies : policy.object_id => policy }
@@ -46,34 +31,54 @@ resource "azurerm_key_vault_access_policy" "kv_access_policy" {
   secret_permissions = each.value.secret_permissions
 }
 
+##################################
+# GENERATE RANDOM PASSWORD       #
+##################################
+
 resource "random_password" "postgres_admin_password" {
-  length  = var.pgsql_password_length
+  length  = 16
   special = true
   upper   = true
   lower   = true
   numeric = true
 }
 
+##################################
+# STORE PASSWORD IN KEY VAULT    #
+##################################
+
 resource "azurerm_key_vault_secret" "postgres_admin_password" {
-  name         = var.pgsql_secret_name
+  name         = "postgres-admin-password"
   value        = random_password.postgres_admin_password.result
   key_vault_id = azurerm_key_vault.kv-db-midaz.id
 
   depends_on = [azurerm_key_vault_access_policy.kv_access_policy]
 }
 
+##################################
+# PRIVATE DNS ZONE - POSTGRESQL  #
+##################################
+
 resource "azurerm_private_dns_zone" "postgres" {
-  name                = var.dns_zone_name
+  name                = "privatelink.postgres.database.azure.com"
   resource_group_name = var.resource_group_name
 }
 
+###########################################
+# PRIVATE DNS ZONE VNET LINK - POSTGRESQL #
+###########################################
+
 resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-  name                  = var.dns_zone_link_name
+  name                  = "vnet-link-postgres"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.postgres.name
   virtual_network_id    = data.azurerm_virtual_network.vnet.id
   registration_enabled  = false
 }
+
+##################################
+# POSTGRESQL FLEXIBLE SERVER     #
+##################################
 
 resource "azurerm_postgresql_flexible_server" "primary" {
   name                   = var.pgsql_primary_name
@@ -81,7 +86,7 @@ resource "azurerm_postgresql_flexible_server" "primary" {
   location               = var.location
   administrator_login    = var.pgsql_admin_login
   administrator_password = azurerm_key_vault_secret.postgres_admin_password.value
-  version                = var.pgsql_version
+  version                = "16"
 
   sku_name   = var.pgsql_sku
   storage_mb = var.pgsql_storage_mb
@@ -94,6 +99,10 @@ resource "azurerm_postgresql_flexible_server" "primary" {
 
   depends_on = [azurerm_key_vault_secret.postgres_admin_password]
 }
+
+##################################
+# POSTGRESQL REPLICA             #
+##################################
 
 resource "azurerm_postgresql_flexible_server" "replica" {
   count               = var.enable_pgsql_replica ? 1 : 0

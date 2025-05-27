@@ -9,9 +9,11 @@ output "primary_postgresql_server_fqdn" {
 }
 
 output "postgresql_read_replica_id" {
-  value = length(azurerm_postgresql_flexible_server.replica) > 0 ? azurerm_postgresql_flexible_server.replica[0].id : ""
+  description = "The resource ID of the PostgreSQL read replica (if enabled)"
+  value       = length(azurerm_postgresql_flexible_server.replica) > 0 ? azurerm_postgresql_flexible_server.replica[0].id : null
 }
 
 output "postgresql_read_replica_fqdn" {
-  value = length(azurerm_postgresql_flexible_server.replica) > 0 ? azurerm_postgresql_flexible_server.replica[0].fqdn : ""
+  description = "The FQDN of the PostgreSQL read replica (if enabled)"
+  value       = length(azurerm_postgresql_flexible_server.replica) > 0 ? azurerm_postgresql_flexible_server.replica[0].fqdn : null
 }
