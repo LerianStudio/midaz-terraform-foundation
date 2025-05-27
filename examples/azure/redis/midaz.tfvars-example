@@ -12,7 +12,7 @@ maxmemory_policy   = "allkeys-lru"
 
 shard_count = 2
 
-enable_non_ssl_port      = true
+#enable_non_ssl_port      = true # Only available on Basic and Standard SKU
 zone_redundant_enabled   = false # Enable HA only if you have a Premium SKU
 
 tags = {

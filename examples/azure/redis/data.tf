@@ -20,10 +20,10 @@ data "azurerm_subnet" "subnet_redis_2" {
 }
 
 data "azurerm_resource_group" "redis" {
-  name = "lerian-terraform-rg"
+  name = var.resource_group_name
 }
 
 data "azurerm_private_dns_zone" "redis" {
   name                = "lerian.internal"
-  resource_group_name = "lerian-terraform-rg"
+  name = var.resource_group_name
 }

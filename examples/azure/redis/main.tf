@@ -9,7 +9,7 @@ provider "azurerm" {
 resource "azurerm_redis_cache" "example" {
   name                = var.redis_name
   location            = var.location
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.redis.name
   capacity            = var.capacity
   family              = var.family
   sku_name            = var.sku
@@ -57,7 +57,7 @@ resource "azurerm_private_endpoint" "redis_2" {
 
 data "azurerm_private_dns_zone_virtual_network_link" "redis" {
   name                  = var.dns_zone_link_name
-  resource_group_name   = var.resource_group_name
+  resource_group_name   = data.azurerm_resource_group.redis.name
   private_dns_zone_name = data.azurerm_private_dns_zone.redis.name
 }
 

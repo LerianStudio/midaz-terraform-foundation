@@ -44,11 +44,11 @@ variable "public_network_access_enabled" {
   default     = false
 }
 
-variable "enable_non_ssl_port" {
-  description = "Enable the non-SSL port (6379)"
-  type        = bool
-  default     = false
-}
+# variable "enable_non_ssl_port" {
+#   description = "Enable the non-SSL port (6379). Only applicable to Basic/Standard SKUs."
+#   type        = bool
+#   default     = false
+# }
 
 variable "maxmemory_reserved" {
   description = "Reserved memory in MB"
