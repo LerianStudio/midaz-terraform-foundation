@@ -127,3 +127,9 @@ variable "pgsql_password_length" {
   type        = number
   default     = 16
 }
+
+variable "pgsql_version" {
+  description = "PostgreSQL server version"
+  type        = string
+  default     = "16"
+}
