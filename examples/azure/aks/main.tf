@@ -37,10 +37,6 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   private_cluster_enabled = var.private_cluster_enabled
 
-  api_server_access_profile {
-    authorized_ip_ranges = ["177.189.119.119/32"]
-  }
-
   default_node_pool {
     name           = var.default_node_pool_name
     node_count     = var.node_count

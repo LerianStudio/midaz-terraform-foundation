@@ -92,7 +92,7 @@ variable "dns_service_ip" {
 variable "private_cluster_enabled" {
   description = "Whether the AKS cluster should be private"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "default_node_pool_name" {
