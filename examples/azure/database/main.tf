@@ -49,7 +49,7 @@ resource "azurerm_key_vault_secret" "postgres_admin_password" {
   value        = random_password.postgres_admin_password.result
   key_vault_id = azurerm_key_vault.kv-db-midaz.id
 
-  content_type = "postgresql-admin-password"
+  content_type    = "postgresql-admin-password"
   expiration_date = timeadd(timestamp(), "8760h") # expires in 1 year
 
   depends_on = [azurerm_key_vault_access_policy.kv_access_policy]
