@@ -119,7 +119,7 @@ resource "azurerm_subnet" "private_db" {
       actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
   }
-   depends_on = [module.vnet]
+  depends_on = [module.vnet]
 }
 
 # Associate private NSG to private DB subnets

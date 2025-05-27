@@ -49,7 +49,7 @@ variable "key_vault_access_policies" {
   }))
   default = [
     {
-      object_id          = "ec5f4491-a949-4432-804b-b82d03c15b3e"  ## Atualize com o object_id do executor Terraform
+      object_id          = "ec5f4491-a949-4432-804b-b82d03c15b3e" ## Atualize com o object_id do executor Terraform
       secret_permissions = ["Get", "List", "Set", "Delete", "Purge"]
     }
   ]

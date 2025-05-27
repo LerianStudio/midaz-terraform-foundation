@@ -34,14 +34,14 @@ data "azurerm_resource_group" "db" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "kv-db-midaz" {
-  name                         = var.key_vault_name
-  resource_group_name          = var.resource_group_name
-  location                     = var.location
-  sku_name                     = "standard"
-  tenant_id                    = data.azurerm_client_config.current.tenant_id
-  purge_protection_enabled     = false
-  soft_delete_retention_days   = 7
-  tags                         = var.tags
+  name                       = var.key_vault_name
+  resource_group_name        = var.resource_group_name
+  location                   = var.location
+  sku_name                   = "standard"
+  tenant_id                  = data.azurerm_client_config.current.tenant_id
+  purge_protection_enabled   = false
+  soft_delete_retention_days = 7
+  tags                       = var.tags
 }
 
 ##############################
@@ -49,7 +49,7 @@ resource "azurerm_key_vault" "kv-db-midaz" {
 ##############################
 
 resource "azurerm_key_vault_access_policy" "kv_access_policy" {
-  for_each     = { for policy in var.key_vault_access_policies : policy.object_id => policy }
+  for_each = { for policy in var.key_vault_access_policies : policy.object_id => policy }
 
   key_vault_id = azurerm_key_vault.kv-db-midaz.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
@@ -96,11 +96,11 @@ resource "azurerm_private_dns_zone" "postgres" {
 ###########################################
 
 resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
-  name                   = "vnet-link-postgres"
-  resource_group_name    = var.resource_group_name
-  private_dns_zone_name  = azurerm_private_dns_zone.postgres.name
-  virtual_network_id     = data.azurerm_virtual_network.vnet.id
-  registration_enabled   = false
+  name                  = "vnet-link-postgres"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.postgres.name
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
+  registration_enabled  = false
 }
 
 ##################################
@@ -124,7 +124,7 @@ resource "azurerm_postgresql_flexible_server" "primary" {
 
   tags = var.tags
 
-  depends_on = [azurerm_key_vault_secret.postgres_admin_password]  
+  depends_on = [azurerm_key_vault_secret.postgres_admin_password]
 }
 
 ##################################

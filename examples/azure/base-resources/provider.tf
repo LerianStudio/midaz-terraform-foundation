@@ -1,5 +1,5 @@
 provider "azurerm" {
-  alias           = "sponsorship"
+  alias = "sponsorship"
 
   features {}
 

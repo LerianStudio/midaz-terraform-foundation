@@ -1,7 +1,7 @@
 variable "location" {
   description = "Azure region where resources will be created"
   type        = string
-  default     = "northcentralus"  # default alinhado com seu tfvars
+  default     = "northcentralus" # default alinhado com seu tfvars
 }
 
 variable "resource_group_name" {
@@ -72,9 +72,9 @@ variable "shard_count" {
   type        = number
   default     = 2
   validation {
-  condition     = !(var.sku != "Premium" && var.shard_count > 1)
-  error_message = "Sharding (shard_count > 1) is only allowed for Premium SKU."
-}
+    condition     = !(var.sku != "Premium" && var.shard_count > 1)
+    error_message = "Sharding (shard_count > 1) is only allowed for Premium SKU."
+  }
 }
 variable "zone_redundant_enabled" {
   description = "Enable zone redundant HA for PostgreSQL Flexible Server"

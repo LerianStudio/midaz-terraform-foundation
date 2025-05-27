@@ -29,7 +29,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "main" {
   name                  = "${var.dns_zone_name}-link"
   resource_group_name   = var.resource_group_name
   private_dns_zone_name = azurerm_private_dns_zone.main.name
-  virtual_network_id = data.azurerm_virtual_network.vnet.id
+  virtual_network_id    = data.azurerm_virtual_network.vnet.id
   registration_enabled  = true
 
   tags = {
@@ -104,7 +104,7 @@ resource "azurerm_private_dns_txt_record" "records" {
 
   # Correção aqui: Usei join para concatenar a lista de strings em uma única string
   record {
-    value = join(" ", each.value.records)  # Juntando as strings da lista com um espaço
+    value = join(" ", each.value.records) # Juntando as strings da lista com um espaço
   }
 
   tags = {
