@@ -5,12 +5,6 @@ variable "location" {
   default     = "eastus2"
 }
 
-# Name of the resource group that will hold the AKS and other resources
-variable "resource_group_name" {
-  description = "Name of the resource group"
-  type        = string
-}
-
 # Name of the AKS cluster
 variable "cluster_name" {
   description = "Name of the AKS cluster"
@@ -21,13 +15,6 @@ variable "cluster_name" {
 variable "kubernetes_version" {
   description = "Version of Kubernetes to use"
   type        = string
-}
-
-# IP CIDRs allowed to access the AKS API server (if public access is enabled)
-variable "api_server_access_cidrs" {
-  description = "List of IP CIDR ranges that are allowed to access the AKS API server"
-  type        = list(string)
-  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 }
 
 # Number of nodes in the default (system) node pool
