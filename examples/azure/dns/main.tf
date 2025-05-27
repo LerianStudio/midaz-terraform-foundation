@@ -4,7 +4,7 @@ provider "azurerm" {
 
 resource "azurerm_private_dns_zone" "main" {
   name                = var.dns_zone_name
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.dns.name
 
   tags = {
     environment = var.environment
@@ -14,7 +14,7 @@ resource "azurerm_private_dns_zone" "main" {
 
 resource "azurerm_private_dns_zone_virtual_network_link" "main" {
   name                  = "${var.dns_zone_name}-link"
-  resource_group_name   = var.resource_group_name
+  resource_group_name   = data.azurerm_resource_group.dns.name
   private_dns_zone_name = azurerm_private_dns_zone.main.name
   virtual_network_id    = data.azurerm_virtual_network.vnet.id
   registration_enabled  = true
@@ -31,7 +31,7 @@ resource "azurerm_private_dns_a_record" "records" {
 
   name                = each.value.name
   zone_name           = azurerm_private_dns_zone.main.name
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.dns.name
   ttl                 = each.value.ttl
   records             = each.value.records
 
@@ -47,7 +47,7 @@ resource "azurerm_private_dns_cname_record" "records" {
 
   name                = each.value.name
   zone_name           = azurerm_private_dns_zone.main.name
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.dns.name
   ttl                 = each.value.ttl
   record              = each.value.record
 
@@ -63,7 +63,7 @@ resource "azurerm_private_dns_mx_record" "records" {
 
   name                = each.value.name
   zone_name           = azurerm_private_dns_zone.main.name
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.dns.name
   ttl                 = each.value.ttl
 
   dynamic "record" {
@@ -86,7 +86,7 @@ resource "azurerm_private_dns_txt_record" "records" {
 
   name                = each.value.name
   zone_name           = azurerm_private_dns_zone.main.name
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.dns.name
   ttl                 = each.value.ttl
 
   record {
