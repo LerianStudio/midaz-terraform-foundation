@@ -144,3 +144,4 @@ variable "key_vault_allowed_subnets" {
   description = "List of subnet IDs allowed to access the Key Vault"
   type        = list(string)
   default     = []
+}
