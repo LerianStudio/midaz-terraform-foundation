@@ -29,10 +29,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   role_based_access_control_enabled = true
 
   network_profile {
-    network_plugin   = var.network_plugin
-    network_policy   = var.network_policy
-    service_cidr     = var.service_cidr
-    dns_service_ip   = var.dns_service_ip
+    network_plugin = var.network_plugin
+    network_policy = var.network_policy
+    service_cidr   = var.service_cidr
+    dns_service_ip = var.dns_service_ip
   }
 
   private_cluster_enabled = var.private_cluster_enabled
@@ -81,4 +81,4 @@ resource "azurerm_kubernetes_cluster_node_pool" "armnp" {
     "architecture" = "arm64"
   }
   tags = var.tags
-} 
+}
