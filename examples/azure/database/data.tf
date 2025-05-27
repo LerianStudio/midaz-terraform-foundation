@@ -22,3 +22,4 @@ data "azurerm_subnet" "subnet_db_2" {
 data "azurerm_resource_group" "db" {
   name = var.resource_group_name
 }
+
