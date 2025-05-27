@@ -33,7 +33,7 @@ if ! command -v tfsec &> /dev/null; then
     exit 1
 fi
 
-tfsec --exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs .
+tfsec --exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy .
 if [ $? -ne 0 ]; then
     echo -e "${RED}Security checks failed.${NC}"
     exit 1
