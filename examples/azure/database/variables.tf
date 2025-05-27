@@ -75,4 +75,32 @@ variable "zone_redundant_enabled" {
   type        = bool
   default     = true
 }
+variable "vnet_name" {
+  description = "Name of the Virtual Network used for PostgreSQL"
+  type        = string
+}
+
+variable "key_vault_sku" {
+  description = "SKU for the Key Vault"
+  type        = string
+  default     = "standard"
+}
+
+variable "kv_purge_protection_enabled" {
+  description = "Enable purge protection for the Key Vault"
+  type        = bool
+  default     = false
+}
+
+variable "kv_soft_delete_retention_days" {
+  description = "Soft delete retention period for the Key Vault"
+  type        = number
+  default     = 7
+}
+
+variable "pgsql_password_length" {
+  description = "Length of the randomly generated admin password"
+  type        = number
+  default     = 16
+}
 
