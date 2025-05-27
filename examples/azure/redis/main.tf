@@ -55,12 +55,6 @@ resource "azurerm_private_endpoint" "redis_2" {
   }
 }
 
-data "azurerm_private_dns_zone_virtual_network_link" "redis" {
-  name                  = var.dns_zone_link_name
-  resource_group_name   = data.azurerm_resource_group.redis.name
-  private_dns_zone_name = data.azurerm_private_dns_zone.redis.name
-}
-
 resource "azurerm_private_dns_a_record" "redis" {
   name                = var.redis_name
   zone_name           = data.azurerm_private_dns_zone.redis.name
