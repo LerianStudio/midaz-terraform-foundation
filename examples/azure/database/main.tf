@@ -5,10 +5,11 @@ provider "azurerm" {
 ##############################
 # KEY VAULT FOR POSTGRES    #
 ##############################
+data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "kv-db-midaz" {
   name                       = var.key_vault_name
-  resource_group_name        = var.resource_group_name
+  resource_group_name        = data.azurerm_resource_group.db.name
   location                   = var.location
   sku_name                   = "standard"
   tenant_id                  = data.azurerm_client_config.current.tenant_id
@@ -61,7 +62,7 @@ resource "azurerm_key_vault_secret" "postgres_admin_password" {
 
 resource "azurerm_private_dns_zone" "postgres" {
   name                = "privatelink.postgres.database.azure.com"
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.db.name
 }
 
 ###########################################
@@ -70,7 +71,7 @@ resource "azurerm_private_dns_zone" "postgres" {
 
 resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
   name                  = "vnet-link-postgres"
-  resource_group_name   = var.resource_group_name
+  resource_group_name   = data.azurerm_resource_group.db.name
   private_dns_zone_name = azurerm_private_dns_zone.postgres.name
   virtual_network_id    = data.azurerm_virtual_network.vnet.id
   registration_enabled  = false
@@ -82,7 +83,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
 
 resource "azurerm_postgresql_flexible_server" "primary" {
   name                   = var.pgsql_primary_name
-  resource_group_name    = var.resource_group_name
+  resource_group_name    = data.azurerm_resource_group.db.name
   location               = var.location
   administrator_login    = var.pgsql_admin_login
   administrator_password = azurerm_key_vault_secret.postgres_admin_password.value
@@ -107,7 +108,7 @@ resource "azurerm_postgresql_flexible_server" "primary" {
 resource "azurerm_postgresql_flexible_server" "replica" {
   count               = var.enable_pgsql_replica ? 1 : 0
   name                = "${var.pgsql_primary_name}-replica"
-  resource_group_name = var.resource_group_name
+  resource_group_name = data.azurerm_resource_group.db.name
   location            = var.location
   create_mode         = "Replica"
   source_server_id    = azurerm_postgresql_flexible_server.primary.id
