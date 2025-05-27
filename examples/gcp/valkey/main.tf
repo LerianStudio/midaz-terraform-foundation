@@ -1,9 +1,3 @@
-// Get the DNS zone data
-data "google_dns_managed_zone" "private_zone" {
-  name    = "midaz-private-dns"
-  project = var.project_id
-}
-
 module "memorystore_valkey" {
   source  = "terraform-google-modules/memorystore/google//modules/valkey"
   version = "~> 14.0"
