@@ -1,6 +1,7 @@
 location            = "northcentralus"
 resource_group_name = "lerian-terraform-rg"
 redis_name          = "midaz-redis-cache"
+dns_zone_name       = "lerian.internal"
 
 capacity = 1
 family   = "P"

@@ -122,3 +122,8 @@ variable "redis_dns_ttl" {
   type        = number
   default     = 300
 }
+
+variable "dns_zone_name" {
+  description = "Name of the existing Private DNS Zone for Redis"
+  type        = string
+}

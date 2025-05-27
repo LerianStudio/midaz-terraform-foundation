@@ -24,6 +24,6 @@ data "azurerm_resource_group" "redis" {
 }
 
 data "azurerm_private_dns_zone" "redis" {
-  name                = "lerian.internal"
-  name = var.resource_group_name
+  name = var.dns_zone_name
+  resource_group_name = var.resource_group_name
 }
