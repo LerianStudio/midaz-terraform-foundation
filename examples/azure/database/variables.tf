@@ -75,17 +75,4 @@ variable "zone_redundant_enabled" {
   type        = bool
   default     = true
 }
-variable "key_vault_access_policies" {
-  description = "List of access policies for the Key Vault"
-  type = list(object({
-    object_id          = string
-    secret_permissions = list(string)
-  }))
-  default = [
-    {
-      object_id          = "ec5f4491-a949-4432-804b-b82d03c15b3e" ## Atualize com o object_id do executor Terraform
-      secret_permissions = ["Get", "List", "Set", "Delete", "Purge"]
-    }
-  ]
-}
 
