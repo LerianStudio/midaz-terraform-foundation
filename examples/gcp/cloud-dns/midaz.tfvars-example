@@ -1,0 +1,4 @@
+project_id    = "<PUT-YOUR-PROJECT-ID>"
+dns_name      = "midaz-private-dns"
+dns_domain    = "midaz.internal." # Note: DNS domain should end with a dot
+vpc_self_link = "projects/<PUT-YOUR-PROJECT-ID>/global/networks/midaz-network"

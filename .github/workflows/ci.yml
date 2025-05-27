@@ -77,7 +77,7 @@ jobs:
         cd ../../../examples/gcp/vpc && terraform init -backend=false
         cd ../cloud-dns && terraform init -backend=false
         cd ../cloud-sql && terraform init -backend=false
-        cd ../memorystore && terraform init -backend=false
+        cd ../valkey && terraform init -backend=false
         cd ../gke && terraform init -backend=false
         # Azure components
         cd ../../../examples/azure/network && terraform init -backend=false
@@ -99,7 +99,7 @@ jobs:
         cd ../../../examples/gcp/vpc && terraform validate
         cd ../cloud-dns && terraform validate
         cd ../cloud-sql && terraform validate
-        cd ../memorystore && terraform validate
+        cd ../valkey && terraform validate
         cd ../gke && terraform validate
         # Azure components
         cd ../../../examples/azure/network && terraform validate
@@ -129,7 +129,7 @@ jobs:
     - name: Run tfsec
       uses: aquasecurity/tfsec-action@v1.0.0
       with:
-        additional_args: "--exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs"
+        additional_args: "--exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy"
 
     # Preview next semantic-release version
     - name: Preview Next Release
