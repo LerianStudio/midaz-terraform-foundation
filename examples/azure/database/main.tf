@@ -8,27 +8,6 @@ provider "azurerm" {
 
 data "azurerm_client_config" "current" {}
 
-data "azurerm_virtual_network" "vnet" {
-  name                = var.vnet_name
-  resource_group_name = var.resource_group_name
-}
-
-data "azurerm_subnet" "subnet_db_1" {
-  name                 = var.subnet_db_1_name
-  virtual_network_name = var.vnet_name
-  resource_group_name  = var.resource_group_name
-}
-
-data "azurerm_subnet" "subnet_db_2" {
-  name                 = var.subnet_db_2_name
-  virtual_network_name = var.vnet_name
-  resource_group_name  = var.resource_group_name
-}
-
-data "azurerm_resource_group" "db" {
-  name = var.resource_group_name
-}
-
 resource "azurerm_key_vault" "kv-db-midaz" {
   name                       = var.key_vault_name
   resource_group_name        = data.azurerm_resource_group.db.name

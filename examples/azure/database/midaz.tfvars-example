@@ -1,8 +1,18 @@
-pgsql_primary_name = "lerian-postgresql"
+# General configuration
 resource_group_name = "lerian-terraform-rg"
-location           = "northcentralus"
+location            = "northcentralus"
+
+# PostgreSQL configuration
+pgsql_primary_name  = "lerian-postgresql"
+
+# Networking (required for data sources)
+vnet_name           = "midaz-vnet"
+subnet_db_1_name    = "private-db-subnet-1"
+subnet_db_2_name    = "private-db-subnet-2"
+
+# DNS
 dns_zone_name       = "lerian.internal"
 
-#HA Configurations
-zone_redundant_enabled = false # enable HA only if you use zone_redundant region/location enabled
-enable_pgsql_replica = true # If you want to create a read replica of the primary server
+# High Availability configuration
+zone_redundant_enabled = false # Enable HA only if your region supports zone redundancy
+enable_pgsql_replica   = true  # Enable to provision a read replica for the primary server

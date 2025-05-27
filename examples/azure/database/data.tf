@@ -3,22 +3,22 @@
 #######################################################
 
 data "azurerm_virtual_network" "vnet" {
-  name                = "midaz-vnet"
-  resource_group_name = "lerian-terraform-rg"
+  name                = var.vnet_name
+  resource_group_name = var.resource_group_name
 }
 
 data "azurerm_subnet" "subnet_db_1" {
-  name                 = "private-db-subnet-1"
+  name                 = var.subnet_db_1_name
   virtual_network_name = data.azurerm_virtual_network.vnet.name
-  resource_group_name  = "lerian-terraform-rg"
+  resource_group_name  = var.resource_group_name
 }
 
 data "azurerm_subnet" "subnet_db_2" {
-  name                 = "private-db-subnet-2"
+  name                 = var.subnet_db_2_name
   virtual_network_name = data.azurerm_virtual_network.vnet.name
-  resource_group_name  = "lerian-terraform-rg"
+  resource_group_name  = var.resource_group_name
 }
 
 data "azurerm_resource_group" "db" {
-  name = "lerian-terraform-rg"
+  name = var.resource_group_name
 }
