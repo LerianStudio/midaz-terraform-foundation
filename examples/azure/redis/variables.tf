@@ -1,19 +1,17 @@
 variable "location" {
   description = "Azure region where resources will be created"
   type        = string
-  default     = "eastus2"
+  default     = "northcentralus"
 }
 
 variable "resource_group_name" {
-  description = "Name of the resource group"
+  description = "Name of the existing resource group"
   type        = string
-  default     = "rg-redis-example"
 }
 
 variable "redis_name" {
   description = "Name of the Redis Cache instance"
   type        = string
-  default     = "redis-cache-example"
 }
 
 variable "capacity" {
@@ -25,20 +23,32 @@ variable "capacity" {
 variable "family" {
   description = "Redis Cache family (C for Basic/Standard, P for Premium)"
   type        = string
-  default     = "C"
+  default     = "P"
 }
 
 variable "sku" {
   description = "Redis Cache SKU (Basic, Standard, Premium)"
   type        = string
-  default     = "Basic"
+  default     = "Premium"
 }
 
-variable "enable_non_ssl_port" {
-  description = "Enable the non-SSL port (6379)"
+variable "minimum_tls_version" {
+  description = "Minimum TLS version for Redis"
+  type        = string
+  default     = "1.2"
+}
+
+variable "public_network_access_enabled" {
+  description = "Enable public network access for Redis"
   type        = bool
   default     = false
 }
+
+# variable "enable_non_ssl_port" {
+#   description = "Enable the non-SSL port (6379). Only applicable to Basic/Standard SKUs."
+#   type        = bool
+#   default     = false
+# }
 
 variable "maxmemory_reserved" {
   description = "Reserved memory in MB"
@@ -58,11 +68,56 @@ variable "maxmemory_policy" {
   default     = "allkeys-lru"
 }
 
+variable "shard_count" {
+  description = "Number of shards for Redis Cluster (only Premium)"
+  type        = number
+  default     = 2
+  validation {
+    condition     = !(var.sku != "Premium" && var.shard_count > 1)
+    error_message = "Sharding (shard_count > 1) is only allowed for Premium SKU."
+  }
+}
+
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
   default = {
-    Environment = "Example"
+    Environment = "Production"
     Terraform   = "true"
   }
+}
+
+variable "pe_1_name" {
+  description = "Name of the first Redis Private Endpoint"
+  type        = string
+  default     = "redis-pe-1"
+}
+
+variable "pe_2_name" {
+  description = "Name of the second Redis Private Endpoint"
+  type        = string
+  default     = "redis-pe-2"
+}
+
+variable "psc_1_name" {
+  description = "Name of the first Redis Private Service Connection"
+  type        = string
+  default     = "redis-psc-1"
+}
+
+variable "psc_2_name" {
+  description = "Name of the second Redis Private Service Connection"
+  type        = string
+  default     = "redis-psc-2"
+}
+
+variable "redis_dns_ttl" {
+  description = "TTL for the Redis private DNS A record"
+  type        = number
+  default     = 300
+}
+
+variable "dns_zone_name" {
+  description = "Name of the existing Private DNS Zone for Redis"
+  type        = string
 }

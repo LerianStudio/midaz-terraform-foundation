@@ -1,0 +1,22 @@
+location            = "northcentralus"
+resource_group_name = "midaz-terraform-rg"
+redis_name          = "midaz-redis-cache"
+dns_zone_name       = "midaz.internal"
+
+capacity = 1
+family   = "P"
+sku      = "Premium"
+
+maxmemory_reserved = 50
+maxmemory_delta    = 50
+maxmemory_policy   = "allkeys-lru"
+
+shard_count = 2
+
+#enable_non_ssl_port      = true # Only available on Basic and Standard SKU
+zone_redundant_enabled   = false # Enable HA only if you have a Premium SKU
+
+tags = {
+  Environment = "<environment>"
+  Terraform   = "true"
+}

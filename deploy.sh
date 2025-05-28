@@ -15,6 +15,22 @@ print_message() {
     echo -e "${color}${message}${NC}"
 }
 
+# Print table header
+print_table_header() {
+    printf "\n%-15s %-10s %-20s %-10s\n" "Component" "Action" "Status" "Duration"
+    printf "%-15s %-10s %-20s %-10s\n" "---------" "------" "------" "--------"
+}
+
+# Print a row in the table with color on status
+print_table_row() {
+    local component=$1
+    local action=$2
+    local status=$3
+    local color=$4
+    local duration=$5
+    printf "%-15s %-10s ${color}%-20s${NC} %-10s\n" "$component" "$action" "$status" "$duration"
+}
+
 # Function to check placeholders in backend files
 check_placeholders() {
     local provider=$1
@@ -38,7 +54,7 @@ check_placeholders() {
                     "network") backend_file="examples/azure/network/backend.tf" ;;
                     "dns") backend_file="examples/azure/dns/backend.tf" ;;
                     "database") backend_file="examples/azure/database/backend.tf" ;;
-                    "valkey") backend_file="examples/azure/valkey/backend.tf" ;;
+                    "valkey") backend_file="examples/azure/redis/backend.tf" ;;
                     "kubernetes") backend_file="examples/azure/aks/backend.tf" ;;
                 esac
                 ;;
@@ -67,8 +83,8 @@ check_placeholders() {
     fi
 }
 
-# Function to get component path
-get_component_path() {
+# Function to deploy a component with timing
+deploy_component() {
     local provider=$1
     local component=$2
     local component_path=""
@@ -88,7 +104,64 @@ get_component_path() {
                 "network") component_path="examples/azure/network" ;;
                 "dns") component_path="examples/azure/dns" ;;
                 "database") component_path="examples/azure/database" ;;
-                "valkey") component_path="examples/azure/valkey" ;;
+                "valkey") component_path="examples/azure/redis" ;;
+                "kubernetes") component_path="examples/azure/aks" ;;
+            esac
+            ;;
+        "gcp")
+            case $component in
+                "network") component_path="examples/gcp/vpc" ;;
+                "dns") component_path="examples/gcp/cloud-dns" ;;
+                "database") component_path="examples/gcp/cloud-sql" ;;
+                "valkey") component_path="examples/valkey/memorystore" ;;
+                "kubernetes") component_path="examples/gcp/gke" ;;
+            esac
+            ;;
+    esac
+
+    if [ -d "$component_path" ]; then
+        print_message "$YELLOW" "\nDeploying $component in $provider..."
+        cd "$component_path"
+
+        start_time=$(date +%s)
+
+        terraform init -input=false -no-color > /dev/null
+        terraform plan -var-file="midaz.tfvars-example" -out=tfplan -input=false -no-color > /dev/null
+        terraform apply -input=false -auto-approve -no-color tfplan > /dev/null
+
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))s
+
+        cd - > /dev/null
+        print_table_row "$component" "Deploy" "Success" "$GREEN" "$duration"
+    else
+        print_message "$RED" "Component path $component_path not found!"
+        exit 1
+    fi
+}
+
+# Function to destroy a component with timing
+destroy_component() {
+    local provider=$1
+    local component=$2
+    local component_path=""
+
+    case $provider in
+        "aws")
+            case $component in
+                "network") component_path="examples/aws/vpc" ;;
+                "dns") component_path="examples/aws/route53" ;;
+                "database") component_path="examples/aws/rds" ;;
+                "valkey") component_path="examples/aws/valkey" ;;
+                "kubernetes") component_path="examples/aws/eks" ;;
+            esac
+            ;;
+        "azure")
+            case $component in
+                "network") component_path="examples/azure/network" ;;
+                "dns") component_path="examples/azure/dns" ;;
+                "database") component_path="examples/azure/database" ;;
+                "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
             esac
             ;;
@@ -103,54 +176,20 @@ get_component_path() {
             ;;
     esac
 
-    echo "$component_path"
-}
-
-# Function to deploy a component
-deploy_component() {
-    local provider=$1
-    local component=$2
-    local component_path=$(get_component_path "$provider" "$component")
-
-    if [ -d "$component_path" ]; then
-        print_message "$YELLOW" "\nDeploying $component in $provider..."
-        cd "$component_path"
-
-        print_message "$YELLOW" "Running terraform init..."
-        terraform init
-
-        print_message "$YELLOW" "Running terraform plan..."
-        terraform plan -out=tfplan -var-file=midaz.tfvars
-
-        print_message "$YELLOW" "Running terraform apply..."
-        terraform apply tfplan
-
-        cd - > /dev/null
-        print_message "$GREEN" "$component deployment completed successfully!"
-    else
-        print_message "$RED" "Component path $component_path not found!"
-        exit 1
-    fi
-}
-
-# Function to destroy a component
-destroy_component() {
-    local provider=$1
-    local component=$2
-    local component_path=$(get_component_path "$provider" "$component")
-
     if [ -d "$component_path" ]; then
         print_message "$YELLOW" "\nDestroying $component in $provider..."
         cd "$component_path"
 
-        print_message "$YELLOW" "Running terraform init..."
-        terraform init
+        start_time=$(date +%s)
 
-        print_message "$YELLOW" "Running terraform destroy..."
-        terraform destroy -auto-approve -var-file=midaz.tfvars
+        terraform init -input=false -no-color > /dev/null
+        terraform destroy -var-file="midaz.tfvars-example" -auto-approve -input=false -no-color > /dev/null
+
+        end_time=$(date +%s)
+        duration=$((end_time - start_time))s
 
         cd - > /dev/null
-        print_message "$GREEN" "$component destruction completed successfully!"
+        print_table_row "$component" "Destroy" "Success" "$RED" "$duration"
     else
         print_message "$RED" "Component path $component_path not found!"
         exit 1
@@ -158,13 +197,7 @@ destroy_component() {
 }
 
 # Main script
-print_message "$GREEN" "Welcome to the Midaz terraform foundation helper!"
-print_message "$YELLOW" "\nAvailable actions:"
-print_message "$NC" "1) Deploy infrastructure"
-print_message "$RED" "2) Destroy infrastructure (BE CAREFUL)"
-
-read -p "Select an action (1-2): " action_choice
-
+print_message "$GREEN" "Welcome to the Infrastructure Deployment Helper!"
 print_message "$YELLOW" "\nAvailable cloud providers:"
 print_message "$NC" "1) AWS"
 print_message "$NC" "2) Azure"
@@ -177,34 +210,40 @@ case $provider_choice in
     2) provider="azure" ;;
     3) provider="gcp" ;;
     *)
-        print_message "$RED" "Invalid provider choice!"
+        print_message "$RED" "Invalid choice!"
         exit 1
         ;;
 esac
+
+print_message "$YELLOW" "\nWhat do you want to do?"
+print_message "$GREEN" "1) Deploy"
+print_message "$RED" "2) Destroy (BE CAREFUL)"
+
+read -p "Select an action (1-2): " action_choice
 
 # Check for placeholders
 print_message "$YELLOW" "\nChecking for placeholders in backend configurations..."
 check_placeholders "$provider"
 
-components=("network" "dns" "database" "valkey" "kubernetes")
+print_table_header
 
 case $action_choice in
     1)
-        # Deploy components in order
+        components=("network" "dns" "database" "valkey" "kubernetes")
         for component in "${components[@]}"; do
             deploy_component "$provider" "$component"
         done
-        print_message "$GREEN" "\nMidaz terraform foundation deployment completed successfully!"
         ;;
     2)
-        # Destroy components in reverse order
-        for (( idx=${#components[@]}-1 ; idx>=0 ; idx-- )) ; do
-            destroy_component "$provider" "${components[idx]}"
+        components=("kubernetes" "valkey" "database" "dns" "network")
+        for component in "${components[@]}"; do
+            destroy_component "$provider" "$component"
         done
-        print_message "$GREEN" "\nMidaz terraform foundation destruction completed successfully!"
         ;;
     *)
-        print_message "$RED" "Invalid action choice!"
+        print_message "$RED" "Invalid action!"
         exit 1
         ;;
 esac
+
+print_message "$GREEN" "\nAll operations completed successfully!"
