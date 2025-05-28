@@ -1,6 +1,6 @@
 # Core Configuration
-name        = "midaz-foundation" # Name identifier for the EKS cluster
-environment = "dev"              # Environment identifier
+name        = "midaz-eks"     # Name identifier for the EKS cluster
+environment = "<environment>" # Environment identifier
 
 # EKS Cluster Configuration
 cluster_version                 = "1.32"
@@ -35,7 +35,7 @@ create_security_group                 = false # Create dedicated security group 
 # Additional Tags
 additional_tags = {
   Project     = "midaz"
-  Environment = "dev"
+  Environment = "<environment>"
   Owner       = "devops"
   ManagedBy   = "terraform"
 }

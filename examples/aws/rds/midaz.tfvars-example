@@ -1,6 +1,6 @@
 # Common Variables
-name        = "midaz-foundation"
-environment = "dev"
+name        = "midaz-rds"
+environment = "<environment>"
 
 # RDS Configuration
 vpc_name              = "midaz-network"

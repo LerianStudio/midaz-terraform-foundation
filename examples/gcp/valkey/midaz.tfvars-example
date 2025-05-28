@@ -24,3 +24,8 @@ snapshot_period_seconds = 43200
 
 # Environment
 environment = "devops"
+
+# Zone and cluster configuration
+mode                          = "CLUSTER_DISABLED"
+zone_distribution_config_mode = "MULTI_ZONE"
+zone_distribution_config_zone = "us-east1-b"

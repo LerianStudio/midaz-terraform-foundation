@@ -7,9 +7,12 @@ module "memorystore_valkey" {
   location    = var.region
 
   # Valkey cluster settings
-  replica_count = var.replica_count
-  shard_count   = var.shard_count
-  node_type     = var.node_type # High memory for better performance
+  replica_count                 = var.replica_count
+  shard_count                   = var.shard_count
+  node_type                     = var.node_type # High memory for better performance
+  mode                          = var.mode
+  zone_distribution_config_mode = var.zone_distribution_config_mode
+  zone_distribution_config_zone = var.zone_distribution_config_mode == "SINGLE_ZONE" ? var.zone_distribution_config_zone : null
 
   # Engine configuration
   engine_version              = var.engine_version
@@ -51,47 +54,5 @@ resource "google_dns_record_set" "valkey" {
   managed_zone = data.google_dns_managed_zone.private_zone.name
   type         = "A"
   ttl          = 300
-  rrdatas      = [module.memorystore_valkey.valkey_cluster.discovery_endpoints[0].address]
-}
-
-# Create service account for Valkey authentication
-resource "google_service_account" "valkey_auth" {
-  project      = var.project_id
-  account_id   = "${var.instance_name}-auth"
-  display_name = "Service Account for ${var.instance_name} Valkey Authentication"
-
-  description = "Service account used for Valkey IAM authentication"
-}
-
-# Grant the required Memorystore DB Connection User role
-resource "google_project_iam_member" "valkey_auth_role" {
-  project = var.project_id
-  role    = "roles/memorystore.dbConnectionUser"
-  member  = "serviceAccount:${google_service_account.valkey_auth.email}"
-}
-
-# Store service account key in Secret Manager for applications to use
-resource "google_secret_manager_secret" "valkey_auth" {
-  project   = var.project_id
-  secret_id = "${var.instance_name}-auth-sa"
-
-  replication {
-    auto {}
-  }
-
-  labels = {
-    environment = var.environment
-    managed_by  = "terraform"
-    type        = "valkey"
-  }
-}
-
-# Create and store service account key
-resource "google_service_account_key" "valkey_auth" {
-  service_account_id = google_service_account.valkey_auth.name
-}
-
-resource "google_secret_manager_secret_version" "valkey_auth" {
-  secret         = google_secret_manager_secret.valkey_auth.id
-  secret_data_wo = base64decode(google_service_account_key.valkey_auth.private_key)
+  rrdatas      = var.mode == "CLUSTER" ? [try(module.memorystore_valkey.valkey_cluster.discovery_endpoints[0].address, "")] : [try(module.memorystore_valkey.valkey_cluster.endpoints[0].connections[0].psc_auto_connection[0].ip_address, "")]
 }

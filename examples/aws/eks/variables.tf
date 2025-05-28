@@ -1,13 +1,13 @@
 variable "name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "midaz-foundation"
+  default     = "midaz-eks"
 }
 
 variable "environment" {
   description = "Environment name for the EKS cluster"
   type        = string
-  default     = "dev"
+  default     = "<environment>"
 }
 
 variable "cluster_version" {
