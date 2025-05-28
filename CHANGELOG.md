@@ -1,3 +1,22 @@
+# [1.2.0-develop.3](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.2.0-develop.2...v1.2.0-develop.3) (2025-05-28)
+
+
+### Bug Fixes
+
+* Pin iam module versions for eks service accounts ([9eecaba](https://github.com/LerianStudio/midaz-terraform-foundation/commit/9eecabab259b60e6552c0f42dd44b98a75453fe4))
+* Update deprecated interpolation syntax ([b8b4411](https://github.com/LerianStudio/midaz-terraform-foundation/commit/b8b44114751eb1646c531048413abd881230144e))
+* Update deprecated interpolation syntax ([b2d6d1f](https://github.com/LerianStudio/midaz-terraform-foundation/commit/b2d6d1fcd8a35250f00a8ca9bf490556df40f95d))
+
+
+### Features
+
+* AWS major infrastructure modules enhancement ([b4945a1](https://github.com/LerianStudio/midaz-terraform-foundation/commit/b4945a1387f21a964b0afa45c393e6637bcfefc8))
+
+
+### Performance Improvements
+
+* Optimize cloud infrastructure based on load tests ([af29355](https://github.com/LerianStudio/midaz-terraform-foundation/commit/af293554a3981f61851ae9ed5c75cee4d2535ef8))
+
 # [1.2.0-develop.2](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.2.0-develop.1...v1.2.0-develop.2) (2025-05-16)
 
 
