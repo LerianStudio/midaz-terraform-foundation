@@ -1,0 +1,5 @@
+resource_group_name = "midaz-terraform-rg"
+location            = "North Central US"
+vnet_name           = "midaz-vnet"
+environment         = "<environment>"
+allowed_ip_ranges   = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]

@@ -1,0 +1,3 @@
+dns_zone_name        = "midaz.internal"
+resource_group_name  = "midaz-terraform-rg"
+environment          = "production"

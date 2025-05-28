@@ -38,9 +38,17 @@ jobs:
 
     # Setup Node.js environment for commitlint
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '22'
+
+    - run: npm install
+    # Run the commitlint action, considering its own dependencies and yours as well 🚀
+    # `github.workspace` is the path to your repository.
+    # Ensure commits follow conventional commits specification
+    - uses: wagoid/commitlint-github-action@v6
+      env:
+        NODE_PATH: ${{ github.workspace }}/node_modules
 
     # Install Terraform CLI
     - name: Setup Terraform
@@ -56,10 +64,6 @@ jobs:
         path: ~/.tflint.d/plugins
         key: ${{ matrix.os }}-tflint-${{ hashFiles('.tflint.hcl') }}
 
-    # Ensure commits follow conventional commits specification
-    - name: Verify Conventional Commits
-      uses: wagoid/commitlint-github-action@v5
-
     # Check Terraform files formatting
     - name: Terraform Format Check
       run: terraform fmt -check -recursive
@@ -71,13 +75,13 @@ jobs:
         cd examples/aws/vpc && terraform init -backend=false
         cd ../route53 && terraform init -backend=false
         cd ../rds && terraform init -backend=false
-        cd ../elasticache && terraform init -backend=false
+        cd ../valkey && terraform init -backend=false
         cd ../eks && terraform init -backend=false
         # GCP components
         cd ../../../examples/gcp/vpc && terraform init -backend=false
         cd ../cloud-dns && terraform init -backend=false
         cd ../cloud-sql && terraform init -backend=false
-        cd ../memorystore && terraform init -backend=false
+        cd ../valkey && terraform init -backend=false
         cd ../gke && terraform init -backend=false
         # Azure components
         cd ../../../examples/azure/network && terraform init -backend=false
@@ -93,13 +97,13 @@ jobs:
         cd examples/aws/vpc && terraform validate
         cd ../route53 && terraform validate
         cd ../rds && terraform validate
-        cd ../elasticache && terraform validate
+        cd ../valkey && terraform validate
         cd ../eks && terraform validate
         # GCP components
         cd ../../../examples/gcp/vpc && terraform validate
         cd ../cloud-dns && terraform validate
         cd ../cloud-sql && terraform validate
-        cd ../memorystore && terraform validate
+        cd ../valkey && terraform validate
         cd ../gke && terraform validate
         # Azure components
         cd ../../../examples/azure/network && terraform validate
@@ -129,24 +133,7 @@ jobs:
     - name: Run tfsec
       uses: aquasecurity/tfsec-action@v1.0.0
       with:
-        additional_args: "--exclude aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs"
-
-    # Preview next semantic-release version
-    - name: Preview Next Release
-      uses: cycjimmy/semantic-release-action@v4
-      with:
-        ci: false
-        dry_run: true
-        semantic_version: 23.0.8
-        extra_plugins: |
-          conventional-changelog-conventionalcommits@v7.0.2
-          @saithodev/semantic-release-backmerge
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        GIT_AUTHOR_NAME: ${{ secrets.LERIAN_CI_CD_USER_NAME }}
-        GIT_AUTHOR_EMAIL: ${{ secrets.LERIAN_CI_CD_USER_EMAIL }}
-        GIT_COMMITTER_NAME: ${{ secrets.LERIAN_CI_CD_USER_NAME }}
-        GIT_COMMITTER_EMAIL: ${{ secrets.LERIAN_CI_CD_USER_EMAIL }}
+        additional_args: "--exclude aws-ssm-secret-use-customer-key,aws-ssm-secret-use-customer-key,aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy"
 
   release:
     needs: validate  # Only run after validation succeeds

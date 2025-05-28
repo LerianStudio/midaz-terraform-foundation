@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket = "<PUT-YOUR-GCS-BUCKET-NAME-HERE>"
+    bucket = "<YOUR-TERRAFORM-STATE-BUCKET>"
     prefix = "gcp/vpc"
   }
 }

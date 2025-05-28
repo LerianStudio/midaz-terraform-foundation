@@ -1,33 +1,59 @@
-locals {
-  environment = lower(var.environment)
-  name        = var.name
-  tags = merge({
-    Name        = "eks-${local.name}-${local.environment}"
-    Environment = local.environment
-    ManagedBy   = "Terraform"
-  }, var.additional_tags)
-}
-
-data "aws_subnets" "private" {
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-
-  tags = {
-    Type = "private"
-  }
-}
-
+# Main EKS cluster configuration using the AWS EKS Terraform module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.0"
+  version = "~> 20.36"
 
-  cluster_name                   = "${local.name}-${local.environment}"
-  cluster_version                = var.cluster_version
-  cluster_endpoint_public_access = var.cluster_endpoint_public_access
+  # Basic cluster settings including name and Kubernetes version
+  cluster_name    = var.name
+  cluster_version = var.cluster_version
 
-  # Enable control plane logging
+  # API server endpoint access - enables private access and configurable public access
+  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
+  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
+  cluster_endpoint_public_access_cidrs = var.allowed_api_access_cidrs
+
+  # Automatically grants admin permissions to the AWS IAM entity creating the cluster
+  enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
+
+  # Define IAM roles that can access the cluster and their permission levels
+  access_entries = {
+    admin = {
+      kubernetes_groups = []
+      principal_arn     = aws_iam_role.admin_role.arn
+
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            namespaces = []
+            type       = "cluster"
+          }
+        }
+      }
+    }
+    developer = {
+      kubernetes_groups = []
+      principal_arn     = aws_iam_role.developer_role.arn
+
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
+          access_scope = {
+            namespaces = []
+            type       = "cluster"
+          }
+        }
+      }
+    }
+  }
+
+  # Configure KMS encryption for Kubernetes secrets
+  cluster_encryption_config = {
+    provider_key_arn = module.eks_kms_key.key_arn
+    resources        = ["secrets"]
+  }
+
+  # Enable comprehensive control plane logging for audit and troubleshooting
   cluster_enabled_log_types = [
     "api",
     "audit",
@@ -36,6 +62,7 @@ module "eks" {
     "scheduler"
   ]
 
+  # Install and configure essential cluster addons with latest versions
   cluster_addons = {
     coredns = {
       most_recent = true
@@ -46,20 +73,28 @@ module "eks" {
     vpc-cni = {
       most_recent = true
     }
+    metrics-server = {
+      most_recent = true
+    }
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = module.ebs_csi_irsa_role.iam_role_arn
+    }
   }
 
-  vpc_id     = var.vpc_id
+  # Network configuration using existing VPC and private subnets
+  vpc_id     = data.aws_vpc.selected.id
   subnet_ids = data.aws_subnets.private.ids
 
+  # Default configuration for all managed node groups
   eks_managed_node_group_defaults = {
-    ami_type       = "AL2_x86_64"
-    instance_types = var.instance_types
-
-    attach_cluster_primary_security_group = true
-    create_security_group                 = false
+    ami_type                              = var.ami_type
+    instance_types                        = var.instance_types
+    attach_cluster_primary_security_group = var.attach_cluster_primary_security_group
+    create_security_group                 = var.create_security_group
   }
 
-  # Add node security group rules
+  # Security group rules for node-to-node communication and external access
   node_security_group_additional_rules = {
     ingress_self_all = {
       description = "Node to node all ports/protocols"
@@ -87,28 +122,34 @@ module "eks" {
     }
   }
 
+  # Configure the default managed node group with autoscaling settings
   eks_managed_node_groups = {
     default = {
-      min_size     = var.min_size
-      max_size     = var.max_size
-      desired_size = var.desired_size
-
-      instance_types = var.instance_types
-      capacity_type  = var.capacity_type
+      name                     = "${var.name}-default-nodepool"
+      use_name_prefix          = false
+      iam_role_name            = "${var.name}-default-nodepool"
+      iam_role_use_name_prefix = false
+      min_size                 = var.min_size
+      max_size                 = var.max_size
+      desired_size             = var.desired_size
+      instance_types           = var.instance_types
+      capacity_type            = var.capacity_type
 
       labels = {
-        Environment = local.environment
-        GithubRepo  = "terraform-midaz-foundation"
+        Environment = lower(var.environment)
+        GithubRepo  = "midaz-terraform-foundation"
       }
 
-      tags = local.tags
+      tags = merge({
+        Environment = lower(var.environment)
+        ManagedBy   = "Terraform"
+      }, var.additional_tags)
     }
   }
 
-  tags = local.tags
-}
-
-# Get VPC information
-data "aws_vpc" "selected" {
-  id = var.vpc_id
+  # Global tags applied to all resources created by this module
+  tags = merge({
+    Environment = lower(var.environment)
+    ManagedBy   = "Terraform"
+  }, var.additional_tags)
 }

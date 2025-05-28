@@ -1,3 +1,4 @@
+# Configure remote state storage in AWS S3
 terraform {
   backend "s3" {
     bucket         = "<PUT-YOUR-BUCKET-NAME-HERE>"

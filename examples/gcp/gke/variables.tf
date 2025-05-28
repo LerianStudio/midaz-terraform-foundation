@@ -14,6 +14,12 @@ variable "region" {
   type        = string
 }
 
+variable "deletion_protection" {
+  description = "Whether to enable deletion protection for the cluster"
+  type        = bool
+  default     = true
+}
+
 variable "zones" {
   description = "The zones for the GKE cluster"
   type        = list(string)
@@ -27,6 +33,18 @@ variable "network_name" {
 variable "subnet_name" {
   description = "The name of the subnet"
   type        = string
+}
+
+variable "ip_range_pods" {
+  description = "The secondary IP range name for pods"
+  type        = string
+  default     = "pods"
+}
+
+variable "ip_range_services" {
+  description = "The secondary IP range name for services"
+  type        = string
+  default     = "services"
 }
 
 variable "master_ipv4_cidr_block" {
@@ -58,25 +76,25 @@ variable "master_authorized_networks" {
 variable "machine_type" {
   description = "The machine type for the GKE nodes"
   type        = string
-  default     = "e2-standard-2"
+  default     = "t2a-standard-2"
 }
 
 variable "min_node_count" {
   description = "Minimum number of nodes per zone"
   type        = number
-  default     = 1
+  default     = 3
 }
 
 variable "max_node_count" {
   description = "Maximum number of nodes per zone"
   type        = number
-  default     = 3
+  default     = 15
 }
 
 variable "initial_node_count" {
   description = "Initial number of nodes per zone"
   type        = number
-  default     = 1
+  default     = 3
 }
 
 variable "disk_size_gb" {
@@ -85,13 +103,62 @@ variable "disk_size_gb" {
   default     = 100
 }
 
-variable "service_account" {
-  description = "The service account to be used by the nodes"
-  type        = string
-}
-
 variable "environment" {
   description = "Environment name for resource labels"
   type        = string
   default     = "production"
+}
+
+variable "network_policy_enabled" {
+  description = "Enable network policy (Calico)"
+  type        = bool
+  default     = false
+}
+
+variable "pod_security_policy_enabled" {
+  description = "Enable pod security policy"
+  type        = bool
+  default     = false
+}
+
+variable "datapath_provider" {
+  description = "The desired datapath provider for the cluster"
+  type        = string
+  default     = "ADVANCED_DATAPATH"
+}
+
+variable "release_channel" {
+  description = "The release channel of this cluster"
+  type        = string
+  default     = "REGULAR"
+}
+
+variable "node_disk_type" {
+  description = "Type of the disk attached to each node"
+  type        = string
+  default     = "pd-ssd"
+}
+
+variable "node_image_type" {
+  description = "The image type to use for nodes"
+  type        = string
+  default     = "COS_CONTAINERD"
+}
+
+variable "node_auto_repair" {
+  description = "Whether the nodes will be automatically repaired"
+  type        = bool
+  default     = true
+}
+
+variable "node_auto_upgrade" {
+  description = "Whether the nodes will be automatically upgraded"
+  type        = bool
+  default     = true
+}
+
+variable "node_preemptible" {
+  description = "Whether to use preemptible nodes"
+  type        = bool
+  default     = false
 }

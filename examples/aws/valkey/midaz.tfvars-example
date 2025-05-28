@@ -1,0 +1,34 @@
+# General
+name        = "midaz-valkey"
+environment = "<environment>"
+vpc_name    = "midaz-network"
+
+# Valkey configuration
+node_type      = "cache.m7g.large"
+engine_version = "7.2"
+parameter_group_family        = "valkey7"
+
+# Maintenance
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+# Parameters
+parameters = [
+  {
+    name  = "latency-tracking"
+    value = "yes"
+  }
+]
+
+# DNS
+dns_name          = "valkey"
+dns_zone_name     = "midaz.internal"
+
+# Additional tags
+additional_tags = {
+  Project = "Midaz"
+  Owner   = "DevOps"
+}
+
+transit_encryption_mode = "preferred"
+transit_encryption_enabled = true
