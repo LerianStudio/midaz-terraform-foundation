@@ -1,0 +1,15 @@
+# Common Variables
+name        = "midaz-private-dns"
+environment = "<environment>"
+
+# Route53 Configuration
+private_domain_name = "midaz.internal"
+vpc_name            = "midaz-network"
+additional_vpcs    = [] # Add additional VPC IDs if needed
+
+# Additional Tags
+additional_tags = {
+  "ManagedBy" = "terraform"
+  "Project"   = "midaz"
+  "Owner"     = "devops"
+}

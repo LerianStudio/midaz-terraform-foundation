@@ -57,7 +57,7 @@ variable "environment" {
 variable "db_version" {
   description = "The database version for PostgreSQL"
   type        = string
-  default     = "POSTGRES_17"
+  default     = "POSTGRES_16"
 }
 
 variable "db_charset" {

@@ -43,7 +43,9 @@ This directory contains Terraform examples for deploying Midaz infrastructure co
 - Integrates with Google Secret Manager
 - Handles encryption keys and sensitive data
 
-**Important Note:**
+**Important Notes:**
+- Midaz currently does not support Valkey in cluster mode - use `CLUSTER_DISABLED` mode
+- For non-production environments, consider using `SINGLE_ZONE` mode to reduce costs
 - TLS encryption in transit is currently not enabled as Midaz does not yet support it
 - TLS support is planned and will be included in future releases
 

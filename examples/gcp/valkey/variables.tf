@@ -71,3 +71,21 @@ variable "snapshot_period_seconds" {
   type        = number
   default     = 43200
 }
+
+variable "mode" {
+  description = "cluster or cluster-disabled. Possible values: CLUSTER, CLUSTER_DISABLED"
+  type        = string
+  default     = "CLUSTER_DISABLED"
+}
+
+variable "zone_distribution_config_mode" {
+  description = "The mode for zone distribution for Memorystore valkey cluster (Immutable). If not provided, MULTI_ZONE will be used as default value. Possible values are: MULTI_ZONE, SINGLE_ZONE"
+  type        = string
+  default     = "MULTI_ZONE"
+}
+
+variable "zone_distribution_config_zone" {
+  description = "The zone for single zone Memorystore valkey cluster (Immutable)"
+  type        = string
+  default     = null
+}

@@ -76,25 +76,25 @@ variable "master_authorized_networks" {
 variable "machine_type" {
   description = "The machine type for the GKE nodes"
   type        = string
-  default     = "e2-standard-2"
+  default     = "t2a-standard-2"
 }
 
 variable "min_node_count" {
   description = "Minimum number of nodes per zone"
   type        = number
-  default     = 1
+  default     = 3
 }
 
 variable "max_node_count" {
   description = "Maximum number of nodes per zone"
   type        = number
-  default     = 3
+  default     = 15
 }
 
 variable "initial_node_count" {
   description = "Initial number of nodes per zone"
   type        = number
-  default     = 1
+  default     = 3
 }
 
 variable "disk_size_gb" {

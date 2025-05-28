@@ -229,12 +229,6 @@ module "postgresql" {
   }
 }
 
-// Get the DNS zone data
-data "google_dns_managed_zone" "private_zone" {
-  name    = "midaz-private-dns"
-  project = var.project_id
-}
-
 // Create DNS A record for the database
 resource "google_dns_record_set" "database" {
   project      = var.project_id
