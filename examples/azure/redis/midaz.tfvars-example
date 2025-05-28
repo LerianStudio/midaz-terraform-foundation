@@ -17,6 +17,6 @@ shard_count = 2
 zone_redundant_enabled   = false # Enable HA only if you have a Premium SKU
 
 tags = {
-  Environment = "Production"
+  Environment = "<environment>"
   Terraform   = "true"
 }
