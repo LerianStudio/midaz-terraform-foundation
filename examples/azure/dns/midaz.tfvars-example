@@ -1,3 +1,3 @@
-dns_zone_name        = "lerian.internal"
+dns_zone_name        = "midaz.internal"
 resource_group_name  = "lerian-terraform-rg"
 environment          = "production"
