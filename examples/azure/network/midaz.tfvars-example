@@ -1,4 +1,4 @@
-resource_group_name = "lerian-terraform-rg"
+resource_group_name = "midaz-terraform-rg"
 location            = "North Central US"
 vnet_name           = "midaz-vnet"
 environment         = "production"

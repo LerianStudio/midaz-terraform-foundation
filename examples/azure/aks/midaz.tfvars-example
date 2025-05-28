@@ -1,4 +1,4 @@
-resource_group_name = "lerian-terraform-rg"
+resource_group_name = "midaz-terraform-rg"
 cluster_name        = "aks-cluster-lerian"
 kubernetes_version  = "1.30.0"
 location           = "northcentralus"

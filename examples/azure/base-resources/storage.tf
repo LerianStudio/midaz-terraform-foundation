@@ -1,6 +1,6 @@
 resource "azurerm_resource_group" "tf_backend_rg" {
   provider = azurerm.sponsorship
-  name     = "lerian-terraform-rg"
+  name     = "midaz-terraform-rg"
   location = "North Central US"
 }
 

@@ -1,9 +1,9 @@
 # General configuration
-resource_group_name = "lerian-terraform-rg"
+resource_group_name = "midaz-terraform-rg"
 location            = "northcentralus"
 
 # PostgreSQL configuration
-pgsql_primary_name  = "lerian-postgresql"
+pgsql_primary_name  = "midaz-postgresql"
 
 # Networking (required for data sources)
 vnet_name           = "midaz-vnet"
@@ -11,7 +11,7 @@ subnet_db_1_name    = "private-db-subnet-1"
 subnet_db_2_name    = "private-db-subnet-2"
 
 # DNS
-dns_zone_name       = "lerian.internal"
+dns_zone_name       = "midaz.internal"
 
 # High Availability configuration
 zone_redundant_enabled = false # Enable HA only if your region supports zone redundancy
