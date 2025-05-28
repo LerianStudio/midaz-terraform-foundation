@@ -34,7 +34,7 @@ print_table_row() {
 # Function to check placeholders in backend files
 check_placeholders() {
     local provider=$1
-    local components=("network" "dns" "database" "redis" "kubernetes")
+    local components=("network" "dns" "database" "valkey" "kubernetes")
     local has_placeholders=false
 
     for component in "${components[@]}"; do
@@ -45,7 +45,7 @@ check_placeholders() {
                     "network") backend_file="examples/aws/vpc/backend.tf" ;;
                     "dns") backend_file="examples/aws/route53/backend.tf" ;;
                     "database") backend_file="examples/aws/rds/backend.tf" ;;
-                    "redis") backend_file="examples/aws/elasticache/backend.tf" ;;
+                    "valkey") backend_file="examples/aws/valkey/backend.tf" ;;
                     "kubernetes") backend_file="examples/aws/eks/backend.tf" ;;
                 esac
                 ;;
@@ -54,7 +54,7 @@ check_placeholders() {
                     "network") backend_file="examples/azure/network/backend.tf" ;;
                     "dns") backend_file="examples/azure/dns/backend.tf" ;;
                     "database") backend_file="examples/azure/database/backend.tf" ;;
-                    "redis") backend_file="examples/azure/redis/backend.tf" ;;
+                    "valkey") backend_file="examples/azure/redis/backend.tf" ;;
                     "kubernetes") backend_file="examples/azure/aks/backend.tf" ;;
                 esac
                 ;;
@@ -63,7 +63,7 @@ check_placeholders() {
                     "network") backend_file="examples/gcp/vpc/backend.tf" ;;
                     "dns") backend_file="examples/gcp/cloud-dns/backend.tf" ;;
                     "database") backend_file="examples/gcp/cloud-sql/backend.tf" ;;
-                    "redis") backend_file="examples/gcp/memorystore/backend.tf" ;;
+                    "valkey") backend_file="examples/gcp/valkey/backend.tf" ;;
                     "kubernetes") backend_file="examples/gcp/gke/backend.tf" ;;
                 esac
                 ;;
@@ -95,7 +95,7 @@ deploy_component() {
                 "network") component_path="examples/aws/vpc" ;;
                 "dns") component_path="examples/aws/route53" ;;
                 "database") component_path="examples/aws/rds" ;;
-                "redis") component_path="examples/aws/elasticache" ;;
+                "valkey") component_path="examples/aws/valkey" ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -104,7 +104,7 @@ deploy_component() {
                 "network") component_path="examples/azure/network" ;;
                 "dns") component_path="examples/azure/dns" ;;
                 "database") component_path="examples/azure/database" ;;
-                "redis") component_path="examples/azure/redis" ;;
+                "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
             esac
             ;;
@@ -113,7 +113,7 @@ deploy_component() {
                 "network") component_path="examples/gcp/vpc" ;;
                 "dns") component_path="examples/gcp/cloud-dns" ;;
                 "database") component_path="examples/gcp/cloud-sql" ;;
-                "redis") component_path="examples/gcp/memorystore" ;;
+                "valkey") component_path="examples/valkey/memorystore" ;;
                 "kubernetes") component_path="examples/gcp/gke" ;;
             esac
             ;;
@@ -152,7 +152,7 @@ destroy_component() {
                 "network") component_path="examples/aws/vpc" ;;
                 "dns") component_path="examples/aws/route53" ;;
                 "database") component_path="examples/aws/rds" ;;
-                "redis") component_path="examples/aws/elasticache" ;;
+                "valkey") component_path="examples/aws/valkey" ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -161,7 +161,7 @@ destroy_component() {
                 "network") component_path="examples/azure/network" ;;
                 "dns") component_path="examples/azure/dns" ;;
                 "database") component_path="examples/azure/database" ;;
-                "redis") component_path="examples/azure/redis" ;;
+                "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
             esac
             ;;
@@ -170,7 +170,7 @@ destroy_component() {
                 "network") component_path="examples/gcp/vpc" ;;
                 "dns") component_path="examples/gcp/cloud-dns" ;;
                 "database") component_path="examples/gcp/cloud-sql" ;;
-                "redis") component_path="examples/gcp/memorystore" ;;
+                "valkey") component_path="examples/gcp/valkey" ;;
                 "kubernetes") component_path="examples/gcp/gke" ;;
             esac
             ;;
@@ -229,13 +229,13 @@ print_table_header
 
 case $action_choice in
     1)
-        components=("network" "dns" "database" "redis" "kubernetes")
+        components=("network" "dns" "database" "valkey" "kubernetes")
         for component in "${components[@]}"; do
             deploy_component "$provider" "$component"
         done
         ;;
     2)
-        components=("kubernetes" "redis" "database" "dns" "network")
+        components=("kubernetes" "valkey" "database" "dns" "network")
         for component in "${components[@]}"; do
             destroy_component "$provider" "$component"
         done
