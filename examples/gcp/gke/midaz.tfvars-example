@@ -17,7 +17,7 @@ master_ipv4_cidr_block  = "172.16.0.0/28"
 enable_private_endpoint = false
 
 # Node pool configuration
-machine_type       = "t2a-standard-2"
+machine_type       = "e2-standard-2"
 min_node_count     = 3
 max_node_count     = 15
 initial_node_count = 3

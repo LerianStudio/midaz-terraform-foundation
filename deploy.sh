@@ -113,7 +113,7 @@ deploy_component() {
                 "network") component_path="examples/gcp/vpc" ;;
                 "dns") component_path="examples/gcp/cloud-dns" ;;
                 "database") component_path="examples/gcp/cloud-sql" ;;
-                "valkey") component_path="examples/valkey/memorystore" ;;
+                "valkey") component_path="examples/gcp/valkey" ;;
                 "kubernetes") component_path="examples/gcp/gke" ;;
             esac
             ;;
@@ -126,7 +126,7 @@ deploy_component() {
         start_time=$(date +%s)
 
         terraform init -input=false -no-color > /dev/null
-        terraform plan -var-file="midaz.tfvars-example" -out=tfplan -input=false -no-color > /dev/null
+        terraform plan -var-file="midaz.tfvars" -out=tfplan -input=false -no-color > /dev/null
         terraform apply -input=false -auto-approve -no-color tfplan > /dev/null
 
         end_time=$(date +%s)
@@ -183,7 +183,7 @@ destroy_component() {
         start_time=$(date +%s)
 
         terraform init -input=false -no-color > /dev/null
-        terraform destroy -var-file="midaz.tfvars-example" -auto-approve -input=false -no-color > /dev/null
+        terraform destroy -var-file="midaz.tfvars" -auto-approve -input=false -no-color > /dev/null
 
         end_time=$(date +%s)
         duration=$((end_time - start_time))s
