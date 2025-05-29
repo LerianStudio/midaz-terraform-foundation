@@ -11,11 +11,11 @@ vpc_self_link = "midaz-network"
 subnet_name   = "midaz-network-subnet"
 
 # Security configuration
-authorization_mode          = "IAM_AUTH"
+authorization_mode          = "AUTH_DISABLED"
 deletion_protection_enabled = false
 
 # Valkey specific configuration
-shard_count    = 3
+shard_count    = 1
 node_type      = "HIGHMEM_MEDIUM"
 engine_version = "VALKEY_8_0"
 
