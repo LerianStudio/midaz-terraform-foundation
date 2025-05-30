@@ -38,9 +38,11 @@ module "gke" {
   release_channel   = var.release_channel # Required for Pod Security Standards
 
   // Node pools
+  remove_default_node_pool = true
+
   node_pools = [
     {
-      name               = "default-node-pool"
+      name               = "midaz-node-pool"
       machine_type       = var.machine_type
       min_count          = var.min_node_count
       max_count          = var.max_node_count

@@ -1,12 +1,12 @@
 # Existing values
 project_id        = "<PUT-YOUR-PROJECT-ID>"
 instance_name     = "midaz-postgresql"
-region            = "us-east1"
-zone              = "us-east1-b"
+region            = "us-central1"
+zone              = "us-central1-a"
 instance_tier     = "db-custom-2-8192" # 2 vCPUs, 8GB RAM
 disk_size         = 50                 # GB
 high_availability = false              # Set to true for production
-backup_location   = "us-east1"
+backup_location   = "us-central1"
 vpc_self_link     = "projects/<PUT-YOUR-PROJECT-ID>/global/networks/midaz-network"
 
 # Database configuration

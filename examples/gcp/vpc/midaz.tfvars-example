@@ -1,5 +1,5 @@
 project_id          = "<PUT-YOUR-PROJECT-ID>" # Your GCP project ID
-region              = "us-east1"      # A common GCP region
+region              = "us-central1"      # A common GCP region
 network_name        = "midaz-network" # Using the default value
 subnet_cidr         = "10.0.0.0/16"   # Using the default value
 pods_cidr_range     = "10.1.0.0/16"   # Using the default value
