@@ -1,7 +1,7 @@
 # Project and location
 project_id = "<PUT-YOUR-PROJECT-ID>"
-region     = "us-east1"
-zones      = ["us-east1-b", "us-east1-c", "us-east1-d"]
+region     = "us-central1"
+zones      = ["us-central1-a", "us-central1-b", "us-central1-f"]
 
 # Cluster configuration
 cluster_name        = "midaz-cluster"
@@ -18,9 +18,9 @@ enable_private_endpoint = false
 
 # Node pool configuration
 machine_type       = "t2a-standard-2"
-min_node_count     = 3
+min_node_count     = 1
 max_node_count     = 15
-initial_node_count = 3
+initial_node_count = 1
 disk_size_gb       = 100
 
 # Master authorized networks

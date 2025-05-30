@@ -1,7 +1,7 @@
 # Project and instance configuration
 project_id    = "<PUT-YOUR-PROJECT-ID>"
 instance_name = "midaz-valkey"
-region        = "us-east1"
+region        = "us-central1"
 
 # Memory and replication settings
 replica_count  = 0
@@ -11,11 +11,11 @@ vpc_self_link = "midaz-network"
 subnet_name   = "midaz-network-subnet"
 
 # Security configuration
-authorization_mode          = "IAM_AUTH"
+authorization_mode          = "AUTH_DISABLED"
 deletion_protection_enabled = false
 
 # Valkey specific configuration
-shard_count    = 3
+shard_count    = 1
 node_type      = "HIGHMEM_MEDIUM"
 engine_version = "VALKEY_8_0"
 
@@ -28,4 +28,4 @@ environment = "devops"
 # Zone and cluster configuration
 mode                          = "CLUSTER_DISABLED"
 zone_distribution_config_mode = "MULTI_ZONE"
-zone_distribution_config_zone = "us-east1-b"
+zone_distribution_config_zone = "us-central1-a"
