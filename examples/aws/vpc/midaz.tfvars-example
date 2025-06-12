@@ -1,6 +1,6 @@
 # Common Variables
 name        = "midaz-network"
-environment = "<environment>"
+environment = "dev"
 
 # VPC Configuration
 vpc_cidr             = "10.50.0.0/16"

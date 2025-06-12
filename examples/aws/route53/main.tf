@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-2" # ou outra região
+}
+
 resource "aws_route53_zone" "private" {
   name = var.private_domain_name
 

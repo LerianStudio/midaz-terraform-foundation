@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-2" # ou outra região
+}
+
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"

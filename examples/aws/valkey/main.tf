@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-2" # ou outra região
+}
+
 # Security group for Valkey cluster
 resource "aws_security_group" "valkey" {
   name_prefix = "${var.name}-valkey-"

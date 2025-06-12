@@ -1,6 +1,6 @@
 # General
 name        = "midaz-valkey"
-environment = "<environment>"
+environment = "dev"
 vpc_name    = "midaz-network"
 
 # Valkey configuration

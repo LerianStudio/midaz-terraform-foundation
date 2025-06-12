@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-2" # ou outra região
+}
+
 # RDS security group for VPC access
 resource "aws_security_group" "rds" {
   name = "${var.name}-security-group-rds"

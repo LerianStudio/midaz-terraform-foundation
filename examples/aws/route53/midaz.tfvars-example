@@ -1,6 +1,6 @@
 # Common Variables
 name        = "midaz-private-dns"
-environment = "<environment>"
+environment = "dev"
 
 # Route53 Configuration
 private_domain_name = "midaz.internal"

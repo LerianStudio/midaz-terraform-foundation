@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-2" # ou outra região
+}
+
 # Main EKS cluster configuration using the AWS EKS Terraform module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
