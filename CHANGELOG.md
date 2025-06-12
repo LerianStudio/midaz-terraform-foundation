@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.0...v1.0.1) (2025-05-30)
+
+
+### Bug Fixes
+
+* update deploy script and infrastructure configurations ([b842613](https://github.com/LerianStudio/midaz-terraform-foundation/commit/b8426132ddb6c58688b39094051c77e791ad671c))
+
 ## [1.0.1-develop.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.0...v1.0.1-develop.1) (2025-05-29)
 
 
