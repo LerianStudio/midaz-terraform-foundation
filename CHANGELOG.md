@@ -1,3 +1,10 @@
+## [1.0.2-develop.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.1...v1.0.2-develop.1) (2025-06-12)
+
+
+### Bug Fixes
+
+* small issues on aws template ([faac6e0](https://github.com/LerianStudio/midaz-terraform-foundation/commit/faac6e0345212071359c19b9576d91c9c5324ff8))
+
 ## [1.0.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.0...v1.0.1) (2025-05-30)
 
 
