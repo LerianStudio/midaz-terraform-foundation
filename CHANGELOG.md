@@ -1,3 +1,13 @@
+# [1.1.0-develop.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.2-develop.1...v1.1.0-develop.1) (2025-07-18)
+
+
+### Features
+
+* insert cosmosdb module on azure resources ([49f2c4c](https://github.com/LerianStudio/midaz-terraform-foundation/commit/49f2c4cd0a0551e79227faa281e6e1e02d9a165e))
+* set changes on main script ([96513b9](https://github.com/LerianStudio/midaz-terraform-foundation/commit/96513b9350c2b432b93207a0dd9354cbd13bb377))
+* set changes on main script ([8673973](https://github.com/LerianStudio/midaz-terraform-foundation/commit/8673973ec7339ec689f1007995e78254a1ceba7f))
+* set changes on main script create conditions of rabbitmq and mongodb ([764425b](https://github.com/LerianStudio/midaz-terraform-foundation/commit/764425b8ffd2e39071dd9d6f6c81c440cb8ef690))
+
 ## [1.0.2-develop.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.1...v1.0.2-develop.1) (2025-06-12)
 
 
