@@ -39,12 +39,6 @@ variable "master_username" {
   sensitive   = true
 }
 
-variable "master_password" {
-  description = "The master password for the DocumentDB cluster"
-  type        = string
-  sensitive   = true
-}
-
 variable "backup_retention_period" {
   description = "The number of days to retain backups for"
   type        = number
