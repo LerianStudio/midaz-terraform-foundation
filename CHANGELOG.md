@@ -1,3 +1,25 @@
+# [1.1.0-develop.2](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0-develop.1...v1.1.0-develop.2) (2025-07-18)
+
+
+### Bug Fixes
+
+* exclude audit logging for rabbitmq vulnerability ([75848ad](https://github.com/LerianStudio/midaz-terraform-foundation/commit/75848adfa80e2503a6be68817fd92bbfec88508d))
+* exclude audit logging for rabbitmq vulnerability ([4afef8a](https://github.com/LerianStudio/midaz-terraform-foundation/commit/4afef8aeebf63a1cdcf761ca17d862f457c152f8))
+* exclude audit logging for rabbitmq vulnerability ([6ae8db2](https://github.com/LerianStudio/midaz-terraform-foundation/commit/6ae8db284fb6310c578e67aff2b91d2101435a94))
+* rmv unusable parameter ([b01dfc8](https://github.com/LerianStudio/midaz-terraform-foundation/commit/b01dfc8b4546a3d3d1c6d1bcdb37ef0dc378cf71))
+* rmv unusable parameters ([115e4f4](https://github.com/LerianStudio/midaz-terraform-foundation/commit/115e4f4265c6acdf469e933d4abb637d556fea64))
+
+
+### Features
+
+* add aws caller for kms key ([bcad3bf](https://github.com/LerianStudio/midaz-terraform-foundation/commit/bcad3bf9099787a7febfe74980d1cab8c97cd494))
+* add components for diff providers ([a1ed7c3](https://github.com/LerianStudio/midaz-terraform-foundation/commit/a1ed7c3a29700dc06f3153409c84d82832b57420))
+* add kms key for documentdb ([5447d1e](https://github.com/LerianStudio/midaz-terraform-foundation/commit/5447d1e25dca3f6102a065d00633a3c2e378afc5))
+* add optional parameter to enable or disable tls in rds ([46b52c1](https://github.com/LerianStudio/midaz-terraform-foundation/commit/46b52c174403283d4faf4a6261d73505cb489709))
+* add optional parameter to enable or disable tls in valkey ([ff725d4](https://github.com/LerianStudio/midaz-terraform-foundation/commit/ff725d458ea3474b68e58013933e7c1ef46f16ad))
+* add storage encryption to documentdb ([86ae501](https://github.com/LerianStudio/midaz-terraform-foundation/commit/86ae5013a04f8fe48bafeb6f221a346b761dea3c))
+* create amazonmq module ([981306f](https://github.com/LerianStudio/midaz-terraform-foundation/commit/981306f790b882ab578d58fd8920dfd52ae9cafd))
+* create documentdb module ([737545f](https://github.com/LerianStudio/midaz-terraform-foundation/commit/737545f63c8f67d8dbc0b90d185f0c99d375780d))
 
 # [1.1.0-develop.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.2-develop.1...v1.1.0-develop.1) (2025-07-18)
 
