@@ -73,5 +73,5 @@ variable "environment" {
 variable "private_cosmos_subnet_prefixes" {
   description = "List of address prefixes for private CosmosDB subnets"
   type        = list(string)
-  default     = ["10.0.13.0/24","10.0.14.0/24"]
+  default     = ["10.0.13.0/24", "10.0.14.0/24"]
 }
