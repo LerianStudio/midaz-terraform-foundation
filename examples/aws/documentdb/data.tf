@@ -1,6 +1,3 @@
-# Get AWS caller identity
-data "aws_caller_identity" "current" {}
-
 # Get VPC by name tag
 data "aws_vpc" "selected" {
   filter {

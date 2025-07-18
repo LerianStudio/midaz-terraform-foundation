@@ -62,9 +62,3 @@ variable "mq_admin_user" {
   type        = string
   sensitive   = true
 }
-
-variable "mq_admin_password" {
-  description = "The administrator's password for the broker"
-  type        = string
-  sensitive   = true
-}
