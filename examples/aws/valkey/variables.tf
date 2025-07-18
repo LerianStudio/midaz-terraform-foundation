@@ -75,15 +75,15 @@ variable "dns_zone_name" {
 }
 
 # transit_encryption_mode and auth_token will be used once Midaz accepts TLS certificates configuration
-# variable "transit_encryption_mode" {
-#   description = "Transit encryption mode for Valkey cluster. Valid values are preferred and required"
-#   type        = string
-#   default     = "preferred"
-#   validation {
-#     condition     = contains(["preferred", "required"], var.transit_encryption_mode)
-#     error_message = "transit_encryption_mode must be either 'preferred' or 'required'"
-#   }
-# }
+variable "transit_encryption_mode" {
+  description = "Transit encryption mode for Valkey cluster. Valid values are preferred and required"
+  type        = string
+  default     = "preferred"
+  validation {
+    condition     = contains(["preferred", "required"], var.transit_encryption_mode)
+    error_message = "transit_encryption_mode must be either 'preferred' or 'required'"
+  }
+}
 
 variable "transit_encryption_enabled" {
   description = "Enable transit encryption for Valkey cluster"
