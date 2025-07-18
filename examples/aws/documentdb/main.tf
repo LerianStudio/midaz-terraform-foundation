@@ -18,7 +18,7 @@ locals {
 
 # Create a new secret for the DocumentDB master password
 resource "aws_secretsmanager_secret" "docdb_password" {
-  name = "${local.name}/documentdb-password"
+  name = "${local.name}/documentdb-password1"
   tags = local.tags
 }
 
@@ -43,6 +43,7 @@ resource "aws_security_group" "docdb" {
 
   # Allow inbound traffic on the DocumentDB port from within the VPC
   ingress {
+    description = "Allow inbound traffic on the DocumentDB port from within the VPC"
     from_port   = 27017
     to_port     = 27017
     protocol    = "tcp"
@@ -77,6 +78,10 @@ resource "aws_docdb_cluster" "main" {
   backup_retention_period         = var.backup_retention_period
   preferred_backup_window         = var.preferred_backup_window
   db_cluster_parameter_group_name = aws_docdb_cluster_parameter_group.example.name
+  storage_encrypted               = true
+  enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+  kms_key_id                      = module.docdb_kms_key.key_arn
+
 
   tags = local.tags
 }
