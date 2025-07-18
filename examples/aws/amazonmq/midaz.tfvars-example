@@ -1,0 +1,25 @@
+# Core Configuration
+name        = "midaz-mq"      # Name identifier for the AmazonMQ broker
+environment = "<environment>" # Environment identifier
+
+# Broker Configuration
+deployment_mode     = "SINGLE_INSTANCE" # SINGLE_INSTANCE, ACTIVE_STANDBY_MULTI_AZ, or CLUSTER_MULTI_AZ
+engine_type         = "RabbitMQ"        # ActiveMQ or RabbitMQ
+engine_version      = "3.11.28"         # Broker engine version
+host_instance_type  = "mq.t3.micro"     # Broker instance type
+publicly_accessible = false             # Set to true to allow public access
+
+# Credentials (use a secrets management system in production)
+mq_admin_user     = "midaz_admin"
+mq_admin_password = "<YourStrongPassword>"
+
+# Network Configuration
+vpc_name = "midaz-network" # Name of the VPC where the broker will be created
+
+# Additional Tags
+additional_tags = {
+  Project     = "midaz"
+  Environment = "<environment>" 
+  Owner       = "devops"
+  ManagedBy   = "terraform"
+}
