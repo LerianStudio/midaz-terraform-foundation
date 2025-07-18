@@ -45,15 +45,15 @@ resource "aws_vpc_security_group_ingress_rule" "mq" {
 
 # Main AmazonMQ broker configuration
 resource "aws_mq_broker" "main" {
-  broker_name         = local.name
-  deployment_mode     = var.deployment_mode
-  engine_type         = var.engine_type
-  engine_version      = var.engine_version
-  host_instance_type  = var.host_instance_type
-  publicly_accessible = var.publicly_accessible
+  broker_name                = local.name
+  deployment_mode            = var.deployment_mode
+  engine_type                = var.engine_type
+  engine_version             = var.engine_version
+  host_instance_type         = var.host_instance_type
+  publicly_accessible        = var.publicly_accessible
   auto_minor_version_upgrade = var.auto_minor_version_upgrade
-  subnet_ids          = [data.aws_subnets.private.ids[0]]
-  security_groups     = [aws_security_group.mq.id]
+  subnet_ids                 = [data.aws_subnets.private.ids[0]]
+  security_groups            = [aws_security_group.mq.id]
 
   user {
     username = var.mq_admin_user

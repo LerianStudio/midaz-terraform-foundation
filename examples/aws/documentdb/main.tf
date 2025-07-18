@@ -67,15 +67,15 @@ resource "aws_docdb_cluster_parameter_group" "example" {
 
 # Main DocumentDB cluster configuration
 resource "aws_docdb_cluster" "main" {
-  cluster_identifier      = local.name
-  engine                  = "docdb"
-  master_username         = var.master_username
-  master_password         = aws_secretsmanager_secret_version.docdb_password.secret_string
-  db_subnet_group_name    = aws_docdb_subnet_group.main.name
-  vpc_security_group_ids  = [aws_security_group.docdb.id]
-  skip_final_snapshot     = true
-  backup_retention_period = var.backup_retention_period
-  preferred_backup_window = var.preferred_backup_window
+  cluster_identifier              = local.name
+  engine                          = "docdb"
+  master_username                 = var.master_username
+  master_password                 = aws_secretsmanager_secret_version.docdb_password.secret_string
+  db_subnet_group_name            = aws_docdb_subnet_group.main.name
+  vpc_security_group_ids          = [aws_security_group.docdb.id]
+  skip_final_snapshot             = true
+  backup_retention_period         = var.backup_retention_period
+  preferred_backup_window         = var.preferred_backup_window
   db_cluster_parameter_group_name = aws_docdb_cluster_parameter_group.example.name
 
   tags = local.tags
