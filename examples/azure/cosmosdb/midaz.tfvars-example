@@ -1,0 +1,6 @@
+cosmos_account_name     = "midaz-cosmos-mongo"
+mongo_db_name           = "midazdb"
+mongo_collection_name   = "usuarios"
+mongo_shard_key         = "_id"
+mongo_throughput        = 400
+location                = "northcentralus"
