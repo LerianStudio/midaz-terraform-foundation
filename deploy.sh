@@ -34,7 +34,7 @@ print_table_row() {
 # Function to check placeholders in backend files
 check_placeholders() {
     local provider=$1
-    local components=("network" "dns" "database" "valkey" "kubernetes")
+    local components=("network" "dns" "database" "valkey" "kubernetes" "cosmosdb")
     local has_placeholders=false
 
     for component in "${components[@]}"; do
@@ -107,7 +107,7 @@ deploy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
-                "cosmosdb") backend_file="examples/azure/cosmosdb/backend.tf" ;;
+                "cosmosdb") component_path="examples/azure/cosmosdb" ;;
             esac
             ;;
         "gcp")
@@ -165,7 +165,7 @@ destroy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
-                "cosmosdb") backend_file="examples/azure/cosmosdb/backend.tf" ;;
+                "cosmosdb") component_path="examples/azure/cosmosdb" ;;
             esac
             ;;
         "gcp")
@@ -232,13 +232,13 @@ print_table_header
 
 case $action_choice in
     1)
-        components=("network" "dns" "database" "valkey" "kubernetes")
+        components=("network" "dns" "database" "valkey" "kubernetes" "cosmosdb")
         for component in "${components[@]}"; do
             deploy_component "$provider" "$component"
         done
         ;;
     2)
-        components=("kubernetes" "valkey" "database" "dns" "network")
+        components=("cosmosdb" "kubernetes" "valkey" "database" "dns" "network")
         for component in "${components[@]}"; do
             destroy_component "$provider" "$component"
         done
