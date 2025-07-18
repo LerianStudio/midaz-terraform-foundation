@@ -22,6 +22,11 @@ parameters = [
     name         = "max_connections"
     value        = "100"
     apply_method = "pending-reboot" # Required for static parameters
+  },
+  {
+    name         = "rds.force_ssl"
+    value        = "0" # Disable SSL for RDS instance for enable set to 1
+    apply_method = "pending-reboot" # Required for static parameters
   }
 ]
 
