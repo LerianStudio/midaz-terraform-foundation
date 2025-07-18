@@ -46,6 +46,8 @@ check_placeholders() {
                     "dns") backend_file="examples/aws/route53/backend.tf" ;;
                     "database") backend_file="examples/aws/rds/backend.tf" ;;
                     "valkey") backend_file="examples/aws/valkey/backend.tf" ;;
+                    "rabbitmq") backend_file="examples/aws/amazonmq/backend.tf" ;;
+                    "mongodb") backend_file="examples/aws/documentdb/backend.tf" ;;
                     "kubernetes") backend_file="examples/aws/eks/backend.tf" ;;
                 esac
                 ;;
@@ -56,6 +58,7 @@ check_placeholders() {
                     "database") backend_file="examples/azure/database/backend.tf" ;;
                     "valkey") backend_file="examples/azure/redis/backend.tf" ;;
                     "kubernetes") backend_file="examples/azure/aks/backend.tf" ;;
+                    "mongodb") backend_file="examples/azure/cosmosdb/backend.tf" ;;
                 esac
                 ;;
             "gcp")
@@ -96,6 +99,8 @@ deploy_component() {
                 "dns") component_path="examples/aws/route53" ;;
                 "database") component_path="examples/aws/rds" ;;
                 "valkey") component_path="examples/aws/valkey" ;;
+                "rabbitmq") component_path="examples/aws/amazonmq" ;;
+                "mongodb") component_path="examples/aws/documentdb" ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -106,6 +111,7 @@ deploy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
+                "mongodb") component_path="examples/azure/cosmosdb" ;;
             esac
             ;;
         "gcp")
@@ -153,6 +159,8 @@ destroy_component() {
                 "dns") component_path="examples/aws/route53" ;;
                 "database") component_path="examples/aws/rds" ;;
                 "valkey") component_path="examples/aws/valkey" ;;
+                "rabbitmq") component_path="examples/aws/amazonmq" ;;
+                "mongodb") component_path="examples/aws/documentdb" ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -163,6 +171,7 @@ destroy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
+                "mongodb") component_path="examples/azure/cosmosdb" ;;
             esac
             ;;
         "gcp")
@@ -230,12 +239,22 @@ print_table_header
 case $action_choice in
     1)
         components=("network" "dns" "database" "valkey" "kubernetes")
+        if [ "$provider" = "aws" ]; then
+            components=("network" "dns" "database" "valkey" "rabbitmq" "mongodb" "kubernetes")
+        elif [ "$provider" = "azure" ]; then
+            components=("network" "dns" "database" "valkey" "mongodb" "kubernetes" )
+        fi
         for component in "${components[@]}"; do
             deploy_component "$provider" "$component"
         done
         ;;
     2)
         components=("kubernetes" "valkey" "database" "dns" "network")
+        if [ "$provider" = "aws" ]; then
+            components=("kubernetes" "mongodb" "rabbitmq" "valkey" "database" "dns" "network")
+        elif [ "$provider" = "azure" ]; then
+            components=("kubernetes" "mongodb" "valkey" "database" "dns" "network")
+        fi
         for component in "${components[@]}"; do
             destroy_component "$provider" "$component"
         done

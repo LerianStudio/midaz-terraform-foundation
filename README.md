@@ -39,6 +39,7 @@ This repository provides Terraform examples for deploying foundation infrastruct
         ├── database/
         ├── redis/
         └── aks/
+        └── cosmosdb/
 ```
 
 **Note**: Components must be created in the following order:

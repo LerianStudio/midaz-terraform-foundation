@@ -48,7 +48,7 @@ module "valkey" {
   transit_encryption_enabled = var.transit_encryption_enabled
 
   # transit_encryption_mode and auth_token will be used once Midaz accepts TLS certificates configuration
-  #transit_encryption_mode    = var.transit_encryption_mode
+  transit_encryption_mode = var.transit_encryption_mode
   #auth_token                 = random_password.valkey_auth.result
 
   # Maintenance
