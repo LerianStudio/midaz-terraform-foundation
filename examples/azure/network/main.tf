@@ -144,3 +144,25 @@ resource "azurerm_subnet_network_security_group_association" "private_redis" {
   subnet_id                 = azurerm_subnet.private_redis[count.index].id
   network_security_group_id = azurerm_network_security_group.private.id
 }
+
+# --- Create private CosmosDB subnets outside the module for Private Endpoint use ---
+
+resource "azurerm_subnet" "private_cosmos" {
+  count                = length(var.private_cosmos_subnet_prefixes)
+  name                 = "private-cosmos-subnet-${count.index + 1}"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = var.vnet_name
+  address_prefixes     = [var.private_cosmos_subnet_prefixes[count.index]]
+
+  service_endpoints = ["Microsoft.AzureCosmosDB"]
+
+  # No delegation required for CosmosDB
+  depends_on = [module.vnet]
+}
+
+# Associate private NSG to private CosmosDB subnets
+resource "azurerm_subnet_network_security_group_association" "private_cosmos" {
+  count                     = length(var.private_cosmos_subnet_prefixes)
+  subnet_id                 = azurerm_subnet.private_cosmos[count.index].id
+  network_security_group_id = azurerm_network_security_group.private.id
+}

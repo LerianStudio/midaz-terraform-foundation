@@ -51,3 +51,8 @@ output "private_nsg_id" {
   description = "The ID of the private network security group"
   value       = azurerm_network_security_group.private.id
 }
+
+output "private_cosmos_subnet_ids" {
+  description = "The IDs of the private CosmosDB subnets"
+  value       = azurerm_subnet.private_cosmos[*].id
+}

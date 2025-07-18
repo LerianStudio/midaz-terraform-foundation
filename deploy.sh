@@ -56,6 +56,7 @@ check_placeholders() {
                     "database") backend_file="examples/azure/database/backend.tf" ;;
                     "valkey") backend_file="examples/azure/redis/backend.tf" ;;
                     "kubernetes") backend_file="examples/azure/aks/backend.tf" ;;
+                    "cosmosdb") backend_file="examples/azure/cosmosdb/backend.tf" ;;
                 esac
                 ;;
             "gcp")
@@ -106,6 +107,7 @@ deploy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
+                "cosmosdb") backend_file="examples/azure/cosmosdb/backend.tf" ;;
             esac
             ;;
         "gcp")
@@ -163,6 +165,7 @@ destroy_component() {
                 "database") component_path="examples/azure/database" ;;
                 "valkey") component_path="examples/azure/redis" ;;
                 "kubernetes") component_path="examples/azure/aks" ;;
+                "cosmosdb") backend_file="examples/azure/cosmosdb/backend.tf" ;;
             esac
             ;;
         "gcp")
