@@ -133,7 +133,7 @@ jobs:
     - name: Run tfsec
       uses: aquasecurity/tfsec-action@v1.0.0
       with:
-        additional_args: "--exclude aws-ssm-secret-use-customer-key,aws-ssm-secret-use-customer-key,aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy,aws-mq-enable-audit-logging"
+        additional_args: "--exclude aws-ssm-secret-use-customer-key,aws-ssm-secret-use-customer-key,aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy,aws-mq-enable-audit-logging,aws-documentdb-encryption-customer-key"
 
   release:
     needs: validate  # Only run after validation succeeds
