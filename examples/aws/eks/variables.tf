@@ -96,28 +96,6 @@ variable "enable_cluster_creator_admin_permissions" {
   default     = true
 }
 
-variable "attach_cluster_primary_security_group" {
-  description = "Indicates whether the EKS managed node group should attach to the cluster primary security group"
-  type        = bool
-  default     = true
-}
-
-variable "create_security_group" {
-  description = "Determines if a security group should be created for the EKS managed node group"
-  type        = bool
-  default     = false
-}
-
-variable "ami_type" {
-  description = "Type of Amazon Machine Image (AMI) associated with the EKS Node Group"
-  type        = string
-  default     = "AL2_ARM_64"
-  validation {
-    condition     = contains(["AL2_x86_64", "AL2_x86_64_GPU", "AL2_ARM_64", "BOTTLEROCKET_x86_64", "BOTTLEROCKET_ARM_64", "WINDOWS_CORE_2019_x86_64", "WINDOWS_FULL_2019_x86_64", "WINDOWS_CORE_2022_x86_64", "WINDOWS_FULL_2022_x86_64"], var.ami_type)
-    error_message = "AMI type must be one of: AL2_x86_64, AL2_x86_64_GPU, AL2_ARM_64, BOTTLEROCKET_x86_64, BOTTLEROCKET_ARM_64, WINDOWS_CORE_2019_x86_64, WINDOWS_FULL_2019_x86_64, WINDOWS_CORE_2022_x86_64, WINDOWS_FULL_2022_x86_64"
-  }
-}
-
 variable "create_autoscaler_role" {
   description = "Whether to create the cluster autoscaler IAM role"
   type        = bool

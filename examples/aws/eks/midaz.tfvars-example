@@ -22,15 +22,10 @@ max_size       = 15            # Maximum number of nodes
 desired_size   = 3             # Desired number of nodes
 capacity_type  = "ON_DEMAND"   # ON_DEMAND or SPOT instances
 
-# AMI Configuration
-ami_type = "AL2_ARM_64"
-
 # Network Configuration
 vpc_name = "midaz-network" # Name of the VPC where EKS cluster will be created
 
 # Security Group Configuration
-attach_cluster_primary_security_group = true  # Attach to cluster's primary security group
-create_security_group                 = false # Create dedicated security group for node group
 
 # Additional Tags
 additional_tags = {
