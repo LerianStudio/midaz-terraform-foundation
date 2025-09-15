@@ -140,6 +140,10 @@ module "eks" {
         GithubRepo  = "midaz-terraform-foundation"
       }
 
+      metadata_options = {
+        http_tokens = "required"
+      }
+
       tags = merge({
         Environment = lower(var.environment)
         ManagedBy   = "Terraform"
