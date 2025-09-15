@@ -135,7 +135,6 @@ module "eks" {
       instance_types                        = var.instance_types
       capacity_type                         = var.capacity_type
       ami_type                              = var.ami_type
-      instance_types                        = var.instance_types
       attach_cluster_primary_security_group = var.attach_cluster_primary_security_group
       create_security_group                 = var.create_security_group
 
