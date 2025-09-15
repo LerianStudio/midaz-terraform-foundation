@@ -125,15 +125,19 @@ module "eks" {
   # Configure the default managed node group with autoscaling settings
   eks_managed_node_groups = {
     default = {
-      name                     = "${var.name}-default-nodepool"
-      use_name_prefix          = false
-      iam_role_name            = "${var.name}-default-nodepool"
-      iam_role_use_name_prefix = false
-      min_size                 = var.min_size
-      max_size                 = var.max_size
-      desired_size             = var.desired_size
-      instance_types           = var.instance_types
-      capacity_type            = var.capacity_type
+      name                                  = "${var.name}-default-nodepool"
+      use_name_prefix                       = false
+      iam_role_name                         = "${var.name}-default-nodepool"
+      iam_role_use_name_prefix              = false
+      min_size                              = var.min_size
+      max_size                              = var.max_size
+      desired_size                          = var.desired_size
+      instance_types                        = var.instance_types
+      capacity_type                         = var.capacity_type
+      ami_type                              = var.ami_type
+      instance_types                        = var.instance_types
+      attach_cluster_primary_security_group = var.attach_cluster_primary_security_group
+      create_security_group                 = var.create_security_group
 
       labels = {
         Environment = lower(var.environment)
