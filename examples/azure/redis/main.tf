@@ -1,5 +1,6 @@
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
 }
 
 ############################################
@@ -15,6 +16,13 @@ resource "azurerm_redis_cache" "example" {
   sku_name            = var.sku
   minimum_tls_version = var.minimum_tls_version
   shard_count         = var.shard_count
+
+  lifecycle {
+    precondition {
+      condition     = var.sku == "Premium" || var.shard_count == 1
+      error_message = "Sharding (shard_count > 1) is only allowed for Premium SKU."
+    }
+  }
 
   public_network_access_enabled = var.public_network_access_enabled
 

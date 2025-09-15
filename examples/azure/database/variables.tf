@@ -119,7 +119,27 @@ variable "enable_pgsql_replica" {
 variable "zone_redundant_enabled" {
   description = "Enable zone redundant HA for PostgreSQL Flexible Server"
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "primary_zone" {
+  description = "Availability Zone for the primary PostgreSQL Flexible Server (1, 2, or 3)"
+  type        = string
+  default     = "1"
+  validation {
+    condition     = can(regex("^(1|2|3)$", var.primary_zone))
+    error_message = "primary_zone must be one of: 1, 2, or 3."
+  }
+}
+
+variable "standby_zone" {
+  description = "Availability Zone for the standby when ZoneRedundant HA is enabled"
+  type        = string
+  default     = "2"
+  validation {
+    condition     = can(regex("^(1|2|3)$", var.standby_zone))
+    error_message = "standby_zone must be one of: 1, 2, or 3."
+  }
 }
 
 variable "pgsql_password_length" {
