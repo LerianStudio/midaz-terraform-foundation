@@ -1,3 +1,10 @@
+# [1.1.0-develop.3](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0-develop.2...v1.1.0-develop.3) (2025-09-16)
+
+
+### Features
+
+* add zone redundancy and HA config for PostgreSQL Flexible Server and improve validation checks ([0423c8e](https://github.com/LerianStudio/midaz-terraform-foundation/commit/0423c8e0a3ad350c1274e1fb233b4ff170eab91a))
+
 # [1.1.0-develop.2](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0-develop.1...v1.1.0-develop.2) (2025-07-18)
 
 
