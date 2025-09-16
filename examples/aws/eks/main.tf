@@ -1,16 +1,19 @@
 # Main EKS cluster configuration using the AWS EKS Terraform module
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.36"
+  version = "~> 21.0"
 
   # Basic cluster settings including name and Kubernetes version
-  cluster_name    = var.name
-  cluster_version = var.cluster_version
+  name               = var.name
+  kubernetes_version = var.cluster_version
+
+  # Authentication mode for EKS v21 compatibility
+  authentication_mode = "API"
 
   # API server endpoint access - enables private access and configurable public access
-  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
-  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
-  cluster_endpoint_public_access_cidrs = var.allowed_api_access_cidrs
+  endpoint_private_access      = var.cluster_endpoint_private_access
+  endpoint_public_access       = var.cluster_endpoint_public_access
+  endpoint_public_access_cidrs = var.allowed_api_access_cidrs
 
   # Automatically grants admin permissions to the AWS IAM entity creating the cluster
   enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
@@ -48,13 +51,13 @@ module "eks" {
   }
 
   # Configure KMS encryption for Kubernetes secrets
-  cluster_encryption_config = {
+  encryption_config = {
     provider_key_arn = module.eks_kms_key.key_arn
     resources        = ["secrets"]
   }
 
   # Enable comprehensive control plane logging for audit and troubleshooting
-  cluster_enabled_log_types = [
+  enabled_log_types = [
     "api",
     "audit",
     "authenticator",
@@ -63,36 +66,33 @@ module "eks" {
   ]
 
   # Install and configure essential cluster addons with latest versions
-  cluster_addons = {
+  addons = {
     coredns = {
-      most_recent = true
+      most_recent                 = true
+      resolve_conflicts_on_create = "NONE"
     }
     kube-proxy = {
-      most_recent = true
+      most_recent                 = true
+      resolve_conflicts_on_create = "NONE"
     }
     vpc-cni = {
-      most_recent = true
+      most_recent                 = true
+      resolve_conflicts_on_create = "NONE"
     }
     metrics-server = {
-      most_recent = true
+      most_recent                 = true
+      resolve_conflicts_on_create = "NONE"
     }
     aws-ebs-csi-driver = {
-      most_recent              = true
-      service_account_role_arn = module.ebs_csi_irsa_role.iam_role_arn
+      most_recent                 = true
+      resolve_conflicts_on_create = "NONE"
+      service_account_role_arn    = module.ebs_csi_irsa_role.iam_role_arn
     }
   }
 
   # Network configuration using existing VPC and private subnets
   vpc_id     = data.aws_vpc.selected.id
   subnet_ids = data.aws_subnets.private.ids
-
-  # Default configuration for all managed node groups
-  eks_managed_node_group_defaults = {
-    ami_type                              = var.ami_type
-    instance_types                        = var.instance_types
-    attach_cluster_primary_security_group = var.attach_cluster_primary_security_group
-    create_security_group                 = var.create_security_group
-  }
 
   # Security group rules for node-to-node communication and external access
   node_security_group_additional_rules = {
@@ -125,19 +125,26 @@ module "eks" {
   # Configure the default managed node group with autoscaling settings
   eks_managed_node_groups = {
     default = {
-      name                     = "${var.name}-default-nodepool"
-      use_name_prefix          = false
-      iam_role_name            = "${var.name}-default-nodepool"
-      iam_role_use_name_prefix = false
-      min_size                 = var.min_size
-      max_size                 = var.max_size
-      desired_size             = var.desired_size
-      instance_types           = var.instance_types
-      capacity_type            = var.capacity_type
+      name                                  = "${var.name}-default-nodepool"
+      use_name_prefix                       = false
+      iam_role_name                         = "${var.name}-default-nodepool"
+      iam_role_use_name_prefix              = false
+      min_size                              = var.min_size
+      max_size                              = var.max_size
+      desired_size                          = var.desired_size
+      instance_types                        = var.instance_types
+      capacity_type                         = var.capacity_type
+      ami_type                              = var.ami_type
+      attach_cluster_primary_security_group = var.attach_cluster_primary_security_group
+      create_security_group                 = var.create_security_group
 
       labels = {
         Environment = lower(var.environment)
         GithubRepo  = "midaz-terraform-foundation"
+      }
+
+      metadata_options = {
+        http_tokens = "required"
       }
 
       tags = merge({
