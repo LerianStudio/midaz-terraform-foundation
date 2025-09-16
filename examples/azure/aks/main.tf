@@ -42,6 +42,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
     node_count     = var.node_count
     vm_size        = var.node_vm_size
     vnet_subnet_id = data.azurerm_subnet.subnet_aks_1.id
+    # Required by Azure when updating certain default node pool properties (e.g., vm_size, subnet, zones)
+    temporary_name_for_rotation = "sysrotate"
   }
 
   identity {

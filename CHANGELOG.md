@@ -1,3 +1,12 @@
+# [1.2.0-develop.1](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0...v1.2.0-develop.1) (2025-09-16)
+
+
+### Features
+
+* add zone redundancy and HA config for PostgreSQL Flexible Server and improve validation checks ([0423c8e](https://github.com/LerianStudio/midaz-terraform-foundation/commit/0423c8e0a3ad350c1274e1fb233b4ff170eab91a))
+
+# [1.1.0-develop.3](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0-develop.2...v1.1.0-develop.3) (2025-09-16)
+=======
 # [1.1.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.2...v1.1.0) (2025-07-18)
 
 
@@ -10,8 +19,11 @@
 * rmv unusable parameters ([115e4f4](https://github.com/LerianStudio/midaz-terraform-foundation/commit/115e4f4265c6acdf469e933d4abb637d556fea64))
 
 
+
 ### Features
 
+
+* add zone redundancy and HA config for PostgreSQL Flexible Server and improve validation checks ([0423c8e](https://github.com/LerianStudio/midaz-terraform-foundation/commit/0423c8e0a3ad350c1274e1fb233b4ff170eab91a))
 * add aws caller for kms key ([bcad3bf](https://github.com/LerianStudio/midaz-terraform-foundation/commit/bcad3bf9099787a7febfe74980d1cab8c97cd494))
 * add components for diff providers ([a1ed7c3](https://github.com/LerianStudio/midaz-terraform-foundation/commit/a1ed7c3a29700dc06f3153409c84d82832b57420))
 * add kms key for documentdb ([5447d1e](https://github.com/LerianStudio/midaz-terraform-foundation/commit/5447d1e25dca3f6102a065d00633a3c2e378afc5))
@@ -24,6 +36,7 @@
 * set changes on main script ([96513b9](https://github.com/LerianStudio/midaz-terraform-foundation/commit/96513b9350c2b432b93207a0dd9354cbd13bb377))
 * set changes on main script ([8673973](https://github.com/LerianStudio/midaz-terraform-foundation/commit/8673973ec7339ec689f1007995e78254a1ceba7f))
 * set changes on main script create conditions of rabbitmq and mongodb ([764425b](https://github.com/LerianStudio/midaz-terraform-foundation/commit/764425b8ffd2e39071dd9d6f6c81c440cb8ef690))
+
 
 # [1.1.0-develop.2](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0-develop.1...v1.1.0-develop.2) (2025-07-18)
 
