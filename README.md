@@ -292,6 +292,54 @@ For detailed configuration options and advanced setup, please refer to the [Mida
 - All sensitive data should be stored in cloud provider secret management services
 - Follow the principle of least privilege for service accounts
 
+## AWS Requirements
+
+When deploying on AWS, please note the following important requirements:
+
+- **Cluster Autoscaler** and **NGINX Ingress Controller** (if required by the client) **must be installed and managed manually or by GitOps or any pipeline that the client uses**.
+- It is **not possible to configure cluster atuscaler and NGINX ingrees by default** via the `addons` block in `main.tf`.
+- These components require manual installation using their respective Helm charts after the EKS cluster is deployed.
+- If the client is deploying **Midaz or plugins** using **Amazon MQ**, they **must set `RABBITMQ_URI: "amqps"`** in Helm values for any component that uses cloud AMQP.
+- If the client wants a **private EKS cluster**, they need to set these variables in their `midaz.tfvars` file: `cluster_endpoint_private_access = true`, `cluster_endpoint_public_access = false`, and there is **no need to set `allowed_api_access_cidrs`**.
+
+### Manual Installation Resources
+
+For installation guidance, please refer to the official Helm charts:
+
+- [Cluster Autoscaler Helm Chart](https://artifacthub.io/packages/helm/cluster-autoscaler/cluster-autoscaler)
+- [NGINX Ingress Controller Helm Chart](https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx)
+
+## VPN and Private Kubernetes Access
+
+When implementing VPN access and private Kubernetes clusters, please consider the following client responsibilities:
+
+### Client Responsibilities
+
+- If the client wants to use a **VPN** and make the **Kubernetes cluster private**, **it is their responsibility** to configure and manage the VPN and related infrastructure.
+- To **access databases** through a VPN, the client must create a **Network ACL (NACL)** (in the case of AWS) that allows the **VPN server to reach the database subnets**.
+- The **database must have a security group rule** that allows the **VPN server to reach the database** on the appropriate database port.
+- To allow the VPN server to access the **EKS control plane endpoint**, the client must add a **security group rule** to the **control plane's security group** permitting traffic from the VPN server over the VPN network.
+
+### Security Group Configuration Example
+
+Below is an example of how to add a security group rule to allow VPN server access to the EKS control plane. **This must be used in `main.tf` inside the `module.eks` block when the client is creating a private EKS cluster and will access the cluster over a VPN:**
+
+```hcl
+  security_group_additional_rules = {
+    ingress_vpn_and_network_vpc = {
+      description                   = "Access EKS from Midaz VPN and Network VPC"
+      type                          = "ingress"
+      from_port                     = 0
+      to_port                       = 65535
+      protocol                      = "tcp"
+      cidr_blocks                   = ["<VPN_SERVER_CIDR>"]
+      source_cluster_security_group = true
+    }
+  }
+```
+
+📌 **Important:** Replace `<VPN_SERVER_CIDR>` with your actual VPN server CIDR block before applying this configuration.
+
 ## Contributing
 
 **IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.

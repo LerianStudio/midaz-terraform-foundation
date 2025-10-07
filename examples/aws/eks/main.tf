@@ -74,10 +74,12 @@ module "eks" {
     kube-proxy = {
       most_recent                 = true
       resolve_conflicts_on_create = "NONE"
+      before_compute = true
     }
     vpc-cni = {
       most_recent                 = true
       resolve_conflicts_on_create = "NONE"
+      before_compute = true
     }
     metrics-server = {
       most_recent                 = true

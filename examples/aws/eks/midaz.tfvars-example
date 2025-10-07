@@ -16,14 +16,14 @@ allowed_api_access_cidrs = [
 enable_cluster_creator_admin_permissions = true # Grant admin permissions to cluster creator
 
 # Node Group Configuration
-instance_types = ["c7g.large"] # List of instance types for the node group
-min_size       = 3             # Minimum number of nodes
-max_size       = 15            # Maximum number of nodes
-desired_size   = 3             # Desired number of nodes
+instance_types = ["c6i.xlarge"] # List of instance types for the node group
+min_size       = 5             # Minimum number of nodes
+max_size       = 20            # Maximum number of nodes
+desired_size   = 5             # Desired number of nodes
 capacity_type  = "ON_DEMAND"   # ON_DEMAND or SPOT instances
 
 # AMI Configuration
-ami_type = "AL2_ARM_64"
+ami_type = "AL2_x86_64"
 
 # Network Configuration
 vpc_name = "midaz-network" # Name of the VPC where EKS cluster will be created
