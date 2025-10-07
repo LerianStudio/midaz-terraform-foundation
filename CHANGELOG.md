@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0...v1.2.0) (2025-10-07)
+
+
+### Features
+
+* add DocumentDB infrastructure and update EKS tfvars and addons ([2dd58d8](https://github.com/LerianStudio/midaz-terraform-foundation/commit/2dd58d8650d2ae5e287cd3f8e95f1de17642d617))
+
 # [1.1.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.0.2...v1.1.0) (2025-07-18)
 
 
