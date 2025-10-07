@@ -5,7 +5,7 @@ environment = "<environment>" # Environment identifier
 # Broker Configuration
 deployment_mode     = "SINGLE_INSTANCE" # SINGLE_INSTANCE, ACTIVE_STANDBY_MULTI_AZ, or CLUSTER_MULTI_AZ
 engine_type         = "RabbitMQ"        # ActiveMQ or RabbitMQ
-engine_version      = "3.11.28"         # Broker engine version
+engine_version      = "3.13"         # Broker engine version
 host_instance_type  = "mq.t3.micro"     # Broker instance type
 publicly_accessible = false             # Set to true to allow public access
 
@@ -19,7 +19,7 @@ vpc_name = "midaz-network" # Name of the VPC where the broker will be created
 # Additional Tags
 additional_tags = {
   Project     = "midaz"
-  Environment = "<environment>" 
+  Environment = "<environment>"
   Owner       = "devops"
   ManagedBy   = "terraform"
 }

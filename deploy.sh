@@ -34,8 +34,14 @@ print_table_row() {
 # Function to check placeholders in backend files
 check_placeholders() {
     local provider=$1
+    local include_plugins=$2
     local components=("network" "dns" "database" "valkey" "kubernetes")
     local has_placeholders=false
+
+    # Add plugin components if requested
+    if [ "$include_plugins" = true ] && [ "$provider" = "aws" ]; then
+        components+=("plugin-fee-docdb" "plugin-crm-docdb")
+    fi
 
     for component in "${components[@]}"; do
         local backend_file=""
@@ -48,6 +54,8 @@ check_placeholders() {
                     "valkey") backend_file="examples/aws/valkey/backend.tf" ;;
                     "rabbitmq") backend_file="examples/aws/amazonmq/backend.tf" ;;
                     "mongodb") backend_file="examples/aws/documentdb/backend.tf" ;;
+                    "plugin-fee-docdb") backend_file="examples/aws/documentdb-plugin-fee/backend.tf" ;;
+                    "plugin-crm-docdb") backend_file="examples/aws/documentdb-plugin-crm/backend.tf" ;;
                     "kubernetes") backend_file="examples/aws/eks/backend.tf" ;;
                 esac
                 ;;
@@ -91,6 +99,7 @@ deploy_component() {
     local provider=$1
     local component=$2
     local component_path=""
+    local tfvars_file="midaz.tfvars"
 
     case $provider in
         "aws")
@@ -101,6 +110,14 @@ deploy_component() {
                 "valkey") component_path="examples/aws/valkey" ;;
                 "rabbitmq") component_path="examples/aws/amazonmq" ;;
                 "mongodb") component_path="examples/aws/documentdb" ;;
+                "plugin-fee-docdb") 
+                    component_path="examples/aws/documentdb-plugin-fee"
+                    tfvars_file="fee.tfvars"
+                    ;;
+                "plugin-crm-docdb") 
+                    component_path="examples/aws/documentdb-plugin-crm"
+                    tfvars_file="crm.tfvars"
+                    ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -132,7 +149,7 @@ deploy_component() {
         start_time=$(date +%s)
 
         terraform init -input=false -no-color > /dev/null
-        terraform plan -var-file="midaz.tfvars" -out=tfplan -input=false -no-color > /dev/null
+        terraform plan -var-file="$tfvars_file" -out=tfplan -input=false -no-color > /dev/null
         terraform apply -input=false -auto-approve -no-color tfplan > /dev/null
 
         end_time=$(date +%s)
@@ -151,6 +168,7 @@ destroy_component() {
     local provider=$1
     local component=$2
     local component_path=""
+    local tfvars_file="midaz.tfvars"
 
     case $provider in
         "aws")
@@ -161,6 +179,14 @@ destroy_component() {
                 "valkey") component_path="examples/aws/valkey" ;;
                 "rabbitmq") component_path="examples/aws/amazonmq" ;;
                 "mongodb") component_path="examples/aws/documentdb" ;;
+                "plugin-fee-docdb") 
+                    component_path="examples/aws/documentdb-plugin-fee"
+                    tfvars_file="fee.tfvars"
+                    ;;
+                "plugin-crm-docdb") 
+                    component_path="examples/aws/documentdb-plugin-crm"
+                    tfvars_file="crm.tfvars"
+                    ;;
                 "kubernetes") component_path="examples/aws/eks" ;;
             esac
             ;;
@@ -192,7 +218,7 @@ destroy_component() {
         start_time=$(date +%s)
 
         terraform init -input=false -no-color > /dev/null
-        terraform destroy -var-file="midaz.tfvars" -auto-approve -input=false -no-color > /dev/null
+        terraform destroy -var-file="$tfvars_file" -auto-approve -input=false -no-color > /dev/null
 
         end_time=$(date +%s)
         duration=$((end_time - start_time))s
@@ -230,9 +256,29 @@ print_message "$RED" "2) Destroy (BE CAREFUL)"
 
 read -p "Select an action (1-2): " action_choice
 
+# Ask about plugin resources (only for AWS currently)
+include_plugins=false
+if [ "$provider" = "aws" ]; then
+    print_message "$YELLOW" "\nDo you want to include plugin resources?"
+    print_message "$NC" "This will deploy/destroy DocumentDB instances for Fee and CRM plugins"
+    print_message "$GREEN" "1) Yes - Include plugin resources"
+    print_message "$NC" "2) No - Core infrastructure only"
+
+    read -p "Select option (1-2): " plugin_choice
+
+    case $plugin_choice in
+        1) include_plugins=true ;;
+        2) include_plugins=false ;;
+        *)
+            print_message "$RED" "Invalid choice! Defaulting to core infrastructure only."
+            include_plugins=false
+            ;;
+    esac
+fi
+
 # Check for placeholders
 print_message "$YELLOW" "\nChecking for placeholders in backend configurations..."
-check_placeholders "$provider"
+check_placeholders "$provider" "$include_plugins"
 
 print_table_header
 
@@ -240,9 +286,14 @@ case $action_choice in
     1)
         components=("network" "dns" "database" "valkey" "kubernetes")
         if [ "$provider" = "aws" ]; then
-            components=("network" "dns" "database" "valkey" "rabbitmq" "mongodb" "kubernetes")
+            components=("network" "dns" "database" "valkey" "rabbitmq" "mongodb")
+            # Add plugin components if requested
+            if [ "$include_plugins" = true ]; then
+                components+=("plugin-fee-docdb" "plugin-crm-docdb")
+            fi
+            components+=("kubernetes")
         elif [ "$provider" = "azure" ]; then
-            components=("network" "dns" "database" "valkey" "mongodb" "kubernetes" )
+            components=("network" "dns" "database" "valkey" "mongodb" "kubernetes")
         fi
         for component in "${components[@]}"; do
             deploy_component "$provider" "$component"
@@ -251,7 +302,12 @@ case $action_choice in
     2)
         components=("kubernetes" "valkey" "database" "dns" "network")
         if [ "$provider" = "aws" ]; then
-            components=("kubernetes" "mongodb" "rabbitmq" "valkey" "database" "dns" "network")
+            components=("kubernetes")
+            # Add plugin components if requested (destroy in reverse order)
+            if [ "$include_plugins" = true ]; then
+                components+=("plugin-crm-docdb" "plugin-fee-docdb")
+            fi
+            components+=("mongodb" "rabbitmq" "valkey" "database" "dns" "network")
         elif [ "$provider" = "azure" ]; then
             components=("kubernetes" "mongodb" "valkey" "database" "dns" "network")
         fi

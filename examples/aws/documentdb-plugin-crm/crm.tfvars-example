@@ -1,0 +1,29 @@
+# Core Configuration
+name        = "midaz-plugin-crm-docdb" # Name identifier for the DocumentDB cluster
+environment = "<environment>"          # Environment identifier
+
+# Cluster Configuration
+instance_class  = "db.t3.medium" # Instance class for the DocumentDB instances
+instances_count = 2              # Number of instances in the cluster
+
+# Credentials (use a secrets management system in production)
+master_username = "plugincrmuser"
+
+# Backup Configuration
+backup_retention_period = 7           # Days to retain backups
+preferred_backup_window = "07:00-09:00" # Daily backup window
+
+# Network Configuration
+vpc_name = "midaz-network" # Name of the VPC where the cluster will be created
+
+# DocumentDB TLS Configuration
+documentdb_tls = "disabled" # Enable or disable TLS for DocumentDB cluster
+
+# Additional Tags
+additional_tags = {
+  Project     = "midaz"
+  Plugin      = "crm"
+  Environment = "<environment>"
+  Owner       = "devops"
+  ManagedBy   = "terraform"
+}
