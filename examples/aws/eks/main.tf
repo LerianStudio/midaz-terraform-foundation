@@ -106,6 +106,14 @@ module "eks" {
       type        = "ingress"
       self        = true
     }
+    ingress_alb_health_check = {
+      description = "Allow ALB to access NodePort services for health checks"
+      protocol    = "tcp"
+      from_port   = 1025
+      to_port     = 65535
+      type        = "ingress"
+      cidr_blocks = [data.aws_vpc.selected.cidr_block]
+    }
     egress_vpc = {
       description = "Allow outbound traffic to VPC CIDR"
       protocol    = "-1"
@@ -146,7 +154,8 @@ module "eks" {
       }
 
       metadata_options = {
-        http_tokens = "required"
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 2
       }
 
       tags = merge({

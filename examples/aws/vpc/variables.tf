@@ -63,6 +63,12 @@ variable "enable_dns_support" {
   default     = true
 }
 
+variable "cluster_name" {
+  description = "EKS cluster name for subnet tagging"
+  type        = string
+  default     = ""
+}
+
 variable "additional_tags" {
   description = "Tags additional for resources use."
   type        = map(string)

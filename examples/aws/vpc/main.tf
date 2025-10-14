@@ -25,18 +25,25 @@ module "vpc" {
   create_flow_log_cloudwatch_log_group = var.flow_logs_enabled
   create_flow_log_cloudwatch_iam_role  = var.flow_logs_enabled
 
-  private_subnet_tags = {
-    Type = "private"
-  }
+  private_subnet_tags = merge(
+    {
+      Type                              = "private"
+      "kubernetes.io/role/internal-elb" = "1"
+    },
+    var.cluster_name != "" ? { "kubernetes.io/cluster/${var.cluster_name}" = "owned" } : {}
+  )
 
-  public_subnet_tags = {
-    Type = "public"
-  }
+  public_subnet_tags = merge(
+    {
+      Type                     = "public"
+      "kubernetes.io/role/elb" = "1"
+    },
+    var.cluster_name != "" ? { "kubernetes.io/cluster/${var.cluster_name}" = "owned" } : {}
+  )
 
   database_subnet_tags = {
     Type = "database"
   }
-
   tags = merge({
     Environment = lower(var.environment)
     ManagedBy   = "Terraform"

@@ -19,6 +19,9 @@ one_nat_gateway_per_az = false
 # Availability Zones
 availability_zones = ["us-east-2a", "us-east-2b", "us-east-2c"]
 
+# EKS Cluster Configuration
+cluster_name = "midaz-eks"
+
 # Additional Tags
 additional_tags = {
   "ManagedBy" = "terraform"

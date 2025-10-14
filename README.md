@@ -296,9 +296,10 @@ For detailed configuration options and advanced setup, please refer to the [Mida
 
 When deploying on AWS, please note the following important requirements:
 
-- **Cluster Autoscaler** and **NGINX Ingress Controller** (if required by the client) **must be installed and managed manually or by GitOps or any pipeline that the client uses**.
-- It is **not possible to configure cluster atuscaler and NGINX ingrees by default** via the `addons` block in `main.tf`.
+- **Cluster Autoscaler**, **AWS Load Balancer Controller**, and **NGINX Ingress Controller** (if required by the client) **must be installed and managed manually or by GitOps or any pipeline that the client uses**.
+- It is **not possible to configure cluster autoscaler, AWS Load Balancer Controller, and NGINX ingress by default** via the `addons` block in `main.tf`.
 - These components require manual installation using their respective Helm charts after the EKS cluster is deployed.
+- **AWS Load Balancer Controller** is required if the client wants to expose Midaz APIs inside the VPC (internal ALB) or to the internet (public ALB - not recommended). The IAM role for the AWS Load Balancer Controller is automatically created in `eks/iam.tf` and should be used by the controller's service account. VPC subnets are already tagged with the required tags (`kubernetes.io/role/elb` for public subnets and `kubernetes.io/role/internal-elb` for private subnets) for automatic subnet discovery by the controller.
 - If the client is deploying **Midaz or plugins** using **Amazon MQ**, they **must set `RABBITMQ_URI: "amqps"`** in Helm values for any component that uses cloud AMQP.
 - If the client wants a **private EKS cluster**, they need to set these variables in their `midaz.tfvars` file: `cluster_endpoint_private_access = true`, `cluster_endpoint_public_access = false`, and there is **no need to set `allowed_api_access_cidrs`**.
 
@@ -307,6 +308,7 @@ When deploying on AWS, please note the following important requirements:
 For installation guidance, please refer to the official Helm charts:
 
 - [Cluster Autoscaler Helm Chart](https://artifacthub.io/packages/helm/cluster-autoscaler/cluster-autoscaler)
+- [AWS Load Balancer Controller Helm Chart](https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller)
 - [NGINX Ingress Controller Helm Chart](https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx)
 
 ## VPN and Private Kubernetes Access
