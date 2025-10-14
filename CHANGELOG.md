@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.2.0...v1.3.0) (2025-10-14)
+
+
+### Features
+
+* add AWS Load Balancer Controller support and improve EKS configuration ([8afbabf](https://github.com/LerianStudio/midaz-terraform-foundation/commit/8afbabfc36aacbb971e4a8ab61da0008d58138ec))
+
 # [1.2.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.1.0...v1.2.0) (2025-10-07)
 
 
