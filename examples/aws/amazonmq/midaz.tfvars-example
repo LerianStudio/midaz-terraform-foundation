@@ -6,7 +6,7 @@ environment = "<environment>" # Environment identifier
 deployment_mode     = "SINGLE_INSTANCE" # SINGLE_INSTANCE, ACTIVE_STANDBY_MULTI_AZ, or CLUSTER_MULTI_AZ
 engine_type         = "RabbitMQ"        # ActiveMQ or RabbitMQ
 engine_version      = "3.13"         # Broker engine version
-host_instance_type  = "mq.t3.micro"     # Broker instance type
+host_instance_type  = "mq.m7g.large"    # Broker instance type
 publicly_accessible = false             # Set to true to allow public access
 
 # Credentials (use a secrets management system in production)

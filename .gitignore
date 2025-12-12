@@ -50,3 +50,6 @@ ehthumbs.db
 Thumbs.db
 node_modules
 package-lock.json
+
+# Plans and documentation (local only)
+docs/
