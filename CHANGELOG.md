@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.3.0...v1.4.0) (2025-12-16)
+
+
+### Features
+
+* update AWS instance types to newer generation and add disclaimer ([101c6a2](https://github.com/LerianStudio/midaz-terraform-foundation/commit/101c6a28db3662f861c9a8eb42e58198be32b073))
+
 # [1.3.0](https://github.com/LerianStudio/midaz-terraform-foundation/compare/v1.2.0...v1.3.0) (2025-10-14)
 
 
