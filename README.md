@@ -16,6 +16,22 @@ This repository provides Terraform examples for clients and open-source users to
 
 This repository provides Terraform examples for deploying foundation infrastructure. Please note that we do not provide a CI/CD pipeline implementation for these Terraform configurations. Users must implement their own CI/CD pipelines according to their specific needs and requirements.
 
+### Instance Types Disclaimer
+
+The instance types specified in the example `.tfvars` files are provided as starting points and examples only. Users are **fully responsible** for selecting appropriate instance types based on their specific workload requirements.
+
+**Key considerations:**
+
+- **Production Workloads:** The default instance types in examples may not be suitable for production environments. Always evaluate your expected transaction volume, concurrent connections, and data size before deploying.
+
+- **High TPS Requirements:** If your application requires high transactions per second (TPS), you must select appropriately sized instances. Consider CPU cores, memory, network bandwidth, and storage IOPS for your expected workload.
+
+- **Cost Optimization:** Larger instances provide more resources but at higher cost. Start with your expected workload profile and scale as needed.
+
+Before selecting instance types, review the official documentation for your chosen cloud provider (AWS, GCP, or Azure) regarding instance/machine type specifications and recommendations.
+
+**Disclaimer:** Lerian Studio is not responsible for performance issues, costs, or other impacts resulting from instance type selections.
+
 ## Project Structure
 
 ```

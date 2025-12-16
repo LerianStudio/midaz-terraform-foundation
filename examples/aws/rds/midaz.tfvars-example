@@ -8,7 +8,7 @@ engine                = "postgres"
 engine_version        = "16.3"
 family                = "postgres16"
 major_engine_version  = "16"
-instance_class        = "db.t3.medium"
+instance_class        = "db.m7g.large"
 allocated_storage     = 20
 max_allocated_storage = 100
 database_name         = "midaz"
@@ -20,7 +20,7 @@ deletion_protection   = true
 parameters = [
   {
     name         = "max_connections"
-    value        = "100"
+    value        = "LEAST({DBInstanceClassMemory/9531392},5000)" # Auto-scales based on instance memory
     apply_method = "pending-reboot" # Required for static parameters
   },
   {

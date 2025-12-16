@@ -3,7 +3,7 @@ name        = "midaz-plugin-crm-docdb" # Name identifier for the DocumentDB clus
 environment = "<environment>"          # Environment identifier
 
 # Cluster Configuration
-instance_class  = "db.t3.medium" # Instance class for the DocumentDB instances
+instance_class  = "db.r8g.large" # Instance class for the DocumentDB instances
 instances_count = 2              # Number of instances in the cluster
 
 # Credentials (use a secrets management system in production)
