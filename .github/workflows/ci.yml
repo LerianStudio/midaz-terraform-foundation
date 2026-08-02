@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
     # Checkout repository code in PR
     - name: Checkout in PR
@@ -137,7 +137,7 @@ jobs:
 
   release:
     needs: validate  # Only run after validation succeeds
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'push'
     steps:
     # Create GitHub App token for better rate limits
