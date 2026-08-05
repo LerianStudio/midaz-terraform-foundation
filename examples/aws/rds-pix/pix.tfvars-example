@@ -1,0 +1,127 @@
+# =============================================================================
+# RDS PostgreSQL Configuration for Pix Service
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Core Configuration
+# -----------------------------------------------------------------------------
+name        = "pix-rds"
+environment = "<environment>"
+
+# -----------------------------------------------------------------------------
+# Network Configuration
+# -----------------------------------------------------------------------------
+vpc_name = "<vpc-name>"
+
+# -----------------------------------------------------------------------------
+# RDS Engine Configuration
+# -----------------------------------------------------------------------------
+engine               = "postgres"
+engine_version       = "16.11"
+family               = "postgres16"
+major_engine_version = "16"
+
+# -----------------------------------------------------------------------------
+# Instance Configuration
+# -----------------------------------------------------------------------------
+instance_class        = "db.m7g.xlarge"  # 4 vCPU, 16GB RAM
+allocated_storage     = 100              # GiB
+max_allocated_storage = 200              # GiB (for autoscaling)
+
+# -----------------------------------------------------------------------------
+# Storage Configuration (gp3)
+# -----------------------------------------------------------------------------
+# gp3 is recommended for most workloads with better price-performance than gp2.
+#
+# IMPORTANT: gp3 IOPS/Throughput rules for PostgreSQL:
+#
+# | Storage Size  | Baseline (automatic)      | Can provision custom? |
+# |---------------|---------------------------|-----------------------|
+# | < 400 GiB     | 3,000 IOPS / 125 MiB/s    | NO (must use null)    |
+# | >= 400 GiB    | 12,000 IOPS / 500 MiB/s   | YES (optional)        |
+#
+# Maximum values (for >= 400 GiB):
+# - IOPS: 64,000 (max ratio: 500 IOPS per GiB)
+# - Throughput: 4,000 MiB/s (max ratio: 0.25 × provisioned IOPS)
+#
+# AWS Documentation: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html
+# -----------------------------------------------------------------------------
+storage_type = "gp3"
+
+# For storage < 400 GiB, leave these as null (baseline is automatic and included in price)
+# For storage >= 400 GiB, you can optionally provision higher values
+# iops               = null  # Uncomment and set value only if allocated_storage >= 400
+# storage_throughput = null  # Uncomment and set value only if allocated_storage >= 400
+
+# -----------------------------------------------------------------------------
+# Database Configuration
+# -----------------------------------------------------------------------------
+database_name       = "pix_db"
+username            = "postgres"
+port                = 5432
+deletion_protection = true  # Set to false for test environments
+
+# -----------------------------------------------------------------------------
+# Database Parameters
+# -----------------------------------------------------------------------------
+parameters = [
+  {
+    name         = "max_connections"
+    value        = "LEAST({DBInstanceClassMemory/9531392},5000)" # Auto-scales based on instance memory
+    apply_method = "pending-reboot"
+  },
+  {
+    name         = "rds.force_ssl"
+    value        = "1" # Enable SSL for production, set to 0 for testing
+    apply_method = "pending-reboot"
+  }
+]
+
+# -----------------------------------------------------------------------------
+# Maintenance and Backup Windows
+# -----------------------------------------------------------------------------
+maintenance_window = "Mon:00:00-Mon:03:00"
+backup_window      = "03:00-06:00"
+
+# -----------------------------------------------------------------------------
+# Monitoring and Logging Configuration
+# -----------------------------------------------------------------------------
+monitoring_interval             = 60  # Set to 0 if monitoring role creation is blocked
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+create_cloudwatch_log_group     = true
+create_monitoring_role          = true  # Set to false if IAM role creation is blocked
+
+# -----------------------------------------------------------------------------
+# Performance Insights
+# -----------------------------------------------------------------------------
+performance_insights_enabled          = true
+performance_insights_retention_period = 7 # Days to retain performance insights data
+
+# -----------------------------------------------------------------------------
+# Backup Configuration
+# -----------------------------------------------------------------------------
+backup_retention_period = 7     # Days to retain automated backups
+skip_final_snapshot     = false # Set to true for test environments
+
+# -----------------------------------------------------------------------------
+# Read Replica Configuration
+# -----------------------------------------------------------------------------
+create_read_replica         = true
+read_replica_instance_class = "db.m7g.xlarge"  # Same as primary
+read_replica_multi_az       = true
+
+# -----------------------------------------------------------------------------
+# DNS Configuration
+# -----------------------------------------------------------------------------
+dns_zone_name = "<dns-zone-name>"
+
+# -----------------------------------------------------------------------------
+# Additional Tags
+# -----------------------------------------------------------------------------
+additional_tags = {
+  "ManagedBy"   = "terraform"
+  "Project"     = "pix"
+  "Owner"       = "<owner>"
+  "Environment" = "<environment>"
+  "Type"        = "database"
+}

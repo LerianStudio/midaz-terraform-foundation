@@ -1,0 +1,67 @@
+# =============================================================================
+# AmazonMQ Broker Configuration for Fetcher Service
+# =============================================================================
+# This file contains example configurations for different deployment scenarios.
+#
+# DEFAULT: SINGLE_INSTANCE (Development) - uses smaller instance types
+#
+# IMPORTANT: Changing deployment_mode from CLUSTER_MULTI_AZ to SINGLE_INSTANCE
+# (or vice versa) will cause the broker to be DESTROYED and RECREATED.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Core Configuration (Required for all deployment modes)
+# -----------------------------------------------------------------------------
+name        = "fetcher-mq"    # Base name - will become "fetcher-mq-single" or "fetcher-mq-cluster"
+environment = "<environment>" # Environment identifier (e.g., dev, staging, prod)
+
+# Network Configuration (Required)
+vpc_name = "fetcher-network"  # Name of the VPC where the broker will be created
+
+# Credentials (Required - use a secrets management system in production)
+mq_admin_user = "fetcher_admin"
+
+# Additional Tags (Optional)
+additional_tags = {
+  Project     = "fetcher"
+  Environment = "<environment>"
+  Owner       = "<owner>"
+  ManagedBy   = "terraform"
+}
+
+# =============================================================================
+# DEPLOYMENT MODE: SINGLE_INSTANCE (Default - Development/Testing)
+# =============================================================================
+# Best for: Development, testing, non-critical workloads
+# Requirements: 1 private subnet
+# Instance types: mq.m5.large+ recommended (mq.t3.* supported for dev/test only)
+# -----------------------------------------------------------------------------
+deployment_mode    = "SINGLE_INSTANCE"
+engine_type        = "RabbitMQ"
+engine_version     = "3.13"
+host_instance_type = "mq.t3.micro"
+
+# =============================================================================
+# DEPLOYMENT MODE: CLUSTER_MULTI_AZ (Production HA)
+# =============================================================================
+# Uncomment the section below for production environments where high
+# availability is required.
+#
+# Best for: Production, staging, any environment requiring high availability
+# Requirements:
+#   - 2-3 private subnets in DIFFERENT availability zones
+#   - RabbitMQ engine type ONLY (ActiveMQ not supported)
+#   - mq.m5.large or larger instance type (mq.t3.* NOT supported)
+#
+# WARNING: Migrating to/from SINGLE_INSTANCE causes RESOURCE RECREATION!
+# -----------------------------------------------------------------------------
+# deployment_mode    = "CLUSTER_MULTI_AZ"
+# engine_type        = "RabbitMQ"
+# engine_version     = "3.13"
+# host_instance_type = "mq.m5.large"
+
+# =============================================================================
+# Common Optional Settings
+# =============================================================================
+publicly_accessible        = false  # Set to true only if external access required
+auto_minor_version_upgrade = true   # Recommended for security patches
