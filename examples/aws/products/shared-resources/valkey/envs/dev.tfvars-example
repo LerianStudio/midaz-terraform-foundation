@@ -1,0 +1,76 @@
+################################################################################
+# products/shared-resources/valkey — dev
+#
+# Absolute minimum sizing: one cache.t4g.micro node, roughly USD 12/month. With
+# the shared PostgreSQL instance this is the cheapest half of the shared tier and
+# the pair we validate in a real AWS account.
+#
+# OPT-IN: applying this directory is what enables the shared Valkey tier. There
+# is no valkey_enabled toggle. Not applying it is what "off" means.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "dev"
+
+# There is no `mode` here on purpose: this stack always CREATES (the module is
+# pinned to mode = "dedicated"). "shared" is what a PRODUCT sets to consume it.
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists. A product consuming with mode = "shared" gets
+# security_group_id = null and cannot authorise itself, so an unreachable shared
+# group is unreachable for every consumer at once.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.t4g.micro x 1 (~USD 12/month)
+#
+# One cache cluster, so no failover and no Multi-AZ (both require at least two).
+#
+# Transit encryption stays on in "preferred" mode, which accepts TLS and
+# plaintext clients — the Lerian charts still connect without TLS, so
+# helm_values reports REDIS_TLS = "false". auth_token_enabled is false: the
+# token is generated and stored in Secrets Manager either way, ElastiCache just
+# does not require it yet. Known gap, see prd.tfvars-example.
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.t4g.micro"
+num_cache_clusters         = 1
+automatic_failover_enabled = false
+multi_az_enabled           = false
+snapshot_retention_limit   = 0
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = true
+
+# Logical database index emitted as REDIS_DB. On a shared group this is the
+# crudest isolation between consumers; coordinating it is an application concern.
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

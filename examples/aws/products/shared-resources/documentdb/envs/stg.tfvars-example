@@ -1,0 +1,61 @@
+################################################################################
+# products/shared-resources/documentdb — stg
+#
+# Two instances across two AZs: one writer, one reader, which is what makes the
+# reader_endpoint output point at something real and what proves an AZ loss is
+# survivable.
+#
+# Deletion protection is ON. A shared staging cluster that anyone can destroy
+# takes every product rehearsing against it down at once.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "stg"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress
+#
+# Same posture as dev. Once infra-base/eks exists in stg and the node security
+# group is resolving (check `terraform output ingress_security_group_ids`), flip
+# allow_private_subnet_cidr_ingress to false — that is the posture prd ships.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium x 2
+#
+# TLS stays disabled for the same chart-side reason as dev and prd: the
+# consuming charts have to mount the global RDS CA bundle first.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 2
+parameter_group_family = "docdb5.0"
+documentdb_tls         = "disabled"
+
+backup_retention_period = 7
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

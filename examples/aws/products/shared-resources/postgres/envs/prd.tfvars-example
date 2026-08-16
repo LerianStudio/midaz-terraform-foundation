@@ -1,0 +1,93 @@
+################################################################################
+# products/shared-resources/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, a read replica for read-heavy
+# consumers, both observability paths enabled, a month of backups.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. They are sized for a
+# moderate Lerian footprint and say nothing about YOUR transaction volume,
+# connection count or data size — and a SHARED instance carries the load of
+# every product pointed at it, so it needs headroom a per-product instance does
+# not. Selecting instance types is the client's responsibility; see the Instance
+# Types Disclaimer in the repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "prd"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — the tight posture
+#
+# allow_private_subnet_cidr_ingress = false: in prd the shared tier accepts
+# traffic ONLY from resolved security groups, not from a subnet CIDR range. That
+# requires infra-base/eks to exist first, which is why the deploy order is
+# vpc -> eks -> shared-resources -> products.
+#
+# Before the first prd apply, confirm the lookup resolves:
+#   terraform plan -var-file=envs/prd.tfvars
+# and check that eks_node_security_group_resolved does NOT warn. If it does,
+# either eks is not applied yet or the cluster name does not match — do not work
+# around it by re-enabling the CIDR path.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+# Add the VPN or bastion security group here if operators need direct access.
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "lerian"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ (~USD 450/month with the replica)
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 30
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Created as shared-prd-postgres-replica and published as replica_endpoint — the
+# host a reporting or read-heavy consumer should point at instead of the writer.
+# With no replica the helm_values REPLICA_* variables point back at the primary,
+# which works but puts every product's read pool on the shared writer.
+################################################################################
+
+create_read_replica         = true
+read_replica_instance_class = "db.m7g.large"
+read_replica_multi_az       = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

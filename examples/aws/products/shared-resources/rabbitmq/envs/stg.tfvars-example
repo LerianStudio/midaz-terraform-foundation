@@ -1,0 +1,72 @@
+################################################################################
+# products/shared-resources/rabbitmq — stg
+#
+# CLUSTER_MULTI_AZ is three broker nodes instead of one, which is the single
+# largest cost step between dev and stg and is unavoidable if the goal is to
+# rehearse a clustered broker. mq.m5.large is a deliberate sizing choice, NOT a
+# floor imposed by the topology: every RabbitMQ instance type — mq.m7g.medium
+# included — supports CLUSTER_MULTI_AZ. What AWS rejects, in every mode, is the
+# ActiveMQ-only mq.t2.* / mq.t3.* families.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "stg"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress
+#
+# Same posture as dev. Once infra-base/eks exists in stg and the node security
+# group is resolving, flip allow_private_subnet_cidr_ingress to false.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Topology — CLUSTER_MULTI_AZ  ->  broker named shared-stg-rabbitmq-cluster
+#
+# EVERY SHARED CONSUMER IN stg MUST SET, on its own rabbitmq root:
+#
+#   shared_broker_name = "shared-stg-rabbitmq-cluster"
+#
+# The derived default on the consumer side is "shared-stg-rabbitmq-single",
+# which does not exist here. data "aws_mq_broker" matches the name exactly and
+# the AWS provider has no list/filter data source for MQ, so the suffix cannot
+# be discovered — it has to be declared. Getting it wrong is loud, not silent:
+# the consumer's plan fails naming the broker it searched for.
+#
+# The secret (shared-stg-rabbitmq/password) never carries the suffix and
+# resolves either way.
+#
+# Confirm the exact string with: terraform output -raw broker_name
+################################################################################
+
+broker_deployment_mode   = "CLUSTER_MULTI_AZ"
+append_deployment_suffix = true
+
+host_instance_type = "mq.m5.large"
+engine_version     = "3.13"
+mq_admin_user      = "rabbitmqadmin"
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+auto_minor_version_upgrade = true
+apply_immediately          = false
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

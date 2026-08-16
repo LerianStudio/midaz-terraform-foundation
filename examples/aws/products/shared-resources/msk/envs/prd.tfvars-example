@@ -1,0 +1,90 @@
+################################################################################
+# products/shared-resources/msk — prd
+#
+# Three brokers, one per Type=database subnet, replication factor 3 so a single
+# broker loss costs no partitions. Roughly USD 630/month at 500 GB per broker.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. A SHARED cluster
+# carries the topics, the retention and the throughput of every product pointed
+# at it. Selecting instance types is the client's responsibility; see the
+# Instance Types Disclaimer in the repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "prd"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — the tight posture
+#
+# allow_private_subnet_cidr_ingress = false: security-group-only ingress, which
+# requires infra-base/eks to exist first. Before the first prd apply, confirm
+# eks_node_security_group_resolved does NOT warn.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+# Add the VPN or bastion security group here if operators need direct access.
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Cluster — kafka.m7g.large x 3, TIERED storage
+#
+# TIERED moves cold segments off the broker EBS volume and is the lever to pull
+# when retention grows. It is rejected by the kafka.t3.* family, which is why
+# dev cannot use it.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.m7g.large"
+broker_ebs_volume_size = 500
+storage_mode           = "TIERED"
+
+enable_storage_autoscaling       = true
+storage_autoscaling_max_capacity = 2000
+
+################################################################################
+# Security
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Kafka configuration
+#
+# Replication factor 3 across three brokers: a single broker loss costs no
+# partitions.
+################################################################################
+
+auto_create_topics_enable  = false
+default_replication_factor = 3
+
+################################################################################
+# Observability
+#
+# PER_TOPIC_PER_BROKER is what lets you attribute load on a SHARED cluster to
+# the product that caused it. It costs more than PER_BROKER and is worth it here
+# precisely because the cluster has several tenants.
+################################################################################
+
+enhanced_monitoring                    = "PER_TOPIC_PER_BROKER"
+cloudwatch_logs_enabled                = true
+cloudwatch_log_group_retention_in_days = 90
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

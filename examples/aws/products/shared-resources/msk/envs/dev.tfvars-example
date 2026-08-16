@@ -1,0 +1,99 @@
+################################################################################
+# products/shared-resources/msk — dev
+#
+# MSK HAS NO CHEAP CORNER, and the broker count is why. kafka.t3.small is the
+# smallest broker AWS offers, the minimum is two brokers, and the broker count
+# must be a MULTIPLE of the number of client subnets. infra-base/vpc tags three
+# subnets Type=database, so the valid values here are 3, 6, 9 — three brokers is
+# the floor, roughly USD 105/month. A 2-broker cluster needs subnet_ids narrowed
+# to exactly two subnet ids, which cannot be written into a tfvars-example
+# because the ids are generated.
+#
+# OPT-IN: applying this directory is what enables the shared MSK tier. There is
+# no msk_enabled toggle. Streaming is OFF by default in the Lerian charts, so
+# for most dev environments the right answer is not to apply this directory at
+# all — USD 105/month of idle broker for a feature nobody turned on.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "dev"
+
+# There is no `mode` here on purpose: this stack always CREATES (the module is
+# pinned to mode = "dedicated"). "shared" is what a PRODUCT sets to consume it.
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists. It matters more on MSK than anywhere else: the
+# module used to ship no VPC-CIDR fallback at all, so empty allow lists produced
+# a cluster with zero ingress that looked healthy and accepted no connections.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+# subnet_ids = []  -> the three Type=database subnets are used, so
+#                     number_of_broker_nodes must be 3, 6 or 9.
+
+################################################################################
+# Cluster — kafka.t3.small x 3 (~USD 105/month)
+#
+# storage_mode stays empty: TIERED is REJECTED by the kafka.t3.* family.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.t3.small"
+broker_ebs_volume_size = 20
+storage_mode           = ""
+
+enable_storage_autoscaling = false
+
+################################################################################
+# Security
+#
+# SASL/SCRAM on, credentials in AmazonMSK_shared-dev-msk under a customer
+# managed CMK (both the prefix and the CMK are AWS requirements). TLS in transit
+# is mandatory once SCRAM is on.
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Kafka configuration
+#
+# auto.create.topics.enable stays false. The Lerian charts create their topics
+# explicitly from an ArgoCD PreSync rpk job, which keeps the topic set versioned
+# with the service that owns it — and on a SHARED cluster keeps two products
+# from silently colliding on a topic name.
+################################################################################
+
+auto_create_topics_enable = false
+
+################################################################################
+# Observability
+################################################################################
+
+enhanced_monitoring                    = "DEFAULT"
+cloudwatch_logs_enabled                = false
+cloudwatch_log_group_retention_in_days = 7
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

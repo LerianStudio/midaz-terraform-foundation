@@ -1,0 +1,77 @@
+################################################################################
+# products/shared-resources/valkey — prd
+#
+# Three cache clusters across three AZs with automatic failover, daily snapshots
+# retained for a week. Roughly USD 350/month on cache.m7g.large.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. A SHARED group carries
+# the keyspace of every product pointed at it. Selecting instance types is the
+# client's responsibility; see the Instance Types Disclaimer in the repository
+# README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "prd"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — the tight posture
+#
+# allow_private_subnet_cidr_ingress = false: security-group-only ingress, which
+# requires infra-base/eks to exist first. Before the first prd apply, confirm
+# eks_node_security_group_resolved does NOT warn. If it does, either eks is not
+# applied yet or the cluster name does not match — do not work around it by
+# re-enabling the CIDR path.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+# Add the VPN or bastion security group here if operators need direct access.
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.m7g.large x 3, Multi-AZ
+#
+# KNOWN GAP: auth_token_enabled stays false in production.
+#
+# The auth token IS generated and stored in Secrets Manager
+# (shared-prd-valkey/auth-token) regardless; this only decides whether
+# ElastiCache REQUIRES it. It stays false until every consuming chart ships a
+# Valkey TLS/AUTH client configuration, because on a SHARED group enabling it is
+# all-or-nothing: it locks every consumer out at the same instant.
+#
+# transit_encryption_mode stays "preferred" for the same reason — "required"
+# would reject every plaintext consumer at once.
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
