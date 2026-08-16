@@ -16,9 +16,14 @@ terraform.tfstate.d/
 # examples/aws/backend/README.md and .gitkeep remain tracked.
 examples/aws/backend/*.hcl
 
-# tfplan files
+# tfplan files. Terraform saved plans are ZIP archives that embed the full state
+# and config, including account ids and any value marked sensitive - they must
+# never be committed. The bare `tfplan` and `*.tfplan` patterns below missed
+# `tfplan.dev` / `tfplan.stg`, which is exactly how two of them got committed, so
+# `tfplan*` catches every suffix.
 *.tfplan
 tfplan
+tfplan*
 
 # Crash log files
 crash.log
