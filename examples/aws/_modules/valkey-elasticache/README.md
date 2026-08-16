@@ -172,6 +172,85 @@ assembled from the raw `endpoint` and `port`.
 The secret holds the raw token string (no JSON envelope), matching the
 pre-refactor stack.
 
+## The generated token is URL-safe — and its character set is one character wide
+
+`random_password.auth` draws from **alphanumerics plus `-`, and nothing else**,
+at **32 characters**.
+
+**The single hyphen is not a typo, and this module is deliberately narrower than
+its three siblings.** Two independent constraints intersect, and the
+intersection has exactly one member.
+
+**1. URL safety.** Consumers interpolate the token raw into a URL —
+`plugin-br-pix-switch` reaches every datastore through one, `VALKEY_URL`
+included. The safe alphabet for that is the RFC 3986 §2.3 *unreserved*
+production:
+
+```
+unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
+```
+
+**2. ElastiCache refuses most of it.** Unlike RDS, DocumentDB and AmazonMQ —
+which all publish a **blocklist** — the ElastiCache AUTH token publishes an
+**allowlist**, and it is short. From `API_CreateReplicationGroup` (`AuthToken`):
+
+> *"The only permitted printable special characters are `!`, `&`, `#`, `$`, `^`,
+> `<`, `>`, and `-`. Other printable special characters cannot be used in the
+> AUTH token."*
+
+| | Set |
+|---|---|
+| ElastiCache allows | `!` `&` `#` `$` `^` `<` `>` `-` |
+| RFC 3986 unreserved | `-` `.` `_` `~` |
+| **Intersection** | **`-`** |
+
+`_`, `.` and `~` are URL-safe but **ElastiCache rejects them**. `!`, `&`, `#`,
+`$`, `^`, `<`, `>` are accepted by ElastiCache but **break a URL** (`#`
+truncates at the fragment, `&` splits query parameters, the rest need shell or
+XML quoting in transit). So `-` is the only character that satisfies both.
+
+### The previous set was illegal, not merely unsafe
+
+It was `` !#$%&'()*+,-.:<=>?[]^_`{|}~ ``. Beyond being url-unsafe, most of it is
+**outside the ElastiCache allowlist** — `%`, `'`, `(`, `)`, `*`, `+`, `,`, `.`,
+`:`, `=`, `?`, `[`, `]`, `_`, `` ` ``, `{`, `|`, `}`, `~`.
+
+It survived unnoticed only because `auth_token_enabled` defaults to `false`: the
+token is generated and stored, but never handed to ElastiCache. **Flipping that
+flag on the old set was liable to fail the apply** on a character the AWS error
+message would not name.
+
+Entropy is unaffected by the narrowing: 32 characters over 63 symbols is
+~191 bits.
+
+### Engine limits this was checked against
+
+| Constraint | ElastiCache AUTH token | This module |
+|---|---|---|
+| Length | 16–128 | 32 |
+| Permitted specials | allowlist `! & # $ ^ < > -` | `-` only |
+| Complexity | "at least three of the four character types" is a **recommendation**, not enforced | all four forced anyway via `min_*` |
+
+### If you migrate to RBAC, this constraint goes away
+
+The ElastiCache **RBAC user password** is governed by a different, laxer rule —
+a blocklist of `,` `"` `/` `@`, with no allowlist — so `-_.~` would be legal
+there and this module could align with its three siblings. That is an
+ElastiCache-side migration, not an edit to make here while `auth_token` is what
+is wired.
+
+### Changing this rotates the token
+
+`length`, `override_special` and the `min_*` floors are all inputs to
+`random_password`, so editing any of them **regenerates the value**.
+
+While `auth_token_enabled = false` — the default in every environment — the
+blast radius is small: the token is rewritten in Secrets Manager and
+ElastiCache never sees it. **Once it is `true`, rotating an in-use auth token is
+a live change to the replication group**; rehearse it in stg, and expect
+clients holding the old token to fail until External Secrets resyncs and the
+pods restart.
+
 ## Usage — `mode = "dedicated"`
 
 ```hcl

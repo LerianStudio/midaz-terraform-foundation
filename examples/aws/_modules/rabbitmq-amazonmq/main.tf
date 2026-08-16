@@ -202,12 +202,64 @@ locals {
 }
 
 # Random admin password, stored in Secrets Manager and handed to the broker.
+#
+################################################################################
+# THE CHARACTER SET IS DELIBERATELY NARROW. DO NOT WIDEN IT.
+#
+# override_special is restricted to the RFC 3986 §2.3 "unreserved" set — the
+# four characters `-` `_` `.` `~` — because this password is ALWAYS consumed as
+# part of a URL. There is no non-URL consumer: the AMQP contract in this fleet
+# is a connection string, not a host/user/password triple.
+#
+#   * br-sfn's correios rail takes correios.secrets.RABBITMQ_URL, which is a URL
+#     by construction — "amqps://<user>:<password>@<endpoint>:5671/". The chart
+#     states the rule in words for its Postgres sibling ("passwords must be
+#     URL-safe (no @ : / ? # %)") and it applies verbatim here.
+#   * plugin-br-pix-switch consumes RABBITMQ_URI.
+#   * plugin-br-bank-transfer builds "amqp://bank_transfer:$(RABBITMQ_PASSWORD)@..."
+#     (charts/plugin-br-bank-transfer/templates/configmap.yaml:168) via
+#     Kubernetes $(VAR) expansion — escaping is structurally impossible there.
+#
+# The previous set was "!#$%^&*()-_+{}<>?" and three of its members break a URL,
+# each in a different and separately confusing way:
+#     #  truncates the URL at the fragment      -> vhost silently dropped
+#     %  opens an invalid percent-escape        -> parse error, or a mangled byte
+#     ?  starts the query string                -> the rest becomes bogus params
+# Over 16 characters drawn from ~17 symbols, hitting at least one was the
+# LIKELY outcome, not the edge case — i.e. an intermittent connection failure
+# that reproduces on roughly every other rebuild and points at nothing.
+#
+# The entropy given up by dropping 13 symbols is bought back with length, which
+# is free here and costs no compatibility. 32 characters over the resulting
+# 66-symbol alphabet (26+26+10+4) is ~193 bits, comfortably above the ~101 bits
+# the old 16-character password carried.
+#
+# Engine limits checked before narrowing (AmazonMQ CreateBroker, User.password —
+# the strictest complexity rule of the four datastore modules):
+#   length     >= 12, no documented maximum   -> 32 is inside
+#   forbidden  , : =                          -> `-_.~` collides with none
+#   complexity "must contain at least 4 unique characters" — a HARD API rule,
+#              not a recommendation. The four min_* floors below satisfy it
+#              DETERMINISTICALLY: one distinct character from each of the four
+#              classes is four unique characters, whatever the draw. This is
+#              why the floors are not decorative here.
+#
+# Unrelated but adjacent, so it does not get rediscovered: the AmazonMQ
+# RabbitMQ USERNAME must not contain a tilde. Only the password is generated
+# here, so nothing in this module trips that.
+################################################################################
+
 resource "random_password" "master" {
   count = local.create ? 1 : 0
 
-  length           = 16
+  length           = 32
   special          = true
-  override_special = "!#$%^&*()-_+{}<>?"
+  override_special = "-_.~"
+
+  min_lower   = 2
+  min_upper   = 2
+  min_numeric = 2
+  min_special = 2
 }
 
 resource "aws_secretsmanager_secret" "mq_password" {

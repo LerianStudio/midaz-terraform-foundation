@@ -187,6 +187,60 @@ fails hostname verification on any client that checks it. There is no
 The secret holds a JSON document with `username`, `password`, `engine`, `host`,
 `port` and `dbname`.
 
+## The generated password is URL-safe by construction
+
+`random_password.master` draws from **alphanumerics plus `-` `_` `.` `~`** at
+**32 characters**. That symbol set is the RFC 3986 §2.3 *unreserved* production
+— the characters that carry no syntactic meaning anywhere in a URI and so never
+need percent-encoding.
+
+**This is deliberate and it is not a style choice. Do not widen it.**
+
+Consumers interpolate the password **raw** into a DSN, with no escaping:
+
+| Consumer | How the password reaches it |
+|---|---|
+| `br-sfn` | baked-flavour migration Jobs build `postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=…` by interpolation (`charts/br-sfn/templates/_helpers.tpl:604`). The chart states the rule in words: *"Postgres passwords must be URL-safe (no `@ : / ? # %`)"* |
+| `plugin-br-pix-switch` | every datastore is reached through a URL — `DATABASE_URL`, `MONGO_URL`, `VALKEY_URL`, `RABBITMQ_URI` |
+
+The previous set was `!#$%^&*()-_=+[]{}<>:?`. Four of its members break a DSN,
+each differently: `#` truncates at the fragment, `%` opens an invalid
+percent-escape, `?` starts the query string, `:` splits userinfo so the password
+is read as `host:port`. At 16 characters over ~20 symbols, drawing at least one
+was the **likely** outcome — an intermittent failure that reproduces on roughly
+every other rebuild and points at nothing.
+
+Entropy went **up**, not down: 32 characters over the 66-symbol alphabet is
+~193 bits against the ~104 bits the old 16-character password carried.
+
+### Engine limits this was checked against
+
+| Constraint | RDS master password | This module |
+|---|---|---|
+| Length | 8–128 (PostgreSQL) | 32 |
+| Forbidden | `/` `"` `@` and space | none emitted |
+| Complexity rule | none | all four character classes forced via `min_*` |
+
+`-_.~` collides with nothing on the blocklist, so the set is legal on every RDS
+engine this module can be pointed at, not only PostgreSQL.
+
+> **Sibling modules differ on purpose.** `mongodb-documentdb` and
+> `rabbitmq-amazonmq` use the same `-_.~`. `valkey-elasticache` uses **`-`
+> alone**, because the ElastiCache AUTH token is governed by an *allowlist*
+> (`! & # $ ^ < > -`) rather than a blocklist, and `-` is its only member that
+> is also RFC 3986 unreserved. See that module's README.
+
+### Changing this rotates the password
+
+`length`, `override_special` and the `min_*` floors are all inputs to
+`random_password`, so editing any of them **regenerates the value** and the next
+`apply` issues a `ModifyDBInstance` that rotates the RDS master password.
+
+Plan for it rather than discovering it: the new value lands in
+`{product}-{environment}-postgres/password`, and any workload holding the old
+one keeps failing authentication until External Secrets resyncs the Kubernetes
+Secret and the pods restart. Roll it in a maintenance window, dev first.
+
 ## Usage — `mode = "dedicated"`
 
 ```hcl

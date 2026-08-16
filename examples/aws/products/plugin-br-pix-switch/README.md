@@ -72,34 +72,47 @@ It is not incompleteness.
 
 ---
 
-## The generated passwords may not be URL-safe
+## The generated passwords are URL-safe — FIXED UPSTREAM
 
-**The cross-cutting trap of this product. Check it before the first release.**
+**This used to be the cross-cutting trap of this product. It is closed.**
 
-Because every datastore is reached through a **URL**, every generated password is
-interpolated into one — and the shared modules generate characters that break
-URLs:
+This product is the sharpest case in the fleet: every datastore is reached
+through a **URL** (`DATABASE_URL`, `MONGO_URL`, `VALKEY_URL`, `RABBITMQ_URI`), so
+every generated password is interpolated into one. The shared modules used to
+generate characters that break URLs. They no longer do:
 
-| Module | `override_special` | Characters that break a URL |
-|---|---|---|
-| `_modules/postgres-rds` | `!#$%^&*()-_=+[]{}<>:?` | `#` `%` `?` `:` |
-| `_modules/rabbitmq-amazonmq` | `!#$%^&*()-_+{}<>?` | `#` `%` `?` |
-| `_modules/valkey-elasticache` | (auth token) | same rule |
+| Module | Was | Now | Length |
+|---|---|---|---|
+| `_modules/postgres-rds` | `!#$%^&*()-_=+[]{}<>:?` — `#` `%` `?` `:` | `-_.~` | 16 → **32** |
+| `_modules/mongodb-documentdb` | `!#$^&*()-_=+[]{}<>?` — `#` `$` `?` | `-_.~` | 16 → **32** |
+| `_modules/rabbitmq-amazonmq` | `!#$%^&*()-_+{}<>?` — `#` `%` `?` | `-_.~` | 16 → **32** |
+| `_modules/valkey-elasticache` | `` !#$%&'()*+,-.:<=>?[]^_`{|}~ `` | **`-`** | 32 |
 
-`#` truncates the URL at the fragment, `%` starts an invalid percent-escape, `?`
-opens a query string, `:` breaks the userinfo split. Over 16 characters, hitting
-at least one is the likely outcome rather than the edge case — and the failure is
-not always clean: the client may connect somewhere unintended instead of
-erroring.
+`-_.~` is the RFC 3986 §2.3 *unreserved* set: no percent-encoding needed in any
+position of a URI. `#` truncates at the fragment, `%` opens an invalid
+percent-escape, `?` starts the query string, `:` splits userinfo — over 16
+characters, drawing at least one was the likely outcome rather than the edge
+case, and the failure was not always clean.
 
-Percent-encode the password on its way into the value, or rotate it in Secrets
-Manager (and on the instance/broker) until it is URL-safe.
+**Valkey is narrower than the other three, on purpose.** The ElastiCache AUTH
+token is governed by an *allowlist* (`! & # $ ^ < > -`) rather than a blocklist,
+and `-` is its only member that is also RFC 3986 unreserved — so `_`, `.` and
+`~` would be rejected by the API. Details in
+[`_modules/valkey-elasticache/README.md`](../../_modules/valkey-elasticache/README.md).
 
-Narrowing `override_special` in the shared modules is the real fix. It affects
-every product, so it belongs upstream rather than in this directory.
+Entropy went up, not down: 32 characters over 66 symbols is ~193 bits (63
+symbols and ~191 bits for Valkey), against the old ~104.
+
+Nothing to check before the first release, and nothing to percent-encode.
 
 > The `br-sfn` chart states the same rule in words — *"passwords must be URL-safe
-> (no `@ : / ? # %`)"* — for the same reason. It is not specific to Pix.
+> (no `@ : / ? # %`)"* — for the same reason. It was never specific to Pix.
+
+> **One-time migration cost.** Narrowing the character sets regenerates the
+> passwords, so the first `apply` after this change **rotates** every credential
+> in the table above. Workloads holding the old values fail authentication until
+> External Secrets resyncs and the pods restart. Roll it dev → stg → prd, in a
+> window.
 
 ---
 

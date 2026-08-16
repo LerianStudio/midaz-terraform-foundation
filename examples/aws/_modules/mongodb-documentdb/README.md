@@ -193,6 +193,63 @@ below, and the same reasoning applies to the "stable name" argument: Helm values
 are generated from `terraform output` on every deploy, so there is no hardcoded
 host to protect.
 
+## The generated password is URL-safe by construction
+
+`random_password.master` draws from **alphanumerics plus `-` `_` `.` `~`** at
+**32 characters**. That symbol set is the RFC 3986 §2.3 *unreserved* production
+— the characters that carry no syntactic meaning anywhere in a URI and so never
+need percent-encoding.
+
+**This is deliberate and it is not a style choice. Do not widen it.**
+
+Consumers interpolate the password **raw** into a MongoDB URI:
+
+| Consumer | How the password reaches it |
+|---|---|
+| `plugin-br-bank-transfer` (**default path**) | `mongodb://bank_transfer:$(MONGO_PASSWORD)@{host}:27017/?authSource=admin` (`templates/_helpers.tpl:196-199`). The password arrives through Kubernetes `$(VAR)` expansion **at container start**, so no Helm function can escape it — escaping is structurally impossible on this path |
+| `plugin-br-bank-transfer` (external-Mongo branch) | `templates/secrets.yaml:56` *does* pipe through `urlquery`. The escaping is therefore **inconsistent between the two paths**, and the unescaped one is the default |
+| `plugin-br-pix-switch` | every datastore is reached through a URL — `MONGO_URL` included |
+
+The previous set was `!#$^&*()-_=+[]{}<>?`. Three of its members break a URI,
+each differently: `#` truncates at the fragment so `authSource` is silently
+dropped, `$` collides with the `$(VAR)` expansion above, `?` starts the query
+string. At 16 characters over ~19 symbols, drawing at least one was the
+**likely** outcome — an intermittent auth failure that reproduces on roughly
+every other rebuild and points at nothing.
+
+Entropy went **up**, not down: 32 characters over the 66-symbol alphabet is
+~193 bits against the ~102 bits the old 16-character password carried.
+
+### Engine limits this was checked against
+
+DocumentDB publishes **its own** limits, which are not the RDS ones — worth
+stating explicitly in this module, since it reads back through
+`data "aws_rds_cluster"` for the reason documented above.
+
+| Constraint | DocumentDB master password | This module |
+|---|---|---|
+| Length | 8–**100** (RDS allows 128; DocumentDB does not) | 32 |
+| Forbidden | `/` `"` `@` | none emitted |
+| Complexity rule | none | all four character classes forced via `min_*` |
+
+> **Sibling modules differ on purpose.** `postgres-rds` and `rabbitmq-amazonmq`
+> use the same `-_.~`. `valkey-elasticache` uses **`-` alone**, because the
+> ElastiCache AUTH token is governed by an *allowlist* (`! & # $ ^ < > -`)
+> rather than a blocklist, and `-` is its only member that is also RFC 3986
+> unreserved. See that module's README.
+
+### Changing this rotates the password
+
+`length`, `override_special` and the `min_*` floors are all inputs to
+`random_password`, so editing any of them **regenerates the value**. It flows
+into `master_password` on the cluster (`main.tf:295`), so the next `apply`
+rotates the DocumentDB master credential.
+
+Plan for it rather than discovering it: the new value lands in
+`{product}-{env}-docdb/password`, and any workload holding the old one keeps
+failing authentication until External Secrets resyncs the Kubernetes Secret and
+the pods restart. Roll it in a maintenance window, dev first.
+
 ## Usage - dedicated
 
 ```hcl

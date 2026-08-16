@@ -163,9 +163,12 @@ output "subnet_group_name" {
 # So helm_values is empty and valkey_url_template below carries the shape. Note
 # it goes into THREE components' secrets blocks: spi, dictHub and dictHubVsync.
 #
-# THE PASSWORD MUST BE URL-SAFE — it is being interpolated into a URL. The
-# valkey-elasticache module generates the auth token, and the same characters
-# that break a postgres:// DSN break this one. See README.md.
+# THE PASSWORD MUST BE URL-SAFE — AND NOW IS, BY CONSTRUCTION. It is being
+# interpolated into a URL, and the same characters that break a postgres:// DSN
+# break this one. The valkey-elasticache module now generates the auth token as
+# 32 characters from alphanumerics plus "-" only — the single character that is
+# BOTH inside the ElastiCache AUTH allowlist (! & # $ ^ < > -) and RFC 3986
+# unreserved. See README.md and the module README.
 #
 # NOT emitted here, on purpose:
 #   the auth token itself — read from secret_name by External Secrets. Note it is

@@ -193,12 +193,60 @@ resource "aws_db_subnet_group" "this" {
 # Secret path is "{product}-{environment}-postgres/password".
 ################################################################################
 
+################################################################################
+# THE CHARACTER SET IS DELIBERATELY NARROW. DO NOT WIDEN IT.
+#
+# override_special is restricted to the RFC 3986 §2.3 "unreserved" set — the
+# four characters `-` `_` `.` `~` — because consumers interpolate this password
+# RAW into a connection URL, with no percent-encoding anywhere in the path.
+#
+# This is not hypothetical. Two concrete consumers, both in this fleet:
+#
+#   * br-sfn states the rule in words in its own chart README:
+#     "Postgres passwords must be URL-safe (no @ : / ? # %)". It has to, because
+#     its baked-flavour migration Jobs build the DSN by string interpolation:
+#       -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=..."
+#     (charts/br-sfn/templates/_helpers.tpl:604).
+#   * plugin-br-pix-switch reaches every datastore through a URL — DATABASE_URL,
+#     MONGO_URL, VALKEY_URL, RABBITMQ_URI.
+#
+# The previous set was "!#$%^&*()-_=+[]{}<>:?" and four of its members break a
+# URL, each in a different and separately confusing way:
+#     #  truncates the DSN at the fragment      -> silently drops everything after it
+#     %  opens an invalid percent-escape        -> parse error, or a mangled byte
+#     ?  starts the query string                -> the rest becomes bogus params
+#     :  splits userinfo                        -> password read as host:port
+# Over 16 characters drawn from ~20 symbols, hitting at least one was the
+# LIKELY outcome, not the edge case — i.e. an intermittent failure that
+# reproduces on roughly every other rebuild and points at nothing.
+#
+# The entropy given up by dropping 16 symbols is bought back with length, which
+# is free here and costs no compatibility. 32 characters over the resulting
+# 66-symbol alphabet (26+26+10+4) is ~193 bits, comfortably above the ~104 bits
+# the old 16-character password carried.
+#
+# Engine limits checked before narrowing (RDS master password):
+#   length     8-128  -> 32 is inside
+#   forbidden  / " @ and space, plus ' on some engines
+# `-_.~` collides with none of them, so this set is legal on every RDS engine
+# this module can be pointed at, not just PostgreSQL.
+#
+# The min_* floors guarantee all four character classes are present, which
+# makes the generated value deterministic in SHAPE (never all-alphanumeric,
+# never a single class) instead of merely probable.
+################################################################################
+
 resource "random_password" "master" {
   count = local.create ? 1 : 0
 
-  length           = 16
+  length           = 32
   special          = true
-  override_special = "!#$%^&*()-_=+[]{}<>:?"
+  override_special = "-_.~"
+
+  min_lower   = 2
+  min_upper   = 2
+  min_numeric = 2
+  min_special = 2
 }
 
 resource "aws_secretsmanager_secret" "this" {

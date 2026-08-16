@@ -110,12 +110,65 @@ locals {
 }
 
 # Random master password, stored in Secrets Manager and handed to the cluster.
+#
+################################################################################
+# THE CHARACTER SET IS DELIBERATELY NARROW. DO NOT WIDEN IT.
+#
+# override_special is restricted to the RFC 3986 §2.3 "unreserved" set — the
+# four characters `-` `_` `.` `~` — because consumers interpolate this password
+# RAW into a MongoDB connection URI, with no percent-encoding.
+#
+# This is not hypothetical. Two concrete consumers, both in this fleet:
+#
+#   * plugin-br-bank-transfer assembles MONGO_URI by string interpolation on the
+#     DEFAULT install path, where escaping is structurally impossible: the
+#     password arrives through Kubernetes $(VAR) expansion at container start,
+#     so no Helm function can touch it —
+#       mongodb://bank_transfer:$(MONGO_PASSWORD)@{host}:27017/?authSource=admin
+#     (charts/plugin-br-bank-transfer/templates/_helpers.tpl:196-199).
+#     Its external-Mongo branch DOES pipe through `urlquery`
+#     (templates/secrets.yaml:56) — so the escaping is inconsistent between the
+#     two paths, and only the unescaped one is the default.
+#   * plugin-br-pix-switch reaches every datastore through a URL — DATABASE_URL,
+#     MONGO_URL, VALKEY_URL, RABBITMQ_URI.
+#
+# The previous set was "!#$^&*()-_=+[]{}<>?" and three of its members break a
+# URI, each in a different and separately confusing way:
+#     #  truncates the URI at the fragment      -> authSource silently dropped
+#     $  collides with $(VAR) shell expansion   -> see the helper above
+#     ?  starts the query string                -> authSource duplicated/lost
+# Over 16 characters drawn from ~19 symbols, hitting at least one was the
+# LIKELY outcome, not the edge case — i.e. an intermittent auth failure that
+# reproduces on roughly every other rebuild and points at nothing.
+#
+# The entropy given up by dropping 15 symbols is bought back with length, which
+# is free here and costs no compatibility. 32 characters over the resulting
+# 66-symbol alphabet (26+26+10+4) is ~193 bits, comfortably above the ~102 bits
+# the old 16-character password carried.
+#
+# Engine limits checked before narrowing (DocumentDB master password — its own
+# limits, NOT the RDS ones, even though this module reads back through
+# data "aws_rds_cluster"):
+#   length     8-100  -> 32 is inside; note the ceiling is 100, not RDS's 128
+#   forbidden  / " @
+# `-_.~` collides with none of them.
+#
+# The min_* floors guarantee all four character classes are present, which
+# makes the generated value deterministic in SHAPE (never all-alphanumeric,
+# never a single class) instead of merely probable.
+################################################################################
+
 resource "random_password" "master" {
   count = local.create ? 1 : 0
 
-  length           = 16
+  length           = 32
   special          = true
-  override_special = "!#$^&*()-_=+[]{}<>?"
+  override_special = "-_.~"
+
+  min_lower   = 2
+  min_upper   = 2
+  min_numeric = 2
+  min_special = 2
 }
 
 resource "aws_secretsmanager_secret" "docdb_password" {

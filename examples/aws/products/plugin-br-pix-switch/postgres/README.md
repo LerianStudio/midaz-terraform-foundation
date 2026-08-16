@@ -175,28 +175,35 @@ Two consequences for this root:
 > `global.externalPostgresDefinitions.postgresAdminLogin.useExistingSecret.name`
 > and point it at a Secret populated from `secret_name` by External Secrets.
 
-## The generated password may not be URL-safe
+## The generated password is URL-safe — FIXED UPSTREAM
 
-**Check this before the first release.** It is the cross-cutting trap of this
-whole product: every datastore is reached through a connection **URL**, so every
-generated password is interpolated into one.
+This used to be the cross-cutting trap of the whole product: every datastore is
+reached through a connection **URL**, so every generated password is
+interpolated into one.
 
-| Module | `override_special` | Characters that break a URL |
-|---|---|---|
-| `_modules/postgres-rds` | `!#$%^&*()-_=+[]{}<>:?` | `#` `%` `?` `:` |
-| `_modules/rabbitmq-amazonmq` | `!#$%^&*()-_+{}<>?` | `#` `%` `?` |
-| `_modules/valkey-elasticache` | (auth token) | same rule applies |
+The shared modules were narrowed to the RFC 3986 §2.3 *unreserved* set, which
+needs no percent-encoding in any position of a URI:
 
-`#` truncates the URL at the fragment, `%` starts an invalid percent-escape, `?`
-opens a query string and `:` breaks the userinfo split. Over 16 characters,
-hitting at least one is the likely outcome rather than the edge case — and the
-failure is not always clean: the client may connect somewhere unintended instead
-of erroring.
+| Module | Was | Now | Length |
+|---|---|---|---|
+| `_modules/postgres-rds` | `!#$%^&*()-_=+[]{}<>:?` — `#` `%` `?` `:` | `-_.~` | 16 → **32** |
+| `_modules/mongodb-documentdb` | `!#$^&*()-_=+[]{}<>?` — `#` `$` `?` | `-_.~` | 16 → **32** |
+| `_modules/rabbitmq-amazonmq` | `!#$%^&*()-_+{}<>?` — `#` `%` `?` | `-_.~` | 16 → **32** |
+| `_modules/valkey-elasticache` | `` !#$%&'()*+,-.:<=>?[]^_`{|}~ `` | **`-`** (ElastiCache allowlist ∩ unreserved) | 32 |
 
-Either percent-encode the password on its way into the value, or rotate it in
-Secrets Manager (and on the instance) until it is URL-safe. Narrowing
-`override_special` in the shared modules is the real fix; it affects every
-product, so it belongs upstream rather than in this directory.
+`#` truncated the URL at the fragment, `%` started an invalid percent-escape,
+`?` opened a query string and `:` broke the userinfo split. Over 16 characters,
+hitting at least one was the likely outcome rather than the edge case — and the
+failure was not always clean: the client could connect somewhere unintended
+instead of erroring.
+
+Nothing to percent-encode and nothing to rotate by hand. Rationale and the
+per-engine limit checks live in each module's README; the product-level summary
+is in [`../README.md`](../README.md).
+
+> **One-time migration cost.** The narrowing regenerates the password, so the
+> first `apply` after this change **rotates** the RDS master credential. Roll it
+> dev → stg → prd, in a window.
 
 ## Read replica
 

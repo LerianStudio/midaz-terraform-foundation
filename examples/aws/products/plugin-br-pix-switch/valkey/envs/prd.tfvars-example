@@ -59,8 +59,11 @@ snapshot_retention_limit   = 7
 # auth_token_enabled = false for the matching reason: over a plaintext connection
 # an AUTH token is on the wire. Enable it together with "required", not before.
 #
-# THE TOKEN MUST BE URL-SAFE IF ENABLED. It is interpolated into a URL; # % ? and
-# : all break one. See ../README.md.
+# THE TOKEN MUST BE URL-SAFE IF ENABLED — AND NOW IS. It is interpolated into a
+# URL, where # % ? and : all break one. The module generates it from
+# alphanumerics plus "-" only, which is the intersection of the ElastiCache AUTH
+# allowlist and the RFC 3986 unreserved set. Nothing to check or rotate.
+# See ../README.md.
 #
 # The auth token IS generated and stored at
 # plugin-br-pix-switch-prd-valkey/auth-token regardless, so flipping both

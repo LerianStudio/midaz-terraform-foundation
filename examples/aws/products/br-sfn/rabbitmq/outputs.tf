@@ -167,12 +167,15 @@ output "admin_username" {
 #
 # TWO THINGS TO GET RIGHT WHEN ASSEMBLING IT
 #
-# 1. THE PASSWORD MUST BE URL-SAFE. It is being interpolated into a URL. The
-#    chart states this rule for Postgres in the same words ("no @ : / ? # %",
-#    README.md:51) and it applies verbatim here. The rabbitmq-amazonmq module
-#    generates the password with override_special = "!#$%^&*()-_+{}<>?", which
-#    INCLUDES ? and % — see README.md, "The generated password may not be
-#    URL-safe". Verify before the first release; percent-encode or rotate.
+# 1. THE PASSWORD MUST BE URL-SAFE — AND NOW IS, BY CONSTRUCTION. It is being
+#    interpolated into a URL. The chart states this rule for Postgres in the
+#    same words ("no @ : / ? # %", README.md:51) and it applies verbatim here.
+#    The rabbitmq-amazonmq module USED TO generate the password with
+#    override_special = "!#$%^&*()-_+{}<>?", which includes ? # and %. It now
+#    draws 32 characters from alphanumerics plus "-_.~", the RFC 3986 §2.3
+#    unreserved set, so no percent-encoding is needed in any position of the
+#    URL. See README.md, "The generated password is URL-safe — FIXED UPSTREAM".
+#    Nothing to verify or rotate before the first release.
 # 2. There is only ONE broker user. The module creates the admin user; any
 #    per-rail user is created on the broker itself, outside Terraform.
 #

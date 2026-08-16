@@ -165,10 +165,12 @@ output "admin_username" {
 # `endpoint` must be used raw — an alias in front of it fails the same hostname
 # verification.
 #
-# THE PASSWORD MUST BE URL-SAFE. It is being interpolated into a URL. The
-# rabbitmq-amazonmq module generates it with
-# override_special = "!#$%^&*()-_+{}<>?", which INCLUDES ? # and % — see
-# README.md, "The generated password may not be URL-safe".
+# THE PASSWORD MUST BE URL-SAFE — AND NOW IS, BY CONSTRUCTION. It is being
+# interpolated into a URL. The rabbitmq-amazonmq module USED TO generate it with
+# override_special = "!#$%^&*()-_+{}<>?", which includes ? # and %. It now draws
+# 32 characters from alphanumerics plus "-_.~", the RFC 3986 §2.3 unreserved
+# set, so no percent-encoding is needed anywhere in the URI — see README.md,
+# "The generated password is URL-safe — FIXED UPSTREAM".
 #
 # NOT emitted here, on purpose:
 #   the password — read from secret_name by External Secrets.

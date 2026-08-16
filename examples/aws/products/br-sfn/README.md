@@ -5,15 +5,22 @@ AWS datastores for **br-sfn** — the Lerian Brazilian SFN rails monorepo: SPB/S
 information), desk, correios (BC Correio regulatory mailbox), slc-edge and the
 cockpit SPA.
 
-Four independent root stacks, one per datastore:
+Five independent root stacks, one per datastore:
 
 ```
 examples/aws/products/br-sfn/
 ├── postgres/   -> _modules/postgres-rds        br-sfn-{env}-postgres
 ├── valkey/     -> _modules/valkey-elasticache  br-sfn-{env}-valkey
 ├── rabbitmq/   -> _modules/rabbitmq-amazonmq   br-sfn-{env}-rabbitmq
-└── msk/        -> _modules/streaming-msk       br-sfn-{env}-msk
+├── msk/        -> _modules/streaming-msk       br-sfn-{env}-msk
+└── s3/         -> _modules/s3-bucket           br-sfn-{env}-correios-attachments-{account}   OPT-IN
 ```
+
+`s3/` backs the `correios` rail only and is gated on `correios.enabled`, which
+the chart defaults to `false` (`values.yaml:604`). It is also shaped differently
+from the other four — no `mode`, no ingress, no seven-output contract — because
+S3 is an IAM-reached regional API rather than a host in the VPC. See
+[`s3/README.md`](s3/README.md).
 
 Everything structural — the `lerian-{env}-vpc` / `lerian-{env}-eks` derivations,
 the `shared-{env}-*` resolution of the shared tier, the ingress model, the
@@ -54,7 +61,7 @@ for what it could not confirm.
 
 ---
 
-## Why these four
+## Why these five
 
 From the chart discovery in
 `infrastructure/IAC/product-infra-dependencies.yaml`, confirmed against
@@ -67,8 +74,14 @@ br-sfn:
   mongodb:    no
   valkey:     yes
   rabbitmq:   yes
-  redpanda:   yes   # extras: IBM MQ externo (rail SPB)
+  redpanda:   yes   # extras: IBM MQ externo (rail SPB);
+                    #         S3 no rail correios (opt-in, correios.enabled)
 ```
+
+The S3 line is the one the original discovery pass missed, because the keys
+appear nowhere in a rendered template — see
+*[Object storage for the correios rail](#object-storage-for-the-correios-rail--now-provisioned-in-s3)*
+below for the evidence and the verdict.
 
 **The chart declares no dependencies at all**, deliberately:
 
@@ -109,31 +122,57 @@ Nothing in this Terraform provisions, configures or connects to it.
 The chart names no IBM MQ variable either — like Kafka, its configuration arrives
 through `spb.configmap` / `spb.secrets`, passed through verbatim.
 
-### Object storage for the correios rail
+### Object storage for the correios rail — now provisioned, in [`s3/`](s3)
 
-`values-template.yaml:75-76` shows two keys the discovery YAML does not account
-for:
+This was recorded here as a follow-up. It has been investigated and **the
+bucket root now exists**: [`products/br-sfn/s3`](s3).
+
+`values-template.yaml:75-76` shows two keys the discovery YAML did not account
+for — **both commented out**, in a file Helm never renders:
 
 ```yaml
-correios:
-  configmap:
-    OBJECT_STORAGE_ENDPOINT: ""
-    OBJECT_STORAGE_BUCKET: ""
+# correios:
+#   configmap:
+#     OBJECT_STORAGE_ENDPOINT: ""
+#     OBJECT_STORAGE_BUCKET: ""
 ```
 
-The discovery YAML lists S3 for the standalone `plugin-bc-correios` chart
-(*"extras: seaweedfs/S3 (bucket bc-correios-attachments)"*) but **not** for
-`br-sfn`, even though br-sfn vendors that same rail as its `correios` component
-(image `ghcr.io/lerianstudio/plugin-bc-correios`).
+A grep for `OBJECT_STORAGE` across the whole br-sfn tree returns those two lines
+and nothing else. That is enough to *look* like residue from a copied template,
+so the question was settled against the binary rather than the chart:
 
-**If the `correios` rail is enabled, this product needs an S3 bucket** and there
-is no `s3/` root here. `_modules/s3-bucket` exists and the naming convention is
-`{product}-{env}-{name}-{account_id}`; adding `products/br-sfn/s3/` is the
-follow-up. Recorded rather than silently created — it was outside the scope this
-directory was generated for.
+| # | Evidence | Where |
+|---|---|---|
+| 1 | *"Postgres + Valkey/Redis cache + RabbitMQ + **S3-compatible object storage**, all external."* | `values.yaml:590-592` |
+| 2 | *"Stores attachments in S3-compatible object storage"* | `docs/UPGRADE-1.1.md:25,27` |
+| 3 | The rail runs **the same image** as the standalone product: `ghcr.io/lerianstudio/plugin-bc-correios` | `values.yaml:608` vs `plugin-bc-correios/values.yaml:70` |
+| 4 | That binary genuinely consumes S3 — the standalone chart hardcodes the four `OBJECT_STORAGE_*` keys and its init container **blocks startup** until the endpoint answers | `plugin-bc-correios/templates/configmap.yaml:47-51`, `deployment.yaml:88-89` |
 
-`correios.secrets.ENCRYPTION_KEY` (AES-256, 32 bytes) is an application secret
-with no Terraform counterpart.
+**Why no template names the keys, and why that is fine:** `correios.configmap`
+is an untyped passthrough — `mergeOverwrite` + `toYaml` in
+`br-sfn.componentConfigData` (`templates/_helpers.tpl:75-82`) into the component
+ConfigMap (`:117-129`) and out through `envFrom` (`:248-260`), with
+`values.schema.json` declaring it as bare `{"type":"object"}` /
+`additionalProperties: true`. There is no allowlist to be absent from. The
+commit that added the rail says the predecessor chart used *"a FIXED ALLOWLIST
+of 40 keys … anything off the list vanished silently. br-sfn emits the map
+verbatim."*
+
+**Verdict: a real dependency the chart declines to type.** The discovery YAML
+now records it.
+
+Two things `s3/README.md` documents that are worth knowing from here:
+
+- the skeleton is **incomplete** — the binary also reads
+  `OBJECT_STORAGE_PROVIDER` and `OBJECT_STORAGE_PATH_STYLE`, plus the credential
+  pair. `helm_values` emits all four config keys;
+- the IRSA role is **broader than the rail**. br-sfn has one chart-level
+  ServiceAccount shared by every component (`templates/_helpers.tpl:33-38`), so
+  the bucket grant reaches `spb`, `spi`, `siloc`, `scr`, `slc-edge`, `desk` and
+  `cockpit` too. Worth a security review before production.
+
+`correios.secrets.ENCRYPTION_KEY` (AES-256, 32 bytes) remains an application
+secret with no Terraform counterpart.
 
 ### The cockpit SPA bakes its URLs
 
@@ -173,9 +212,9 @@ and `spi.secrets`, so SPI takes the map once.
 
 ---
 
-## The generated passwords may not be URL-safe
+## The generated passwords are URL-safe — FIXED UPSTREAM
 
-**The one cross-cutting trap in this product. Check it before the first apply.**
+**This used to be the one cross-cutting trap in this product. It is closed.**
 
 The chart states the rule plainly:
 
@@ -186,28 +225,32 @@ straight into a connection URL with no escaping
 (`templates/_helpers.tpl:604`), and `correios.secrets.RABBITMQ_URL` is a URL by
 construction.
 
-The shared modules generate passwords that violate it:
+The shared modules used to violate that rule. They no longer do — the fix went
+upstream, into the modules, which is where it belonged:
 
-| Module | `override_special` | Forbidden characters it includes |
-|---|---|---|
-| `_modules/postgres-rds` | `!#$%^&*()-_=+[]{}<>:?` | `#` `%` `?` `:` |
-| `_modules/rabbitmq-amazonmq` | `!#$%^&*()-_+{}<>?` | `#` `%` `?` |
+| Module | Was | Now | Length |
+|---|---|---|---|
+| `_modules/postgres-rds` | `!#$%^&*()-_=+[]{}<>:?` — includes `#` `%` `?` `:` | `-_.~` | 16 → **32** |
+| `_modules/rabbitmq-amazonmq` | `!#$%^&*()-_+{}<>?` — includes `#` `%` `?` | `-_.~` | 16 → **32** |
+| `_modules/valkey-elasticache` | `` !#$%&'()*+,-.:<=>?[]^_`{|}~ `` | `-` (ElastiCache allowlist ∩ RFC 3986 unreserved) | 32 |
 
-Over 16 characters, hitting at least one is the likely outcome. The failure is
-not clean: `#` truncates the URL at the fragment, `%` starts an invalid
-percent-escape, `?` opens a query string, `:` breaks the userinfo split.
+`-_.~` is the RFC 3986 §2.3 *unreserved* set: no percent-encoding needed in any
+position of a URI. Entropy went up, not down — 32 characters over 66 symbols is
+~193 bits against the old ~104. Full rationale and the per-engine limit checks
+are in each module's README.
 
-These roots do **not** work around it — the passwords belong to the shared
-modules and every other product uses them. Do one of:
+**Nothing to do in this directory, and nothing to work around.** The three
+mitigations this section used to recommend — rotate until lucky, percent-encode
+in transit, or prefer the *dedicated*-flavour migrator images (`spi`, `siloc`)
+that take the `POSTGRES_*` env contract instead of building a URL — are no
+longer needed for URL-safety reasons. The last one remains a fine choice on its
+own merits.
 
-- read `secret_name`, check the value, rotate it in Secrets Manager (and on the
-  instance/broker) until it is URL-safe;
-- percent-encode the password on its way into the chart value; or
-- for Postgres, prefer the *dedicated*-flavour migrator images (`spi`, `siloc`),
-  which take the `POSTGRES_*` env contract instead of building a URL.
-
-Narrowing `override_special` in the shared modules is the real fix. It affects
-every product, so it belongs upstream, not in this directory.
+> **One-time migration cost.** Narrowing the character set regenerates the
+> passwords, so the first `apply` after this change **rotates** the Postgres
+> master password and the RabbitMQ admin password. Workloads holding the old
+> values fail authentication until External Secrets resyncs and the pods
+> restart. Roll it dev → stg → prd, in a window.
 
 ---
 
@@ -291,23 +334,34 @@ br-sfn service owners before provisioning either mode. See
 3. examples/aws/infra-base/eks               -> lerian-{env}-eks
 4. examples/aws/products/shared-resources/*  -> shared-{env}-*  (OPTIONAL, only for mode = "shared")
 5. products/br-sfn/{postgres,valkey,rabbitmq,msk}   <- in any order, in parallel
+5b. products/br-sfn/s3                              <- OPT-IN; requires step 3
 6. create the per-rail Postgres databases on the instance
 7. create the Kafka topics (nothing else does — see msk/README.md)
 8. helm upgrade --install br-sfn ...
 ```
 
-Step 2 is the one hard prerequisite in `dedicated` mode: every root looks the VPC
-up by `tag:Name`.
+Step 2 is the one hard prerequisite in `dedicated` mode: every datastore root
+looks the VPC up by `tag:Name`.
 
-**Step 3 is not.** Each root resolves the EKS node security group with
-`data "aws_security_groups"` — the plural data source, which returns an empty
-list instead of failing. `check "eks_node_security_group_resolved"` warns until
-the cluster exists; until then ingress comes from the `Type=private` subnet
-CIDRs.
+**Step 3 is not — except for `s3/`.** Each datastore root resolves the EKS node
+security group with `data "aws_security_groups"` — the plural data source, which
+returns an empty list instead of failing. `check
+"eks_node_security_group_resolved"` warns until the cluster exists; until then
+ingress comes from the `Type=private` subnet CIDRs.
 
-**Step 4 only matters to a root running `mode = "shared"`.**
+`s3/` is the exception: with `irsa_enabled = true` (the default) it resolves the
+cluster OIDC provider through two **singular** data sources, which fail the plan
+when the cluster is absent. That is deliberate — an IRSA role bound to a
+provider that does not exist applies cleanly and produces pods that cannot reach
+the bucket. Step 3 is therefore a hard prerequisite for step 5b, and only for it.
 
-The four roots in step 5 have **no dependency on each other**. Separate state
+**Step 4 only matters to a root running `mode = "shared"`.** `s3/` has no `mode`
+at all: object storage has no shared tier.
+
+**Step 5b is opt-in** and only needed when `correios.enabled` is true (chart
+default `false`).
+
+The roots in steps 5 and 5b have **no dependency on each other**. Separate state
 files, separate locks, separate blast radius — run them in parallel.
 
 **Steps 6 and 7 are not automated anywhere.** RDS creates one database and the
@@ -355,6 +409,7 @@ terraform apply tfplan
 | valkey | `aws/products/br-sfn/valkey/terraform.tfstate` |
 | rabbitmq | `aws/products/br-sfn/rabbitmq/terraform.tfstate` |
 | msk | `aws/products/br-sfn/msk/terraform.tfstate` |
+| s3 | `aws/products/br-sfn/s3/terraform.tfstate` |
 
 `*.tfvars` is gitignored; `*.tfvars-example` is not.
 
@@ -370,9 +425,15 @@ With `mode = "dedicated"` and `environment = "dev"`:
 | valkey | `br-sfn-dev-valkey` (ElastiCache) | `br-sfn-dev-valkey/auth-token` |
 | rabbitmq | `br-sfn-dev-rabbitmq-single` (AmazonMQ) | `br-sfn-dev-rabbitmq/password` |
 | msk | `br-sfn-dev-msk` (MSK) | `AmazonMSK_br-sfn-dev-msk` |
+| s3 *(opt-in)* | `br-sfn-dev-correios-attachments-{account}` (S3) + IRSA role | **none** — access is IAM, not credential |
 
 The RabbitMQ broker name carries a `-single` / `-cluster` topology suffix; the
 secret and the security group never do.
+
+`s3/` is the only root here with no Secrets Manager entry, and the only one
+whose name carries an account-id suffix — S3 bucket names are globally unique
+across every AWS account, so the product-and-environment prefix alone is not
+enough.
 
 ---
 
@@ -439,6 +500,28 @@ no streaming variable at all, the values are available as `endpoint`, `port`,
 br-sfn service owners. The SASL mechanism is `SCRAM-SHA-512` — the only one MSK
 offers.
 
+### s3 → `correios.configmap` only
+
+Four keys, all on the one rail:
+
+| Terraform | Chart env var |
+|---|---|
+| literal `"s3"` | `OBJECT_STORAGE_PROVIDER` |
+| `bucket_name` | `OBJECT_STORAGE_BUCKET` |
+| `https://s3.{region}.amazonaws.com` | `OBJECT_STORAGE_ENDPOINT` |
+| literal `"false"` | `OBJECT_STORAGE_PATH_STYLE` |
+
+Same situation as `msk` in that **the chart names none of them** — but unlike
+`msk`, the key names are not unknown: the rail runs the `plugin-bc-correios`
+image and that product's own chart hardcodes all four
+(`plugin-bc-correios/templates/configmap.yaml:47-51`). So the map is emitted
+rather than left empty, and it flows through the `correios.configmap`
+passthrough with no chart change. See [`s3/README.md`](s3/README.md).
+
+Plus one annotation, on the chart's ServiceAccount:
+`eks.amazonaws.com/role-arn: <iam_role_arn>` — noting that the ServiceAccount is
+shared by every rail, so the grant is broader than `correios`.
+
 ---
 
 ## Secrets
@@ -451,9 +534,14 @@ No stack outputs a password. Each one outputs `secret_name` and `secret_arn`.
 | valkey | `br-sfn-{env}-valkey/auth-token` | `shared-{env}-valkey/auth-token` |
 | rabbitmq | `br-sfn-{env}-rabbitmq/password` | `shared-{env}-rabbitmq/password` |
 | msk | `AmazonMSK_br-sfn-{env}-msk` | `AmazonMSK_shared-{env}-msk` |
+| s3 | **none** | — |
 
 The shared RabbitMQ secret carries no topology suffix, so it resolves whether the
 shared broker is `-single` or `-cluster`.
+
+`s3/` has no secret because S3 has no credential to store: access is an IRSA
+role, and `iam_role_arn` is the thing to wire. That is also why it publishes
+none of the seven uniform datastore outputs except `mode`.
 
 ---
 

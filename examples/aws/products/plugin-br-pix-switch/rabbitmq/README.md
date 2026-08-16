@@ -149,19 +149,26 @@ The cost is that replacing the broker changes the host and is therefore a values
 change. Regenerated from `terraform output`, so nothing is hardcoded, but the
 release has to be re-rendered.
 
-## The generated password may not be URL-safe
+## The generated password is URL-safe — FIXED UPSTREAM
 
-**Check this before the first release.** The password is interpolated into a URL.
+The password is interpolated into a URL, so this mattered.
 
-`_modules/rabbitmq-amazonmq` generates it with
-`override_special = "!#$%^&*()-_+{}<>?"`, which **includes `#`, `%` and `?`**.
-`#` truncates the URI at the fragment, `%` starts an invalid percent-escape and
-`?` opens a query string — so the worker either fails to connect or connects
+`_modules/rabbitmq-amazonmq` **used to** generate it with
+`override_special = "!#$%^&*()-_+{}<>?"`, which includes `#`, `%` and `?`. `#`
+truncates the URI at the fragment, `%` starts an invalid percent-escape and `?`
+opens a query string — so the worker would either fail to connect or connect
 somewhere unintended.
 
-Either percent-encode the password on its way into the value, or rotate it in
-Secrets Manager (and on the broker) until it is URL-safe. This applies to every
-datastore in this product; see [`../README.md`](../README.md).
+It now draws **32 characters** from alphanumerics plus `-_.~`, the RFC 3986 §2.3
+*unreserved* set, so no percent-encoding is needed in any position of the URI.
+The AmazonMQ limits were verified at the same time — min 12, `,:=` forbidden,
+and a hard *"at least 4 unique characters"* API rule the module now satisfies
+deterministically. This applies to every datastore in this product; see
+[`../README.md`](../README.md).
+
+> **One-time migration cost.** The narrowing regenerates the password, so the
+> first `apply` after this change **rotates** the broker admin credential. Roll
+> it dev → stg → prd, in a window.
 
 ## The vhost, and the username
 

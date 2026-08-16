@@ -137,10 +137,9 @@ Host, user and database are all **required** by the migration helper, which
 `fail`s the render when any is missing (`templates/_helpers.tpl:474-490`). That
 is a good failure: it happens at template time, not at connect time.
 
-## The generated password may not be URL-safe
+## The generated password is URL-safe — FIXED UPSTREAM
 
-**Check this before the first apply.** It is the one cross-cutting trap in this
-product.
+**This used to be the one cross-cutting trap in this product. It is closed.**
 
 The br-sfn chart states the rule plainly: *"Postgres passwords must be URL-safe
 (no `@ : / ? # %`)"* (`README.md:51`). It has to, because the baked-flavour
@@ -152,28 +151,33 @@ escaping:
 ```
 (`templates/_helpers.tpl:604`)
 
-`_modules/postgres-rds` generates the master password with
-`override_special = "!#$%^&*()-_=+[]{}<>:?"` — which **includes `#`, `%`, `?` and
-`:`**, four of the six characters the chart forbids. Over 16 characters, hitting
-at least one is the likely outcome, not the edge case.
+`_modules/postgres-rds` **used to** generate the master password with
+`override_special = "!#$%^&*()-_=+[]{}<>:?"` — which includes `#`, `%`, `?` and
+`:`, four of the six characters the chart forbids. Over 16 characters, hitting
+at least one was the likely outcome, not the edge case.
 
-The failure is not clean. `#` truncates the URL at the fragment, `%` starts an
-invalid percent-escape, `?` opens a query string and `:` breaks the userinfo
-split — so the migration Job fails with a parse error or, worse, silently
-connects somewhere unintended.
+The failure was not clean either. `#` truncates the URL at the fragment, `%`
+starts an invalid percent-escape, `?` opens a query string and `:` breaks the
+userinfo split — so the migration Job would fail with a parse error or, worse,
+silently connect somewhere unintended.
 
-This root does not work around it, because the password belongs to the module
-and the module is shared with every other product. Do one of:
+**The module was fixed rather than worked around here**, because the password
+belongs to the module and the module is shared with every other product. It now
+generates **32 characters** over alphanumerics plus `-_.~`, the RFC 3986 §2.3
+*unreserved* set — none of which needs percent-encoding in any position of a
+URI, and none of which appears on the chart's forbidden list. Rationale and the
+RDS limit checks are in
+[`_modules/postgres-rds/README.md`](../../../_modules/postgres-rds/README.md).
 
-- read `secret_name`, check the value, and rotate it in Secrets Manager (and on
-  the instance) until it is URL-safe; or
-- percent-encode the password in the value that reaches the chart; or
-- use the `dedicated`-flavour migrator images where available, which take the
-  `POSTGRES_*` env contract instead of building a URL.
+Nothing to check before the first apply, and nothing to mitigate. The
+`dedicated`-flavour migrator images that take the `POSTGRES_*` env contract
+instead of building a URL remain a fine choice on their own merits, but no
+longer for this reason.
 
-Report it upstream rather than patching the module from here: narrowing
-`override_special` in `_modules/postgres-rds` is the real fix and it affects all
-products.
+> **One-time migration cost.** Narrowing the set regenerates the password, so
+> the first `apply` after this change **rotates** the RDS master credential.
+> Workloads holding the old value fail authentication until External Secrets
+> resyncs and the pods restart. Roll it dev → stg → prd, in a window.
 
 ## Read replica
 
@@ -203,8 +207,9 @@ terraform output -json helm_values | jq
 No password is ever an output. `secret_name` is what an External Secrets
 Operator `ExternalSecret` references to populate each rail's
 `POSTGRES_PASSWORD` — required for every rail except `slcEdge` and `cockpit`,
-which have no database. Read *The generated password may not be URL-safe* above
-before wiring it.
+which have no database. It is URL-safe by construction; see *The generated
+password is URL-safe — FIXED UPSTREAM* above for what changed and for the
+one-time rotation the first apply performs.
 
 ## Shared mode
 

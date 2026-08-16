@@ -150,12 +150,70 @@ check "ingress_is_reachable" {
 # path to read; var.auth_token_enabled decides whether ElastiCache enforces it.
 ################################################################################
 
+################################################################################
+# THE CHARACTER SET IS DELIBERATELY NARROW, AND NARROWER THAN ITS THREE SIBLING
+# MODULES. DO NOT WIDEN IT. THE SINGLE HYPHEN IS NOT A TYPO.
+#
+# Two independent constraints intersect here, and the intersection is one
+# character:
+#
+#   1. URL SAFETY. Consumers interpolate this token RAW into a URL. In this
+#      fleet plugin-br-pix-switch reaches every datastore through one, VALKEY_URL
+#      included. The safe alphabet for that is the RFC 3986 §2.3 "unreserved"
+#      set — the characters that carry no meaning in any position of a URI and
+#      therefore never need percent-encoding:
+#          unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
+#      The three sibling modules (postgres-rds, mongodb-documentdb,
+#      rabbitmq-amazonmq) all use exactly `-_.~` for this reason.
+#
+#   2. ELASTICACHE REFUSES MOST OF THAT SET. Unlike RDS, DocumentDB and
+#      AmazonMQ — which all publish a BLOCKLIST — the ElastiCache AUTH token
+#      publishes an ALLOWLIST, and it is short. Per API_CreateReplicationGroup
+#      (AuthToken): "The only permitted printable special characters are
+#      !, &, #, $, ^, <, >, and -. Other printable special characters cannot be
+#      used in the AUTH token."
+#
+#          ElastiCache allows:   ! & # $ ^ < > -
+#          RFC 3986 unreserved:  - . _ ~
+#          intersection:         -
+#
+#      `_`, `.` and `~` are URL-safe but ElastiCache REJECTS them. `!`, `&`,
+#      `#`, `$`, `^`, `<` and `>` are accepted by ElastiCache but break a URL
+#      (`#` truncates at the fragment, `&` splits query parameters, and the rest
+#      need shell or XML quoting on the way through). So `-` is the only
+#      character that satisfies both, and that is the whole set.
+#
+# The previous set was "!#$%&'()*+,-.:<=>?[]^_`{|}~", which was BOTH url-unsafe
+# AND largely illegal for the API it feeds: `%`, `'`, `(`, `)`, `*`, `+`, `,`,
+# `.`, `:`, `=`, `?`, `[`, `]`, `_`, backtick, `{`, `|`, `}` and `~` are all
+# outside the ElastiCache allowlist. It survived only because
+# auth_token_enabled defaults to false, so the token is stored but never handed
+# to ElastiCache — flipping that flag on the old set was liable to fail the
+# apply on a character the error message would not name.
+#
+# Entropy is unaffected by the narrowing: 32 characters over 63 symbols
+# (26+26+10+1) is ~191 bits.
+#
+# Engine limits checked before narrowing (ElastiCache AUTH token):
+#   length     16-128  -> 32 is inside
+#   allowlist  ! & # $ ^ < > -  (see above)
+#   complexity "at least three of the four character types" is a RECOMMENDATION
+#              in the ElastiCache docs, not an enforced rule. The four min_*
+#              floors below satisfy all four types anyway.
+#
+# Note for anyone migrating to RBAC later: the ElastiCache RBAC *user* password
+# is governed by a different, laxer rule — a blocklist of `,` `"` `/` `@`, with
+# no allowlist — so `-_.~` would be legal there and this module could align
+# with its siblings. That is an ElastiCache-side migration, not a change to
+# make here while auth_token is what is wired.
+################################################################################
+
 resource "random_password" "auth" {
   count = local.create ? 1 : 0
 
   length           = 32
   special          = true
-  override_special = "!#$%&'()*+,-.:<=>?[]^_`{|}~"
+  override_special = "-"
   min_lower        = 2
   min_upper        = 2
   min_numeric      = 2

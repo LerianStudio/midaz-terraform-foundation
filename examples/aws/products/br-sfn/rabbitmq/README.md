@@ -147,25 +147,33 @@ the broker changes the URL and is therefore a values change — regenerated from
 `terraform output`, so nothing is hardcoded, but the release has to be
 re-rendered.
 
-## The generated password may not be URL-safe
+## The generated password is URL-safe — FIXED UPSTREAM
 
-**Check this before the first release.** The password is being interpolated into
-a URL.
+The password is interpolated into a URL, so this mattered.
 
 The chart states the rule for Postgres in exactly these words — *"passwords must
 be URL-safe (no `@ : / ? # %`)"* (`README.md:51`) — and it applies verbatim to
 `RABBITMQ_URL`, which is a URL by construction.
 
-`_modules/rabbitmq-amazonmq` generates the broker password with
-`override_special = "!#$%^&*()-_+{}<>?"`, which **includes `#`, `%` and `?`**.
-`#` truncates the URL at the fragment, `%` starts an invalid percent-escape and
-`?` opens a query string — so the rail either fails to connect or connects to
+`_modules/rabbitmq-amazonmq` **used to** generate the broker password with
+`override_special = "!#$%^&*()-_+{}<>?"`, which includes `#`, `%` and `?`. `#`
+truncates the URL at the fragment, `%` starts an invalid percent-escape and `?`
+opens a query string — so the rail would either fail to connect or connect to
 something unintended.
 
-Either percent-encode the password on its way into the value, or rotate it in
-Secrets Manager (and on the broker) until it is URL-safe. Narrowing
-`override_special` in the shared module is the real fix and affects every
-product, so report it rather than patching it from here.
+The module was fixed rather than worked around here: it now generates **32
+characters** over alphanumerics plus `-_.~`, the RFC 3986 §2.3 *unreserved* set.
+The AmazonMQ limits were checked at the same time — min 12 characters, `,:=`
+forbidden, and a hard *"at least 4 unique characters"* API rule that the
+module's `min_*` floors now satisfy deterministically. See
+[`_modules/rabbitmq-amazonmq/README.md`](../../../_modules/rabbitmq-amazonmq/README.md).
+
+Nothing to check before the first release, and nothing to percent-encode.
+
+> **One-time migration cost.** Narrowing the set regenerates the password, so
+> the first `apply` after this change **rotates** the broker admin credential.
+> Workloads holding the old value fail authentication until External Secrets
+> resyncs and the pods restart. Roll it dev → stg → prd, in a window.
 
 > **CONFIRMAR no chart:** whether any rail other than `correios` speaks AMQP. The
 > chart's infra contract lists RabbitMQ as external for the whole monorepo

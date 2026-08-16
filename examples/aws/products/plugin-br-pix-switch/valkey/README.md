@@ -140,15 +140,25 @@ The token **is** generated and written to
 is a tfvars change plus a values change, not a rebuild. Documented in
 `envs/prd.tfvars-example`, not forgotten.
 
-## If you do enable the token: it must be URL-safe
+## If you do enable the token: it is already URL-safe — FIXED UPSTREAM
 
-The token is interpolated into a URL. `#` truncates it at the fragment, `%`
-starts an invalid percent-escape, `?` opens a query string and `:` breaks the
-userinfo split — and the failure is not always clean.
+The token is interpolated into a URL, so this mattered. `#` truncates it at the
+fragment, `%` starts an invalid percent-escape, `?` opens a query string and `:`
+breaks the userinfo split — and the failure was not always clean.
+
+`_modules/valkey-elasticache` now generates **32 characters from alphanumerics
+plus `-`, and nothing else**. That one-character special set is not laziness: the
+ElastiCache AUTH token is governed by an API *allowlist* (`! & # $ ^ < > -`)
+rather than a blocklist, and `-` is its only member that is also RFC 3986
+unreserved — `_`, `.` and `~` would be rejected by AWS. The old set was both
+url-unsafe *and* largely illegal for that API, which had gone unnoticed only
+because `auth_token_enabled` defaults to `false`.
 
 This applies to every datastore in this product, because every one of them is
 reached through a URL. See [`../README.md`](../README.md), *The generated
-passwords may not be URL-safe*.
+passwords are URL-safe — FIXED UPSTREAM*, and
+[`_modules/valkey-elasticache/README.md`](../../../_modules/valkey-elasticache/README.md)
+for the allowlist detail.
 
 ## Availability
 

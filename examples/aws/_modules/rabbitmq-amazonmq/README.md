@@ -229,6 +229,71 @@ The first seven are the uniform datastore contract and are identical across
 `postgres-rds`, `mongodb-documentdb`, `valkey-elasticache`, `rabbitmq-amazonmq`
 and `streaming-msk`.
 
+## The generated password is URL-safe by construction
+
+`random_password.master` draws from **alphanumerics plus `-` `_` `.` `~`** at
+**32 characters**. That symbol set is the RFC 3986 §2.3 *unreserved* production
+— the characters that carry no syntactic meaning anywhere in a URI and so never
+need percent-encoding.
+
+**This is deliberate and it is not a style choice. Do not widen it.**
+
+There is no non-URL consumer of this password. The AMQP contract across this
+fleet is a connection **string**, never a host/user/password triple:
+
+| Consumer | How the password reaches it |
+|---|---|
+| `br-sfn` (`correios` rail) | `correios.secrets.RABBITMQ_URL` — `amqps://<user>:<password>@<endpoint>:5671/`, a URL by construction. The chart states the rule for its Postgres sibling in the same words: *"passwords must be URL-safe (no `@ : / ? # %`)"* |
+| `plugin-br-pix-switch` | `RABBITMQ_URI` |
+| `plugin-br-bank-transfer` | `amqp://bank_transfer:$(RABBITMQ_PASSWORD)@…` (`templates/configmap.yaml:168`), assembled through Kubernetes `$(VAR)` expansion — escaping is structurally impossible on that path |
+
+The previous set was `!#$%^&*()-_+{}<>?`. Three of its members break a URL, each
+differently: `#` truncates at the fragment so the vhost is silently dropped, `%`
+opens an invalid percent-escape, `?` starts the query string. At 16 characters
+over ~17 symbols, drawing at least one was the **likely** outcome — an
+intermittent connection failure that reproduces on roughly every other rebuild
+and points at nothing.
+
+Entropy went **up**, not down: 32 characters over the 66-symbol alphabet is
+~193 bits against the ~101 bits the old 16-character password carried.
+
+### Engine limits this was checked against
+
+AmazonMQ carries the **strictest** rule of the four datastore modules — the only
+one with an enforced complexity requirement.
+
+| Constraint | AmazonMQ RabbitMQ `User.password` | This module |
+|---|---|---|
+| Length | ≥ 12, no documented maximum | 32 |
+| Forbidden | `,` `:` `=` | none emitted |
+| Complexity | **"must contain at least 4 unique characters"** — a hard API rule | satisfied *deterministically*: `min_lower`/`min_upper`/`min_numeric`/`min_special` = 2 each guarantees one distinct character from each of four classes, whatever the draw |
+
+That last row is why the `min_*` floors in this module are load-bearing rather
+than decorative. Removing them makes the constraint merely probable.
+
+> Adjacent, so it does not get rediscovered: the AmazonMQ RabbitMQ **username**
+> must not contain a tilde. Only the password is generated here, so nothing in
+> this module trips that — but do not paste this character set into a username
+> generator.
+
+> **Sibling modules differ on purpose.** `postgres-rds` and `mongodb-documentdb`
+> use the same `-_.~`. `valkey-elasticache` uses **`-` alone**, because the
+> ElastiCache AUTH token is governed by an *allowlist* (`! & # $ ^ < > -`)
+> rather than a blocklist, and `-` is its only member that is also RFC 3986
+> unreserved. See that module's README.
+
+### Changing this rotates the password
+
+`length`, `override_special` and the `min_*` floors are all inputs to
+`random_password`, so editing any of them **regenerates the value**. It flows
+into the broker user (`main.tf:373`), so the next `apply` rotates the admin
+credential.
+
+Plan for it rather than discovering it: the new value lands in
+`{product}-{env}-rabbitmq/password`, and any workload holding the old one keeps
+failing authentication until External Secrets resyncs the Kubernetes Secret and
+the pods restart. Roll it in a maintenance window, dev first.
+
 ## Usage - dedicated
 
 Dev, cheapest viable shape (single instance, `mq.m7g.medium` — the smallest type
