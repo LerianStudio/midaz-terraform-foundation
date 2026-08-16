@@ -1,0 +1,127 @@
+################################################################################
+# products/plugin-fees/msk — dev
+#
+################################################################################
+# MOST DEV ENVIRONMENTS SHOULD NOT APPLY THIS DIRECTORY AT ALL.
+#
+# Streaming is OFF by default in the chart: plugin-fees-helm 7.3.0 renders
+# STREAMING_ENABLED = "false", and the key is not even present in values.yaml.
+# Provisioning Kafka for a feature nobody turned on is pure idle cost.
+#
+# And MSK has no cheap corner. kafka.t3.small is the smallest broker AWS offers,
+# and number_of_broker_nodes must be a MULTIPLE of the number of client subnets.
+# infra-base/vpc tags THREE subnets Type=database, so the valid values are 3, 6,
+# 9 — three brokers is the floor, roughly USD 105/month. A 2-broker cluster needs
+# subnet_ids narrowed to exactly two subnet ids, which cannot be written into a
+# tfvars-example because the ids are generated.
+#
+# THIS FILE THEREFORE SHIPS mode = "shared".
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-fees"
+environment = "dev"
+
+# SHARED: creates nothing. Resolves shared-dev-msk (owned by
+# products/shared-resources/msk) plus the secret AmazonMSK_shared-dev-msk.
+#
+# That directory must be applied FIRST: data "aws_msk_cluster" is singular and
+# fails the plan when the cluster does not exist, naming what it looked for.
+# That is the desired behaviour — an unresolvable shared cluster has to stop the
+# apply rather than emit a null broker list into the Helm values.
+#
+# Every sizing value below is IGNORED in this mode. They are left in place so
+# switching to "dedicated" is a one-line change.
+#
+# Note this OVERRIDES the variable default, which is "dedicated" only so this
+# root behaves like every other product root.
+mode = "shared"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress — IGNORED in shared mode
+#
+# A product in shared mode creates no security group and cannot authorise itself
+# on the shared cluster; opening it is products/shared-resources/msk's job.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+# subnet_ids = []  -> the three Type=database subnets are used, so
+#                     number_of_broker_nodes must be 3, 6 or 9.
+
+################################################################################
+# Cluster — kafka.t3.small x 3 (~USD 105/month) if mode = "dedicated"
+#
+# storage_mode stays empty: TIERED is REJECTED by the kafka.t3.* family.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.t3.small"
+broker_ebs_volume_size = 20
+storage_mode           = ""
+
+enable_storage_autoscaling = false
+
+################################################################################
+# Security
+#
+# SASL/SCRAM on, TLS in transit mandatory once SCRAM is on. scram_username must
+# MATCH what products/shared-resources/msk created — both default to "lerian".
+# The module reads the shared secret by name, but the username is declared, not
+# discovered, so a mismatch here produces an authentication failure rather than a
+# plan error.
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Helm handoff
+#
+# streaming_sasl_mechanism is EMPTY, which omits STREAMING_SASL_MECHANISM from
+# helm_values. MSK implements SCRAM-SHA-512 and nothing else, but the exact
+# spelling the Lerian streaming client accepts is not verifiable from the chart —
+# plugin-fees-helm 7.3.0 renders the key with an empty default and enumerates no
+# accepted values. CONFIRMAR against lib-streaming, then set it here.
+#
+# streaming_cloudevents_source empty keeps the chart default "lerian.midaz.fees".
+################################################################################
+
+streaming_sasl_mechanism     = ""
+streaming_cloudevents_source = ""
+
+################################################################################
+# Kafka configuration
+#
+# auto.create.topics.enable stays false. The Lerian charts create their topics
+# explicitly from an ArgoCD PreSync rpk job, which keeps the topic set versioned
+# with the service that owns it — and on a SHARED cluster keeps two products from
+# silently colliding on a topic name.
+################################################################################
+
+auto_create_topics_enable = false
+
+################################################################################
+# Observability
+################################################################################
+
+enhanced_monitoring                    = "DEFAULT"
+cloudwatch_logs_enabled                = false
+cloudwatch_log_group_retention_in_days = 7
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

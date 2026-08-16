@@ -1,0 +1,70 @@
+################################################################################
+# products/plugin-fees/documentdb — prd
+#
+# Three instances across three AZs, deletion protection on, audit AND profiler
+# logs exported. A fee engine computes money; audit export is what a regulator
+# asks for, and profiler is what tells you which fee rule got slow.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-fees"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# TLS — a KNOWN GAP, not an oversight
+#
+# documentdb_tls stays "disabled", matching every other product in this
+# repository. The host side is already correct: helm_values emits the raw
+# *.docdb.amazonaws.com writer endpoint, exactly the name the DocumentDB
+# certificate covers, so hostname validation passes.
+#
+# The remaining blocker is the CA bundle. plugin-fees-helm 7.3.0 DOES expose
+# MONGO_TLS_CA_CERT (templates/fees/configmap.yaml), so unlike product-console
+# there is a place to put it — Terraform simply does not distribute the global
+# RDS bundle and cannot. Mount it, then flip this to "enabled" and
+# MONGO_PARAMETERS picks up tls=true automatically.
+################################################################################
+
+documentdb_tls = "disabled"
+
+################################################################################
+# Engine and sizing — db.r6g.large, three instances
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.r6g.large"
+instances_count        = 3
+parameter_group_family = "docdb5.0"
+
+backup_retention_period = 14
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

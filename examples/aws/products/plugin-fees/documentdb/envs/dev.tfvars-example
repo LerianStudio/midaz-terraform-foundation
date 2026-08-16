@@ -1,0 +1,62 @@
+################################################################################
+# products/plugin-fees/documentdb — dev
+#
+# DocumentDB has no cheap corner: db.t3.medium is the SMALLEST class the service
+# offers (there is no micro and no small), so one instance is roughly USD
+# 60/month. If that is not acceptable for an ephemeral environment, set
+# mode = "shared" and consume the cluster owned by
+# products/shared-resources/documentdb instead of running a second one.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-fees"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium, one instance (~USD 60/month)
+#
+# instance_class MUST be db.t3.medium or larger; the RDS burstable range below it
+# does not exist for DocumentDB and the module rejects it at plan time.
+#
+# One instance means no failover: an AZ loss takes the cluster down.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 1
+parameter_group_family = "docdb5.0"
+
+# TLS off in dev. Unlike product-console, this chart HAS a MONGO_TLS_CA_CERT
+# variable, so enabling it later is a two-sided change rather than a blocked one.
+documentdb_tls = "disabled"
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+enabled_cloudwatch_logs_exports = []
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

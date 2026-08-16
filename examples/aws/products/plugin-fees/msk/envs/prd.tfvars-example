@@ -1,0 +1,117 @@
+################################################################################
+# products/plugin-fees/msk — prd
+#
+# SHARED BY DEFAULT, AND THIS IS THE FILE WHERE THAT DECISION IS ACTUALLY MADE.
+#
+# A fee engine emitting CloudEvents is a low-volume publisher. Weighed against a
+# dedicated three-broker cluster at roughly USD 630/month on kafka.m7g.large, the
+# shared tier is the right default even in production.
+#
+# SWITCH TO mode = "dedicated" WHEN ONE OF THESE IS TRUE:
+#   - fee events must not share a topic namespace, an ACL set or a retention
+#     budget with any other product (a real compliance answer, not a preference);
+#   - the shared cluster's retention budget cannot hold the fee event history a
+#     regulator expects;
+#   - throughput from another product on the shared tier is measurably starving
+#     the fee stream, which PER_TOPIC_PER_BROKER monitoring on the shared cluster
+#     is what proves.
+#
+# If you do switch, the sizing block below is a STARTING POINT, not a
+# recommendation — see the Instance Types Disclaimer in the repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-fees"
+environment = "prd"
+
+mode = "shared"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — IGNORED in shared mode
+#
+# If you switch to "dedicated", set allow_private_subnet_cidr_ingress = false for
+# security-group-only ingress, and confirm check "eks_node_security_group_resolved"
+# does NOT warn before the first apply.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Cluster — IGNORED in shared mode. The values below are what a dedicated prd
+# cluster would look like: kafka.m7g.large x 3 with TIERED storage, roughly
+# USD 630/month at 500 GB per broker.
+#
+# TIERED moves cold segments off the broker EBS volume and is the lever to pull
+# when retention grows. It is rejected by the kafka.t3.* family, which is why dev
+# cannot use it.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.m7g.large"
+broker_ebs_volume_size = 500
+storage_mode           = "TIERED"
+
+enable_storage_autoscaling       = true
+storage_autoscaling_max_capacity = 2000
+
+################################################################################
+# Security
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Helm handoff
+#
+# streaming_sasl_mechanism MUST be filled in before the first production release
+# that turns streaming on. Empty omits STREAMING_SASL_MECHANISM, and without it
+# the client cannot authenticate to a SASL/SCRAM cluster. It is left empty rather
+# than guessed because the accepted spelling is not verifiable from the chart —
+# confirm it against lib-streaming in stg first. This is the one CONFIRMAR left
+# in the plugin-fees handoff.
+################################################################################
+
+streaming_sasl_mechanism     = ""
+streaming_cloudevents_source = ""
+
+################################################################################
+# Kafka configuration
+#
+# Replication factor 3 across three brokers: a single broker loss costs no
+# partitions. Ignored in shared mode — the shared tier sets its own.
+################################################################################
+
+auto_create_topics_enable  = false
+default_replication_factor = 3
+
+################################################################################
+# Observability
+#
+# PER_TOPIC_PER_BROKER is what lets you attribute load to a topic. Ignored in
+# shared mode, where products/shared-resources/msk owns the monitoring level —
+# and where it matters more, because the cluster has several tenants.
+################################################################################
+
+enhanced_monitoring                    = "PER_TOPIC_PER_BROKER"
+cloudwatch_logs_enabled                = true
+cloudwatch_log_group_retention_in_days = 90
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

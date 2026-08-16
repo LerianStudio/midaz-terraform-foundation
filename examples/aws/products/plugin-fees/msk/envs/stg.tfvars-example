@@ -1,0 +1,92 @@
+################################################################################
+# products/plugin-fees/msk — stg
+#
+# STILL SHARED. Staging is where the shared-tier assumption gets rehearsed: if
+# production is going to run plugin-fees against shared-{env}-msk, staging has to
+# prove that the topic namespace, the ACLs and the SASL/SCRAM wiring work when
+# another product is on the same cluster. A dedicated cluster in stg would test
+# the wrong topology.
+#
+# Apply products/shared-resources/msk first.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-fees"
+environment = "stg"
+
+mode = "shared"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress — IGNORED in shared mode
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Cluster — IGNORED in shared mode, kept so a switch to "dedicated" is one line
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.t3.small"
+broker_ebs_volume_size = 100
+storage_mode           = ""
+
+enable_storage_autoscaling = false
+
+################################################################################
+# Security
+#
+# scram_username must MATCH what products/shared-resources/msk created — both
+# default to "lerian". The module reads the shared secret by name, but the
+# username is declared, not discovered, so a mismatch produces an authentication
+# failure at runtime rather than a plan error.
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Helm handoff
+#
+# STAGING IS WHERE STREAMING_SASL_MECHANISM SHOULD BE SETTLED. It is left empty
+# here — which omits the key — because MSK's SCRAM-SHA-512 is certain but the
+# spelling the Lerian streaming client accepts is not verifiable from the chart.
+# Confirm it against lib-streaming in stg, set it here and in prd, and the
+# handoff is complete.
+################################################################################
+
+streaming_sasl_mechanism     = ""
+streaming_cloudevents_source = ""
+
+################################################################################
+# Kafka configuration
+################################################################################
+
+auto_create_topics_enable = false
+
+################################################################################
+# Observability
+################################################################################
+
+enhanced_monitoring                    = "PER_BROKER"
+cloudwatch_logs_enabled                = false
+cloudwatch_log_group_retention_in_days = 14
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}
