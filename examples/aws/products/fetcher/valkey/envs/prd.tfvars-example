@@ -1,0 +1,72 @@
+################################################################################
+# products/fetcher/valkey — prd
+#
+# Three cache clusters across three AZs with automatic failover, daily
+# snapshots retained for a week.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "fetcher"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc   (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks   (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+################################################################################
+# Security — a KNOWN GAP with two halves that differ
+#
+#   REDIS_PASSWORD exists in this chart, so auth_token_enabled = true is a
+#   tfvars change plus an ExternalSecret, with no chart change. It is left false
+#   here only so the first production apply is not the one that discovers the
+#   ExternalSecret is missing. Flip it deliberately.
+#
+#   REDIS_TLS does NOT exist in this chart, so transit_encryption_mode cannot go
+#   to "required" without a chart change, no matter what the AWS side supports.
+#
+# The auth token IS generated and stored at fetcher-prd-valkey/auth-token either
+# way. Until both are on, the cache is protected by the security group and the
+# private subnets alone.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
