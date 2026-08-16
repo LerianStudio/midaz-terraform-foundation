@@ -1,0 +1,101 @@
+################################################################################
+# products/br-sisbajud/postgres — dev
+#
+# Absolute minimum sizing. Validating this stack in a real AWS account costs real
+# money: db.t4g.micro with 20 GB is roughly USD 15/month.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sisbajud"
+environment = "dev"
+
+# "dedicated" creates br-sisbajud-dev-postgres. Switch to "shared" to consume the
+# instance owned by products/shared-resources/postgres instead; this stack then creates
+# nothing and every sizing value below is ignored.
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+# Override either of them only when the sibling infra-base stack was given an
+# explicit override. Both carry the "lerian" prefix on purpose: they belong to
+# the infra-base FOUNDATION, not to br-sisbajud — and not to the shared datastore
+# tier either, which carries "shared".
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists: it authorises the Type=private subnet CIDRs,
+# which only depend on infra-base/vpc. The EKS node security group is looked up
+# on top of that and simply resolves to nothing until the cluster is created —
+# check "eks_node_security_group_resolved" warns while that is the case.
+#
+# allow_vpc_cidr_ingress is the module's VPC CIDR FALLBACK, applied only when
+# both allow lists resolve empty. False here so an empty allow list trips the
+# module's check "ingress_is_reachable" instead of quietly widening to a CIDR
+# that includes the public subnets.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+#
+# database_name and username both use UNDERSCORES and both match the chart:
+# brSisbajud.configmap.POSTGRES_NAME and .POSTGRES_USER default to br_sisbajud
+# (values-template.yaml:15-16). Nothing in the chart CREATES an application role,
+# so the RDS master user has to be the one the PreSync migration Job connects as.
+# The AWS resource keeps the hyphen (br-sisbajud-dev-postgres); only the database
+# and the role inside it use the underscore form, because an unquoted PostgreSQL
+# identifier cannot contain a hyphen and the migrator does not quote it.
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "br_sisbajud"
+username             = "br_sisbajud"
+
+################################################################################
+# Sizing — db.t4g.micro (~USD 15/month)
+#
+# Performance Insights MUST stay false: AWS does not offer it on db.t4g.micro,
+# and the module rejects the combination with a plan-time precondition rather
+# than letting the apply fail five minutes in. Enhanced Monitoring is off for the
+# same cost reason, and the monitoring IAM role goes with it.
+################################################################################
+
+instance_class        = "db.t4g.micro"
+allocated_storage     = 20
+max_allocated_storage = 50
+multi_az              = false
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+performance_insights_enabled = false
+monitoring_interval          = 0
+create_monitoring_role       = false
+
+enabled_cloudwatch_logs_exports = ["postgresql"]
+
+# No replica in dev. The chart's DB_*_REPLICA_HOST variables are pointed at the
+# primary by the helm_values output, which is the correct single-instance shape.
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}
