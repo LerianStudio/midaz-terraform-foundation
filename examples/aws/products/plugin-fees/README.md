@@ -2,15 +2,21 @@
 
 AWS datastores for **plugin-fees**, the fee engine.
 
-Two independent root stacks — one **required**, one **optional**:
+Three independent root stacks — one **required**, two **optional**:
 
 ```
 examples/aws/products/plugin-fees/
 ├── documentdb/   -> _modules/mongodb-documentdb   plugin-fees-{env}-docdb    REQUIRED
-└── msk/          -> _modules/streaming-msk        plugin-fees-{env}-msk      OPT-IN
+├── msk/          -> _modules/streaming-msk        plugin-fees-{env}-msk      OPT-IN
+└── valkey/       -> _modules/valkey-elasticache   plugin-fees-{env}-valkey   OPT-IN
 ```
 
 The directory name is the **chart** name, verbatim, `plugin-` prefix included.
+
+Only `documentdb/` is on the default path. `msk/` and `valkey/` each back a
+feature the chart ships **turned off**, and the rule for both is the same one
+`products/shared-resources/*` follows: **applying the directory is what enables
+it; not applying it is what "disabled" means.**
 
 ---
 
@@ -41,28 +47,49 @@ That is the only declared dependency (`Chart.yaml:29-33`), default
 
 ### One correction to the discovery YAML: Valkey is not simply "no"
 
-The YAML records `valkey: no`. That is right for the default deployment and
+The YAML recorded `valkey: no`. That is right for the default deployment and
 incomplete as a statement about the chart. plugin-fees defines **four** Redis
 variables, all namespaced under `MULTI_TENANT_`:
 
 | Variable | Where | Default |
 |---|---|---|
-| `MULTI_TENANT_REDIS_HOST` | `templates/fees/configmap.yaml:104` (`required`) | `""` |
-| `MULTI_TENANT_REDIS_PORT` | `templates/fees/configmap.yaml:105` | `"6379"` |
-| `MULTI_TENANT_REDIS_TLS` | `templates/fees/configmap.yaml:106` | `"false"` |
-| `MULTI_TENANT_REDIS_PASSWORD` | `templates/fees/secrets.yaml:29` (Secret) | `""` |
+| `MULTI_TENANT_REDIS_HOST` | `templates/fees/configmap.yaml:104` (`required`) | `""` (`values.yaml:211`) |
+| `MULTI_TENANT_REDIS_PORT` | `templates/fees/configmap.yaml:105` | `"6379"` (`values.yaml:213`) |
+| `MULTI_TENANT_REDIS_TLS` | `templates/fees/configmap.yaml:106` | `"false"` (`values.yaml:215`) |
+| `MULTI_TENANT_REDIS_PASSWORD` | `templates/fees/secrets.yaml:28-30` (Secret) | `""` (`values.yaml:246`) |
 
-All four sit inside `{{- if eq ... MULTI_TENANT_ENABLED ... "true" }}`, and
-`MULTI_TENANT_ENABLED` defaults to `"false"`, so by default none render. There is
-no plain `REDIS_HOST` in this chart at all.
+All four sit inside `{{- if eq (.Values.fees.configmap.MULTI_TENANT_ENABLED | default "false" | toString) "true" }}`
+(`configmap.yaml:96`, closed at `110`), and `MULTI_TENANT_ENABLED` defaults to
+`"false"` (`values.yaml:196`), so by default none render. There is no plain
+`REDIS_HOST` in this chart at all.
 
-**Consequence:** there is no `valkey/` directory here today, and turning
-multi-tenancy on for plugin-fees requires adding one — copy
-`products/flowker/valkey` or `products/midaz/valkey`, change the `product`
-variable and its validation, and emit the `MULTI_TENANT_REDIS_*` names above
-(note `HOST` and `PORT` are **split** in this family, unlike midaz's joined
-`REDIS_HOST`). This mirrors `tracer`, which the same YAML annotates
-"opcional, só multi-tenant".
+**Resolved:** [`valkey/`](valkey) now exists. It was adapted from
+[`products/tracer/valkey`](../tracer/valkey) — the correct precedent, since
+`tracer` is the other chart in the fleet whose Redis lives only on the
+multi-tenant path, and the same discovery YAML already annotated it
+*"opcional, só multi-tenant"*. Both entries in the YAML now carry that
+annotation.
+
+Two things that were **verified against this chart rather than inherited** from
+tracer:
+
+- the values prefix is **`fees.configmap`**, not `tracer.configmap`. The
+  variable names are byte-identical between the two charts, so this is the one
+  thing a copy gets silently wrong;
+- `MULTI_TENANT_REDIS_TLS` defaults to **`"false"`** here and `"true"` in
+  tracer (`values.yaml:215` vs `values.yaml:251`) — plugin-fees is
+  insecure-by-default on the tenant cache connection. The `helm_values` output
+  of the new root reports what the server actually enforces and overrides both.
+
+`HOST` and `PORT` are **split** in this family, unlike midaz's joined
+`REDIS_HOST`. Do not copy the midaz shape.
+
+> Two keys the template reads that `values.yaml` never declares:
+> `MULTI_TENANT_ALLOW_INSECURE_HTTP` (`configmap.yaml:98`) and
+> `MULTI_TENANT_CONNECTIONS_CHECK_INTERVAL_SEC` (`configmap.yaml:109`). They
+> render through the `| default` filter so nothing breaks, but they are
+> undiscoverable for an operator reading `values.yaml`. tracer declares both.
+> Chart-side gap; reported, not worked around.
 
 ---
 
@@ -255,22 +282,68 @@ container `env:` list, which outranks all `envFrom`.
 
 ---
 
+## `valkey/` — the other optional one
+
+**OPT-IN, and cheap enough to be applied by reflex — which is the trap.**
+`~USD 12/month` in dev buys an idle cache if multi-tenancy is off.
+
+Full detail in [`valkey/README.md`](valkey/README.md). The short version:
+
+| | |
+|---|---|
+| Creates | `plugin-fees-{env}-valkey` |
+| Secret | `plugin-fees-{env}-valkey/auth-token` |
+| Chart target | **`fees.configmap`** |
+| Renders only when | `MULTI_TENANT_ENABLED == "true"` (`configmap.yaml:96-110`; default `"false"`) |
+
+### Helm handoff
+
+| Terraform | Chart env var |
+|---|---|
+| `endpoint` (bare host) | `MULTI_TENANT_REDIS_HOST` |
+| `port` | `MULTI_TENANT_REDIS_PORT` |
+| derived from `transit_encryption_mode` | `MULTI_TENANT_REDIS_TLS` |
+| `secret_name` → External Secrets | `MULTI_TENANT_REDIS_PASSWORD` |
+
+`MULTI_TENANT_REDIS_HOST` is `required(...)`, so an empty value fails the Helm
+render rather than producing a pod that dials nothing.
+
+### Dedicated or shared
+
+| `mode` | What the stack does | Resources created |
+|---|---|---|
+| `dedicated` (default) | Creates the replication group under the plugin-fees name, with its own security group and auth-token secret. | All of them |
+| `shared` | Creates nothing. Resolves `shared-{env}-valkey` **by name**, plus `shared-{env}-valkey/auth-token`. | None |
+
+### No subchart to turn off
+
+Unlike `documentdb/`, there is nothing to disable: plugin-fees declares exactly
+one dependency, `mongodb` 16.4.0 (`Chart.yaml:29-33`). There is no Valkey or
+Redis subchart and no `valkey:` / `redis:` block in `values.yaml`. The cache is
+external by construction.
+
+---
+
 ## Deploy order
 
 ```
 1. examples/aws/bootstrap                (state bucket + lock table, per env)
 2. examples/aws/infra-base/vpc           -> lerian-{env}-vpc
 3. examples/aws/infra-base/eks           -> lerian-{env}-eks
-4. examples/aws/products/shared-resources/{documentdb,msk}   (OPTIONAL; REQUIRED for any mode = "shared")
-5. products/plugin-fees/documentdb   and   products/plugin-fees/msk   <- in any order, in parallel
+4. examples/aws/products/shared-resources/{documentdb,msk,valkey}   (OPTIONAL; REQUIRED for any mode = "shared")
+5. products/plugin-fees/{documentdb,msk,valkey}   <- in any order, in parallel
 6. helm upgrade --install plugin-fees ...
 ```
 
-The two roots in step 5 have **no dependency on each other**: separate state
+The three roots in step 5 have **no dependency on each other**: separate state
 files, separate locks, separate blast radius.
 
 Step 4 is mandatory for `msk/` as shipped, because the tfvars set
-`mode = "shared"`.
+`mode = "shared"`. It is only mandatory for `valkey/` if you switch that root to
+shared mode too — its tfvars ship `dedicated`.
+
+`valkey/` needs `infra-base/vpc`; `infra-base/eks` is optional at its apply
+time, same as the datastore siblings.
 
 ```bash
 cd examples/aws/products/plugin-fees/documentdb
@@ -280,6 +353,10 @@ terraform init -backend-config=../../../backend/dev.hcl \
 cd examples/aws/products/plugin-fees/msk
 terraform init -backend-config=../../../backend/dev.hcl \
   -backend-config="key=aws/products/plugin-fees/msk/terraform.tfstate"
+
+cd examples/aws/products/plugin-fees/valkey
+terraform init -backend-config=../../../backend/dev.hcl \
+  -backend-config="key=aws/products/plugin-fees/valkey/terraform.tfstate"
 ```
 
 `../../../` is **three** levels up and lands on `examples/aws`. Verified with
@@ -291,6 +368,7 @@ State keys:
 |---|---|
 | documentdb | `aws/products/plugin-fees/documentdb/terraform.tfstate` |
 | msk | `aws/products/plugin-fees/msk/terraform.tfstate` |
+| valkey | `aws/products/plugin-fees/valkey/terraform.tfstate` |
 
 `*.tfvars` is gitignored; `*.tfvars-example` is not.
 
@@ -304,10 +382,20 @@ No stack outputs a password.
 |---|---|---|
 | documentdb | `plugin-fees-{env}-docdb/password` | `shared-{env}-docdb/password` |
 | msk | `AmazonMSK_plugin-fees-{env}-msk` | `AmazonMSK_shared-{env}-msk` |
+| valkey | `plugin-fees-{env}-valkey/auth-token` | `shared-{env}-valkey/auth-token` |
 
 The MSK secret carries the AWS-mandated `AmazonMSK_` prefix rather than the usual
 `{name}/password` path, and AWS requires it to be encrypted with a customer
 managed CMK. Both are service constraints, not Lerian conventions.
+
+The Valkey entry is `auth-token`, not `password`, and it is written whether or
+not ElastiCache enforces it — `auth_token_enabled` decides enforcement, not
+existence.
+
+All generated credentials in this product are **URL-safe by construction**: the
+shared modules draw from the RFC 3986 §2.3 unreserved set at 32 characters
+(`-_.~`, and `-` alone for the ElastiCache auth token, whose API publishes an
+allowlist rather than a blocklist). See each module's README.
 
 ---
 
@@ -320,6 +408,8 @@ Approximate `us-east-1` on-demand, minimum sizing:
 | documentdb | dedicated | `db.t3.medium`, 1 instance | 60 |
 | msk | **shared** | — | 0 (the shared tier's cost, if it exists) |
 | msk | *dedicated, if you switch* | `kafka.t3.small` × 3 | *105* |
+| valkey | **not applied** | — | 0 |
+| valkey | *dedicated, if multi-tenancy is on* | `cache.t4g.micro` × 1 | *12* |
 | **total as shipped** | | | **~60** |
 
 *These are estimates. Price them against your own AWS Pricing Calculator before
