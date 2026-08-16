@@ -16,6 +16,12 @@ terraform.tfstate.d/
 # examples/aws/backend/README.md and .gitkeep remain tracked.
 examples/aws/backend/*.hcl
 
+# Environment -> AWS account mapping consumed by deploy.sh. Carries the client's
+# account ids and profile names, for the same reason the backend config above is
+# excluded. examples/aws/environments.conf.example remains tracked and is the
+# template operators copy.
+examples/aws/environments.conf
+
 # tfplan files. Terraform saved plans are ZIP archives that embed the full state
 # and config, including account ids and any value marked sensitive - they must
 # never be committed. The bare `tfplan` and `*.tfplan` patterns below missed

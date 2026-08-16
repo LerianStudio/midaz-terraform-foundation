@@ -1,0 +1,102 @@
+################################################################################
+# environments.conf — environment -> AWS account mapping
+#
+# Copy to `environments.conf` (gitignored, it carries account ids) and edit:
+#
+#   cp examples/aws/environments.conf.example examples/aws/environments.conf
+#
+# `deploy.sh` reads this file to answer three questions before it runs anything:
+#
+#   1. Which AWS credentials should this environment use?   -> profile
+#   2. Which account MUST those credentials resolve to?     -> account_id
+#   3. Which region is this environment in?                 -> region
+#
+# Question 2 is the important one. The script calls
+# `aws sts get-caller-identity` and refuses to continue when the account it gets
+# back is not the one declared here. Applying prd into a dev account because the
+# wrong profile was active is the worst mistake available in this repository, and
+# this file is what makes it impossible rather than unlikely.
+#
+# There is deliberately NO command-line flag to bypass that check. If the account
+# genuinely changed, edit this file — a reviewable, diffable act — instead of
+# typing an override at the end of a long day.
+#
+################################################################################
+# Format
+################################################################################
+#
+# One `[section]` per environment. Sections must be named dev, stg or prd.
+# Keys are `key = value`, one per line. `#` starts a comment.
+#
+#   account_id   REQUIRED  Exactly 12 digits. The account this environment lives
+#                          in. Cross-checked twice: offline against the bucket
+#                          name in backend/<env>.hcl, then online against
+#                          `aws sts get-caller-identity`.
+#
+#   region       REQUIRED  e.g. us-east-2. Cross-checked against the `region`
+#                          line in backend/<env>.hcl. This value is NOT injected
+#                          into Terraform — every stack takes its region from
+#                          `envs/<env>.tfvars`. It exists so a mismatch between
+#                          the three places a region is written gets caught at
+#                          preflight instead of halfway through an apply.
+#
+#   profile      OPTIONAL  Named profile from ~/.aws/config. Exported as
+#                          AWS_PROFILE for both the aws CLI and Terraform.
+#                          Leave empty or set to "-" to use ambient credentials
+#                          (env vars, EC2/ECS/IRSA role) — that is the CI shape.
+#                          The account check still runs either way.
+#
+################################################################################
+# Single account: dev, stg and prd in ONE AWS account
+################################################################################
+#
+# Supported and proven. Nothing collides: every resource name carries the
+# environment (`midaz-dev-postgres` vs `midaz-prd-postgres`), and state is
+# segregated by bucket (`lerian-tfstate-dev-<id>` vs `lerian-tfstate-prd-<id>`)
+# plus a per-environment DynamoDB lock table.
+#
+# Point all three sections at the same account_id and the same profile. Uncomment
+# the block below and delete the separate-accounts block further down.
+#
+# [dev]
+# account_id = 123456789012
+# profile    = lerian
+# region     = us-east-2
+#
+# [stg]
+# account_id = 123456789012
+# profile    = lerian
+# region     = us-east-2
+#
+# [prd]
+# account_id = 123456789012
+# profile    = lerian
+# region     = us-east-1
+#
+################################################################################
+# Separate accounts: one AWS account per environment
+################################################################################
+#
+# The default and the recommended posture. Each environment gets its own account,
+# its own profile, and — because bootstrap names the bucket
+# `lerian-tfstate-<env>-<account_id>` — state that cannot physically be reached
+# from the wrong account.
+#
+# Profile names below are placeholders. Every client names their accounts
+# differently; that is exactly why this mapping is a config file and not a
+# hardcoded table in the script.
+
+[dev]
+account_id = 123456789012
+profile    = lerian-dev
+region     = us-east-2
+
+[stg]
+account_id = 234567890123
+profile    = lerian-stg
+region     = us-east-2
+
+[prd]
+account_id = 345678901234
+profile    = lerian-prd
+region     = us-east-1
