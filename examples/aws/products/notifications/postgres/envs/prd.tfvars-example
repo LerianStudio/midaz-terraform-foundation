@@ -1,0 +1,88 @@
+################################################################################
+# products/notifications/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, a read replica the service uses
+# for its second connection pool, and both observability paths enabled.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "notifications"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+#
+# database_name is the ONE logical database notifications uses, and the chart's
+# POSTGRES_NAME default is the same string — unlike midaz, which needs a second
+# database created by its migration. helm_values therefore emits POSTGRES_NAME.
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "notifications"
+username             = "notifications"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Created as notifications-prd-postgres-replica and published through the
+# helm_secret_values output as POSTGRES_REPLICA_HOST / _PORT / _USER / _NAME.
+#
+# Those four keys go into .Values.secrets, NOT .Values.config — that is where the
+# chart declares them (values.yaml `secrets` block), even though none of them is
+# a credential. POSTGRES_REPLICA_PASSWORD is the only sensitive one and comes
+# from secret_name through External Secrets, exactly like POSTGRES_PASSWORD: a
+# read replica shares the master credentials of its source instance.
+################################################################################
+
+create_read_replica         = true
+read_replica_instance_class = "db.m7g.large"
+read_replica_multi_az       = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
