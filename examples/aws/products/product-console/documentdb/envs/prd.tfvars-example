@@ -1,0 +1,79 @@
+################################################################################
+# products/product-console/documentdb — prd
+#
+# Three instances across three AZs, deletion protection on, audit logs exported.
+#
+# Sized one step below the midaz prd cluster (db.r6g.large there): the console is
+# an admin UI whose read volume is human-paced, not a ledger. Re-price it against
+# your own traffic before committing.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "product-console"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# TLS — a KNOWN GAP, and a slightly worse one here than elsewhere
+#
+# documentdb_tls stays "disabled". The HOST side is already correct: helm_values
+# emits the raw *.docdb.amazonaws.com writer endpoint, exactly the name the
+# DocumentDB certificate covers, so hostname validation would pass.
+#
+# What is missing is the CA bundle. Sibling charts (reporter, plugin-fees) expose
+# a MONGO_TLS_CA_CERT variable to mount the global RDS bundle into;
+# product-console-helm 3.3.0 has NO such variable at all. Enabling TLS here
+# therefore depends on the container image already trusting the Amazon RDS root,
+# or on the chart gaining the variable.
+#
+# The chart's own docs (docs/UPGRADE-2.0.md) suggest "tlsInsecure=true" in
+# MONGO_PARAMETERS as the way around this. Do not take it: that disables
+# certificate validation outright, and it was written when a private CNAME sat
+# in front of the cluster. There is no private zone in this repository.
+#
+# Flip documentdb_tls once the CA path is real. Leaving it disabled with no note
+# would be the oversight; this is the note.
+################################################################################
+
+documentdb_tls = "disabled"
+
+################################################################################
+# Engine and sizing — db.t3.medium, three instances
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 3
+parameter_group_family = "docdb5.0"
+
+backup_retention_period = 14
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
