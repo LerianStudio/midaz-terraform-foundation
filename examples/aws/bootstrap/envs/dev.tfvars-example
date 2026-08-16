@@ -1,0 +1,20 @@
+################################################################################
+# bootstrap — dev
+#
+# Copy to dev.tfvars (gitignored) and adjust, then:
+#   terraform workspace select dev || terraform workspace new dev
+#   terraform apply -var-file=envs/dev.tfvars
+################################################################################
+
+environment = "dev"
+region      = "us-east-1"
+
+# SSE-S3 (AES256) plus the AWS managed DynamoDB key. No CMK in dev: a customer
+# managed key costs USD 1/month per key and buys nothing for a validation
+# environment.
+kms_key_arn = ""
+
+noncurrent_version_expiration_days     = 30
+abort_incomplete_multipart_upload_days = 7
+
+write_backend_config = true

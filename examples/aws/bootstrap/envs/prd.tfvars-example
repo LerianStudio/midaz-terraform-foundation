@@ -1,0 +1,23 @@
+################################################################################
+# bootstrap — prd
+#
+# Copy to prd.tfvars (gitignored) and adjust, then:
+#   terraform workspace select prd || terraform workspace new prd
+#   terraform apply -var-file=envs/prd.tfvars
+################################################################################
+
+environment = "prd"
+region      = "us-east-1"
+
+# Recommended in production: a customer managed key gives an auditable key policy
+# and a revocable grant over every state file. Create the key outside this stack
+# (it must survive a bootstrap teardown) and paste its ARN here. Leave empty to
+# stay on SSE-S3 — still encrypted at rest, just without the separate key policy.
+kms_key_arn = ""
+
+# Longer recovery window in production: a state corruption noticed weeks later is
+# still recoverable from a noncurrent version.
+noncurrent_version_expiration_days     = 365
+abort_incomplete_multipart_upload_days = 7
+
+write_backend_config = true

@@ -1,0 +1,19 @@
+################################################################################
+# bootstrap — stg
+#
+# Copy to stg.tfvars (gitignored) and adjust, then:
+#   terraform workspace select stg || terraform workspace new stg
+#   terraform apply -var-file=envs/stg.tfvars
+################################################################################
+
+environment = "stg"
+region      = "us-east-1"
+
+# Leave empty for SSE-S3, or set a CMK ARN to mirror the prd configuration and
+# validate the KMS path before it reaches production.
+kms_key_arn = ""
+
+noncurrent_version_expiration_days     = 90
+abort_incomplete_multipart_upload_days = 7
+
+write_backend_config = true
