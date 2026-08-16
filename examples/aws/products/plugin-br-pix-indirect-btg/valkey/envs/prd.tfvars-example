@@ -1,0 +1,75 @@
+################################################################################
+# products/plugin-br-pix-indirect-btg/valkey — prd
+#
+# Three cache clusters across three AZs with automatic failover, daily snapshots
+# retained for a week.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-indirect-btg"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+################################################################################
+# Security — the KNOWN GAP, same as products/midaz/valkey
+#
+# transit_encryption_mode stays "preferred" and auth_token_enabled stays false,
+# not because production should run a plaintext unauthenticated cache, but
+# because the chart is not wired for either yet:
+#
+#   - REDIS_CA_CERT defaults to empty on every component and nothing distributes
+#     the ElastiCache CA bundle into the pod.
+#   - REDIS_PASSWORD is operator-provided and empty by default; no component
+#     sends AUTH before the first command on a plaintext connection.
+#
+# The auth token IS generated and stored at
+# plugin-br-pix-indirect-btg-prd-valkey/auth-token regardless, so flipping both
+# switches later is a tfvars change plus a chart change, not a rebuild. Until
+# then the cache is protected by the security group and the private subnets
+# alone. Documented, not forgotten.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

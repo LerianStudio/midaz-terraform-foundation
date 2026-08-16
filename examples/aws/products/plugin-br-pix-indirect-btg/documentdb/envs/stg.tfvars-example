@@ -1,0 +1,65 @@
+################################################################################
+# products/plugin-br-pix-indirect-btg/documentdb — stg
+#
+# Two instances on the smallest class: enough to exercise a real failover and the
+# reader endpoint, which a single-instance dev cluster cannot.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-indirect-btg"
+environment = "stg"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-stg-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-stg-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# TLS
+#
+# Off here, matching products/shared-resources/documentdb. See prd for why this
+# is a documented gap rather than an oversight.
+#
+# Note that documentdb_tls only reaches ONE chart component: MONGO_TLS exists in
+# templates/pix/configmap.yaml and nowhere else. inbound and outbound have no
+# such key, so enabling TLS on the cluster while those two still connect in
+# plaintext is a state the chart cannot express.
+################################################################################
+
+documentdb_tls = "disabled"
+
+################################################################################
+# Engine and sizing — db.t3.medium, two instances
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 2
+parameter_group_family = "docdb5.0"
+
+backup_retention_period = 7
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = false
+
+enabled_cloudwatch_logs_exports = ["audit"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}
