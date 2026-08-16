@@ -1,0 +1,95 @@
+################################################################################
+# products/plugin-br-payments/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, both observability paths enabled,
+# and a read replica.
+#
+# MULTI-AZ IS NOT OPTIONAL HERE. This single instance carries three things at
+# once — the payment records, the idempotency table (ADR-003) and the
+# transactional outbox (ADR-002). An AZ loss without a standby does not merely
+# stop reads: it stops the outbox dispatcher, so every asynchronous ledger
+# operation stalls, and it stops idempotency enforcement, which is the guarantee
+# that a retried payment is not a second payment.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-payments"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress can be flipped to false once the cluster
+# exists and check "eks_node_security_group_resolved" stops warning, which
+# narrows the instance to security-group-only ingress. Leave it true until then:
+# false plus an unresolved lookup means nothing can connect.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "plugin_br_payments"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Created as plugin-br-payments-prd-postgres-replica. helm_values then emits
+# POSTGRES_REPLICA_HOST / _PORT / _USER / _DB, which the chart ships commented
+# out (values.yaml) but the binary reads — the application resolves the replica
+# DSN when POSTGRES_REPLICA_HOST is set and the primary DSN when it is not.
+#
+# THE CQRS READ PATH IS WHAT THIS IS FOR, not the outbox. Keep writes, the
+# idempotency check and the outbox insert on the primary; they are one
+# transaction and a replica cannot serve them.
+#
+# Wire POSTGRES_REPLICA_PASSWORD from the SAME secret_name as the primary: a read
+# replica inherits the master credentials.
+################################################################################
+
+create_read_replica         = true
+read_replica_instance_class = "db.m7g.large"
+read_replica_multi_az       = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

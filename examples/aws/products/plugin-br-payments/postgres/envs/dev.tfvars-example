@@ -1,0 +1,93 @@
+################################################################################
+# products/plugin-br-payments/postgres — dev
+#
+# Absolute minimum sizing. db.t4g.micro with 20 GB is roughly USD 15/month, which
+# also makes this the cheapest complete product in the repository: PostgreSQL is
+# the ONLY datastore plugin-br-payments needs. No Redis (ADR-003), no broker
+# (ADR-002) — see ../README.md.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-payments"
+environment = "dev"
+
+# "dedicated" creates plugin-br-payments-dev-postgres. Switch to "shared" to
+# consume the instance owned by products/shared-resources/postgres instead; this
+# stack then creates nothing and every sizing value below is ignored.
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists. The EKS node security group is looked up on top
+# of that and resolves to nothing until the cluster is created —
+# check "eks_node_security_group_resolved" warns while that is the case.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+#
+# database_name matches the chart default, so RDS creates the database up front
+# and the chart's optional bootstrap Job has nothing left to do.
+#
+# username is the RDS MASTER. The chart's own POSTGRES_USER default is the
+# least-privilege role "plugin_br_payments"; creating that role is a DBA task (or
+# the bootstrap Job's, which expects DB_USER_ADMIN = postgres). helm_values emits
+# the master because it is the only role Terraform creates.
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "plugin_br_payments"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.t4g.micro (~USD 15/month)
+#
+# Performance Insights MUST stay false: AWS does not offer it on db.t4g.micro,
+# and the module rejects the combination with a plan-time precondition rather
+# than letting the apply fail five minutes in.
+################################################################################
+
+instance_class        = "db.t4g.micro"
+allocated_storage     = 20
+max_allocated_storage = 50
+multi_az              = false
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+performance_insights_enabled = false
+monitoring_interval          = 0
+create_monitoring_role       = false
+
+enabled_cloudwatch_logs_exports = ["postgresql"]
+
+# No replica in dev. Note this is NOT the midaz shape: with no replica,
+# helm_values omits the POSTGRES_REPLICA_* keys entirely and the application
+# falls back to the primary by itself. Do not set them by hand.
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}
