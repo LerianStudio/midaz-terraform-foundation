@@ -1,0 +1,81 @@
+################################################################################
+# products/plugin-br-bank-transfer/rabbitmq — prd
+#
+# OPTIONAL — see dev.tfvars-example for why this datastore is off by default on
+# both the chart and the application side.
+#
+# CLUSTER_MULTI_AZ on mq.m5.large. AmazonMQ spreads a RabbitMQ cluster across
+# three AZs from the subnets the module selects; there is no separate node count
+# to set.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-bank-transfer"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+
+# If you switch to mode = "shared", shared_broker_name is MANDATORY here. The
+# products/shared-resources/rabbitmq prd tfvars deploy the shared broker as
+# CLUSTER_MULTI_AZ, and the derived default assumes -single:
+#   shared_broker_name = "shared-prd-rabbitmq-cluster"
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Ports
+#
+# 5671 (AMQPS) and 443 (management HTTPS) are what AmazonMQ actually serves.
+#
+# Neither is emitted into helm_values: this chart has no port variables at all.
+# Its only connection setting is RABBITMQ_URL, which carries scheme, credentials,
+# host and port in one string — and which Terraform deliberately does not build,
+# because it would put a password in the state file. Use the amqp_endpoint
+# output (amqps://host:5671) as the credential-free half.
+#
+# Nothing in this chart calls the RabbitMQ management API, so
+# enable_console_ingress is for operators, not for a health check.
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — CLUSTER_MULTI_AZ on mq.m5.large
+#
+# AmazonMQ spreads a RabbitMQ cluster across three AZs from the subnets the
+# module selects; there is no separate node count to set.
+#
+# apply_immediately is false in production: a broker modification applied outside
+# the maintenance window is a reboot in the middle of the trading day.
+################################################################################
+
+broker_deployment_mode   = "CLUSTER_MULTI_AZ"
+append_deployment_suffix = true
+host_instance_type       = "mq.m5.large"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = false
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
