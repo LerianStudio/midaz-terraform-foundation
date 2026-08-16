@@ -1,0 +1,92 @@
+################################################################################
+# products/br-sfn/rabbitmq — dev
+#
+# There is no cheap AmazonMQ RabbitMQ broker. The engine only accepts the mq.m5.*
+# and mq.m7g.* families, so the floor is a SINGLE_INSTANCE mq.m7g.medium at
+# roughly USD 100/month (us-east-1 on-demand, ESTIMATE — price it against the AWS
+# Pricing Calculator before committing). mq.t3.micro, which this file used to
+# carry, is an ActiveMQ-ONLY type: it is cheap (~USD 20/month) but AmazonMQ
+# refuses it for RabbitMQ outright, in every deployment mode.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sfn"
+environment = "dev"
+
+# The LERIAN sharing mode. Not the AmazonMQ topology — that is
+# broker_deployment_mode below.
+mode = "dedicated"
+
+# If you switch to mode = "shared", also set shared_broker_name: the shared
+# broker's name carries a -single / -cluster suffix that the lookup cannot
+# discover. For dev the derived default already matches
+# ("shared-dev-rabbitmq-single"), so nothing extra is needed here.
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Ports
+#
+# 5671 (AMQPS) and 443 (management HTTPS) are what AmazonMQ actually serves;
+# there is no reason to change either. enable_console_ingress stays true because
+# operators reach the management console on 443. No component of this chart
+# calls the management API, so this can be tightened to false.
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — SINGLE_INSTANCE on mq.m7g.medium
+#
+# mq.m7g.medium is the smallest type the RabbitMQ engine offers, and it supports
+# CLUSTER_MULTI_AZ exactly as well as SINGLE_INSTANCE: for RabbitMQ the deployment
+# mode does not constrain the instance type at all. What dev saves by staying
+# SINGLE_INSTANCE is the node count — one broker instead of three.
+#
+# The module rejects any type outside mq.m5.* / mq.m7g.* at plan time, so an
+# ActiveMQ-only type such as mq.t3.micro now fails before the apply starts.
+################################################################################
+
+broker_deployment_mode   = "SINGLE_INSTANCE"
+append_deployment_suffix = true
+host_instance_type       = "mq.m7g.medium"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = true
+enable_general_logs        = true
+
+################################################################################
+# Helm handoff
+#
+# RABBITMQ_HOST is the raw AWS broker host, and there is no switch for it. The
+# broker's TLS certificate covers *.mq.{region}.on.aws, and AmazonMQ has no
+# plaintext AMQP listener, so an AMQPS client pointed at any private alias fails
+# hostname verification. That is why this repository publishes no CNAMEs at all.
+#
+# The consequence to plan around: replacing the broker changes RABBITMQ_HOST, so
+# it is a Helm values change. Values are generated from `terraform output` on
+# every deploy, so this is a re-run, not a hand edit.
+################################################################################
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}
