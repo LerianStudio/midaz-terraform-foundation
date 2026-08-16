@@ -1,0 +1,43 @@
+################################################################################
+# infra-base/vpc — dev
+#
+# Cheapest posture that still exercises every code path: ONE shared NAT Gateway,
+# short flow log retention, only the three data-path interface endpoints.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "lerian"
+environment = "dev"
+
+# Network
+vpc_cidr           = "10.50.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+# NAT: one gateway for all three private subnets. About USD 32/month instead of
+# USD 97, at the cost of a single point of failure that dev can absorb.
+enable_nat_gateway     = true
+single_nat_gateway     = true
+one_nat_gateway_per_az = false
+
+# DNS
+enable_dns_hostnames = true
+enable_dns_support   = true
+
+# Flow logs: kept on so the wiring is proven in dev, retention cut to a week.
+flow_logs_enabled        = true
+flow_logs_retention_days = 7
+
+# Endpoints
+vpc_endpoint_enabled        = true
+interface_endpoint_services = ["rds", "secretsmanager", "elasticache"]
+enable_s3_gateway_endpoint  = true
+
+# cluster_name is left unset on purpose: it derives to lerian-dev-eks, which is
+# what infra-base/eks creates. Only set it to point at a cluster created elsewhere.
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform"
+}

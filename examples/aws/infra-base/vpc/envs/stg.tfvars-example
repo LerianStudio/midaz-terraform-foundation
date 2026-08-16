@@ -1,0 +1,45 @@
+################################################################################
+# infra-base/vpc — stg
+#
+# Production topology at reduced cost: one NAT Gateway per AZ so failover
+# behaviour matches prd, but a shorter flow log window.
+#
+# Copy to stg.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+#
+# Note the DIFFERENT vpc_cidr. dev, stg and prd run in the same account and are
+# expected to be peered or attached to the same transit gateway eventually;
+# overlapping CIDRs make that impossible after the fact.
+################################################################################
+
+region      = "us-east-1"
+product     = "lerian"
+environment = "stg"
+
+# Network
+vpc_cidr           = "10.51.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+# NAT: one per AZ, same as prd, so an AZ failure drill in stg is meaningful.
+enable_nat_gateway     = true
+single_nat_gateway     = false
+one_nat_gateway_per_az = true
+
+# DNS
+enable_dns_hostnames = true
+enable_dns_support   = true
+
+# Flow logs
+flow_logs_enabled        = true
+flow_logs_retention_days = 30
+
+# Endpoints
+vpc_endpoint_enabled        = true
+interface_endpoint_services = ["rds", "secretsmanager", "elasticache"]
+enable_s3_gateway_endpoint  = true
+
+# cluster_name derives to lerian-stg-eks.
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform"
+}
