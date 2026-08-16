@@ -1,0 +1,78 @@
+################################################################################
+# products/plugin-bc-correios/s3 — prd
+#
+# Correios attachments — correspondence with the Brazilian Central Bank. This
+# is the only bucket of the three products where a customer-managed key is
+# worth the operational cost.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-bc-correios"
+environment = "prd"
+
+# eks_cluster_name is derived -> lerian-prd-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# The NAME half of service_account is confirmed from the chart:
+# bc-correios.serviceAccountName falls back to bc-correios.fullname, which is
+# nameOverride "bc-correios". The NAMESPACE half is whatever namespace the
+# release is installed into — check it before the first apply, because a mismatch
+# fails at runtime with AccessDenied rather than at apply time.
+#
+# Set oidc_provider_arn explicitly to skip both lookups.
+################################################################################
+
+irsa_enabled    = true
+service_account = "bc-correios:bc-correios"
+
+################################################################################
+# Buckets
+#
+# kms_key_arn is left NULL here on purpose, and that is a decision to revisit
+# rather than a default to accept.
+#
+# The module supports SSE-KMS and, when kms_key_arn is set, extends the bucket's
+# IAM policy with the matching kms:Encrypt/Decrypt/GenerateDataKey actions —
+# without them the application could write objects it can never read back. What
+# it does NOT do is create the key: this repository provisions no CMK for S3, so
+# supplying an ARN here means adopting a key created elsewhere, with its own
+# rotation and grant lifecycle.
+#
+# Set it once that key exists and its ARN is stable:
+#
+#   kms_key_arn = "arn:aws:kms:us-east-1:<account>:key/<key-id>"
+#
+# Until then the bucket is encrypted with SSE-S3 (AES256) and Bucket Keys, which
+# is the module default and is not "unencrypted".
+#
+# expiration_days = 1825 is five years. Confirm against the retention BACEN
+# actually requires for this correspondence before the first production write —
+# shortening it later does not bring back an expired object.
+################################################################################
+
+buckets = {
+  "bc-correios-attachments" = {
+    versioning_enabled = true
+    force_destroy      = false
+    kms_key_arn        = null
+
+    transition_ia_days         = 30
+    transition_glacier_days    = 180
+    expiration_days            = 1825
+    noncurrent_expiration_days = 90
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

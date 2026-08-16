@@ -1,0 +1,84 @@
+################################################################################
+# products/plugin-bc-correios/rabbitmq — stg
+#
+# CLUSTER_MULTI_AZ on mq.m5.large: the first topology that exercises a real
+# cluster. Three broker nodes instead of dev's one.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-bc-correios"
+environment = "stg"
+
+mode = "dedicated"
+
+# If you switch to mode = "shared", shared_broker_name is MANDATORY here:
+#   shared_broker_name = "shared-stg-rabbitmq-cluster"
+
+# vpc_name         is derived -> lerian-stg-vpc   (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-stg-eks   (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# READ THIS BEFORE APPLYING
+#
+# The plugin-bc-correios chart cannot talk to an AmazonMQ broker today. Its init
+# container waits on a HARDCODED port 5672:
+#
+#   wait_for_service "$RABBITMQ_HOST" "5672"        templates/deployment.yaml
+#
+# AmazonMQ for RabbitMQ serves AMQPS on 5671 only and publishes no plaintext
+# listener, so that check times out after 300 seconds and the pod never starts.
+# It needs a chart change — the literal has to become a configurable port.
+#
+# This stack is still correct and still worth applying (the broker, its security
+# group and its secret are real, and the shape is right), but do not schedule the
+# Helm cutover until the chart is fixed. Full detail in outputs.tf.
+################################################################################
+
+################################################################################
+# Ports
+#
+# 5671 (AMQPS) and 443 (management HTTPS) are what AmazonMQ actually serves.
+# Neither number reaches the chart: it has no RabbitMQ port variable at all. The
+# port travels inside RABBITMQ_URL, which is a Secret because it embeds the
+# password — see outputs.tf.
+#
+# enable_console_ingress stays true so global.externalRabbitmqDefinitions can run
+# its bootstrap Job against the management API (set its connection.protocol to
+# "https" and connection.port to 443 when pointing it at AmazonMQ).
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — CLUSTER_MULTI_AZ on mq.m5.large
+################################################################################
+
+broker_deployment_mode   = "CLUSTER_MULTI_AZ"
+append_deployment_suffix = true
+host_instance_type       = "mq.m5.large"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = false
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

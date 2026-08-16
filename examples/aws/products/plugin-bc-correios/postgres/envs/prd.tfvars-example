@@ -1,0 +1,91 @@
+################################################################################
+# products/plugin-bc-correios/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, both observability paths
+# enabled. plugin-bc-correios keeps correspondence state and its audit trail
+# here, so this is the instance that has to survive an AZ loss.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-bc-correios"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc   (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks   (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+#
+# NOTE ON THE MAJOR: the chart's bundled Bitnami subchart runs PostgreSQL 17.4,
+# while this root provisions 16 — the repository-wide default that midaz and the
+# shared tier also run. 16 is the conservative choice, not a verified
+# requirement. CONFIRMAR with the application team whether plugin-bc-correios
+# depends on anything that landed in 17; if it does, move engine_version, family
+# and major_engine_version together.
+#
+# database_name and username are UNDERSCORED, not the chart's hyphenated
+# defaults. RDS rejects hyphens in db_name and in the master username, and the
+# root validates both. helm_values emits these values as POSTGRES_NAME and
+# POSTGRES_USER so the chart follows RDS.
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "bc_correios"
+username             = "bc_correios"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Off. The plugin-bc-correios chart has NO read-only PostgreSQL variable — there
+# is one POSTGRES_HOST and nothing else — so a replica here would be provisioned
+# for operators and reporting, not for the application. Turn it on deliberately
+# if something outside the release needs it.
+################################################################################
+
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
