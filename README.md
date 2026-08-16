@@ -38,11 +38,19 @@ Before selecting instance types, review the official documentation for your chos
 .
 ├── examples/
     ├── aws/
-    │   ├── vpc/
-    │   ├── route53/
-    │   ├── rds/
-    │   ├── valkey/
-    │   └── eks/
+    │   ├── bootstrap/
+    │   ├── infra-base/                  # mandatory foundation
+    │   │   ├── vpc/
+    │   │   └── eks/
+    │   ├── products/
+    │   │   ├── shared-resources/        # OPTIONAL, opt-in per directory
+    │   │   │   ├── postgres/
+    │   │   │   ├── documentdb/
+    │   │   │   ├── valkey/
+    │   │   │   ├── rabbitmq/
+    │   │   │   └── msk/
+    │   │   └── midaz/
+    │   └── _modules/
     ├── gcp/
     │   ├── vpc/
     │   ├── cloud-dns/
@@ -60,10 +68,20 @@ Before selecting instance types, review the official documentation for your chos
 
 **Note**: Components must be created in the following order:
 1. VPC/Network
-2. DNS
+2. DNS (GCP and Azure only — the AWS examples have no DNS stack)
 3. Database
 4. Valkey
 5. Kubernetes Cluster
+
+On AWS the order is `bootstrap` → `infra-base/vpc` → `infra-base/eks` →
+`[products/shared-resources/* if you opted in]` → product stacks.
+
+`infra-base` is only what **every** deployment needs: the VPC and the EKS
+cluster. The shared datastore tier is **optional** and lives under
+`products/shared-resources/`, one root stack per service — apply a directory to
+enable that datastore, leave it unapplied to not have it. Shared datastores are
+resolved by resource name and Secrets Manager name, never through a private DNS
+zone — see `examples/aws/products/shared-resources/README.md`.
 
 ## Creating State Storage
 
@@ -250,7 +268,10 @@ After deploying the foundation infrastructure, you can install Midaz using Helm.
    helm repo update
    ```
 
-2. Create a values file (`values.yaml`) with your configuration:
+2. Create a values file (`values.yaml`) with your configuration. The hostnames
+   below are placeholders: on AWS, take every host and port from `terraform
+   output` on the datastore stack you deployed — those outputs carry the raw AWS
+   endpoints, which is what the TLS certificate of each service actually covers.
    ```yaml
    # Example values.yaml
    # Disable default dependencies
