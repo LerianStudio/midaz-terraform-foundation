@@ -1,0 +1,74 @@
+################################################################################
+# products/plugin-br-pix-direct-jd/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, both observability paths enabled.
+#
+# MULTI-AZ IS NOT OPTIONAL HERE. This instance backs a Pix rail: BACEN settlement
+# messages arrive whether or not the database is up, and a single-AZ instance
+# turns an AZ event into a reconciliation exercise.
+#
+# There is deliberately no read replica — the chart defines no variable to point
+# one at. See main.tf.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-direct-jd"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress can be flipped to false once the cluster
+# exists and check "eks_node_security_group_resolved" stops warning. Leave it
+# true until then: false plus an unresolved lookup means nothing can connect —
+# including the CronJob.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "pix"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
