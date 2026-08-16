@@ -1,0 +1,64 @@
+################################################################################
+# products/flowker/documentdb — dev
+#
+# INFERRED COMPOSITION. flowker has no readable Helm chart in this monorepo; the
+# evidence for this datastore is a vendored mongodb-16.4.0.tgz with no Chart.yaml
+# above it. The sizing below is the standard Lerian dev shape, not a value
+# validated against flowker's real workload. See ../../README.md.
+#
+# DocumentDB has no cheap corner: db.t3.medium is the SMALLEST class the service
+# offers, so one instance is roughly USD 60/month. mode = "shared" against
+# products/shared-resources/documentdb is the cheaper dev answer.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "flowker"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium, one instance (~USD 60/month)
+#
+# instance_class MUST be db.t3.medium or larger; the RDS burstable range below it
+# does not exist for DocumentDB and the module rejects it at plan time.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 1
+parameter_group_family = "docdb5.0"
+
+# TLS off. With no chart to read there is no way to confirm the client trusts the
+# Amazon RDS root; enabling it blind would turn a working connection into a
+# handshake failure.
+documentdb_tls = "disabled"
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+enabled_cloudwatch_logs_exports = []
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}
