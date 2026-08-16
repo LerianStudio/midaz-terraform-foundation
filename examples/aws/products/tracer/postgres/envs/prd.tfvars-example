@@ -1,0 +1,91 @@
+################################################################################
+# products/tracer/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, both observability paths
+# enabled.
+#
+# Copy to prd.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "tracer"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+# Both carry the "lerian" prefix on purpose: they belong to the infra-base
+# FOUNDATION, not to tracer — and not to the shared datastore tier either,
+# which carries "shared".
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists: it authorises the Type=private subnet CIDRs,
+# which only depend on infra-base/vpc. The EKS node security group is looked up
+# on top of that and simply resolves to nothing until the cluster is created —
+# check "eks_node_security_group_resolved" warns while that is the case.
+#
+# allow_vpc_cidr_ingress is the module's VPC CIDR FALLBACK, applied only when
+# both allow lists resolve empty. False here so an empty allow list trips the
+# module's check "ingress_is_reachable" instead of quietly widening to a CIDR
+# that includes the public subnets.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "tracer"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Off by default even in production: the tracer chart defines a single DB_HOST
+# and no replica variable of any kind, so a replica would be provisioned with
+# nothing able to address it. Turn it on only alongside a chart that grows one.
+################################################################################
+
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
