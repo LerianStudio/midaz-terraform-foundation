@@ -1,0 +1,84 @@
+################################################################################
+# products/plugin-br-pix-switch/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, an optional read replica, and
+# both observability paths enabled.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-switch"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress can be flipped to false once the cluster
+# exists and check "eks_node_security_group_resolved" stops warning, which
+# narrows the instance to security-group-only ingress. Leave it true until then:
+# false plus an unresolved lookup means nothing can connect.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "pixswitch"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Created as plugin-br-pix-switch-prd-postgres-replica and published as the
+# replica_endpoint output.
+#
+# IT IS NOT WIRED INTO helm_values: no component names a read-only DSN, and
+# <component>.secrets is a verbatim passthrough, so a replica DSN would be an
+# operator-composed value. database_url_templates covers the writer only. Leave
+# this false unless something consumes replica_endpoint.
+################################################################################
+
+create_read_replica         = false
+read_replica_instance_class = "db.m7g.large"
+read_replica_multi_az       = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

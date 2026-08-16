@@ -1,0 +1,66 @@
+################################################################################
+# products/plugin-br-pix-switch/documentdb — dev
+#
+# DocumentDB has no cheap corner: db.t3.medium is the SMALLEST class the service
+# offers (there is no micro and no small), so one instance is roughly USD
+# 60/month — more than the dev PostgreSQL and Valkey put together. If that is not
+# acceptable for an ephemeral environment, set mode = "shared" and consume the
+# cluster owned by products/shared-resources/documentdb instead of running a second one.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-switch"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium, one instance (~USD 60/month)
+#
+# instance_class MUST be db.t3.medium or larger. db.t4g.micro, db.t3.small and
+# the rest of the RDS burstable range simply do not exist for DocumentDB, and the
+# module rejects them with a plan-time precondition rather than five minutes into
+# the apply.
+#
+# One instance means no failover: an AZ loss takes the cluster down. That is the
+# correct trade in dev and the wrong one anywhere else.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 1
+parameter_group_family = "docdb5.0"
+
+# TLS off in dev, matching products/shared-resources/documentdb. See prd for why this is a
+# documented gap rather than an oversight.
+documentdb_tls = "disabled"
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+# Empty keeps the dev bill down. audit is what a regulator asks for in prd.
+enabled_cloudwatch_logs_exports = []
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

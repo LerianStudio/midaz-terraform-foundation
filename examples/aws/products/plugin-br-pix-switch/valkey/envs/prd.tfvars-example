@@ -1,0 +1,84 @@
+################################################################################
+# products/plugin-br-pix-switch/valkey — prd
+#
+# Three cache clusters across three AZs with automatic failover, daily snapshots
+# retained for a week.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-switch"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+################################################################################
+# Security — a DELIBERATE POSTURE, not an oversight
+#
+# transit_encryption_mode stays "preferred" and auth_token_enabled stays false,
+# matching the chart's own example: values-template.yaml:44 shows
+# VALKEY_URL as redis://default:<password>@valkey-host:6379/0 — plaintext scheme,
+# port 6379.
+#
+# Moving to TLS is POSSIBLE here, unlike in the other Lerian products: setting
+# transit_encryption_mode = "required" makes valkey_url_template emit rediss://
+# and the URL is the whole client configuration. It is a COORDINATED change,
+# because all THREE components that read VALKEY_URL — spi, dictHub and
+# dictHubVsync — must take the new URL in the same release, and the chart carries
+# no CA-bundle key if the client needs one.
+#
+# auth_token_enabled = false for the matching reason: over a plaintext connection
+# an AUTH token is on the wire. Enable it together with "required", not before.
+#
+# THE TOKEN MUST BE URL-SAFE IF ENABLED. It is interpolated into a URL; # % ? and
+# : all break one. See ../README.md.
+#
+# The auth token IS generated and stored at
+# plugin-br-pix-switch-prd-valkey/auth-token regardless, so flipping both
+# switches later is a tfvars change plus a values change, not a rebuild. Until
+# then the cache is protected by the security group and the private subnets
+# alone. Documented, not forgotten.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
