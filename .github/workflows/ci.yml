@@ -119,8 +119,46 @@ jobs:
       with:
         additional_args: "--exclude aws-ssm-secret-use-customer-key,aws-ssm-secret-use-customer-key,aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy,aws-mq-enable-audit-logging,aws-documentdb-encryption-customer-key"
 
+  # cmd/lerian-infra and pkg/infra, kept entirely separate from the Terraform job:
+  # they share a repository because the tool is coupled by design to this layout,
+  # not a toolchain.
+  go:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        # Read from go.mod so the version lives in exactly one place.
+        go-version-file: go.mod
+        cache: true
+
+    - name: Go Build
+      run: go build ./...
+
+    - name: Go Vet
+      run: go vet ./...
+
+    # gofmt exits 0 whether or not it found anything; the file list on stdout is
+    # the whole result, so it has to be turned into an exit code by hand.
+    - name: Go Format Check
+      run: |
+        set -euo pipefail
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "These files are not gofmt-formatted:" >&2
+          echo "$unformatted" >&2
+          exit 1
+        fi
+
+    - name: Go Test
+      run: go test ./... -cover
+
   release:
-    needs: validate  # Only run after validation succeeds
+    # Both jobs gate the release: a tag cut from a tree where cmd/lerian-infra
+    # does not compile ships a broken tool alongside working Terraform.
+    needs: [validate, go]  # Only run after validation succeeds
     runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'push'
     steps:

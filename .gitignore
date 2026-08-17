@@ -78,3 +78,18 @@ package-lock.json
 
 # Beads issue tracker (local only)
 .beads/
+
+# Go build artifacts of cmd/lerian-infra. Every pattern here is root-anchored or
+# extension-based on purpose: an unanchored `bin` would also swallow any bin/
+# directory that appears under examples/, and this repository's Terraform roots
+# are not off-limits to one.
+#
+# `go build ./cmd/lerian-infra` with no -o writes ./lerian-infra; `make build`
+# writes bin/lerian-infra. Both are listed because both are things people run.
+/bin/
+/lerian-infra
+
+# `go test -c` output, and the coverage files the Makefile and CI can produce.
+*.test
+coverage.out
+coverage.html
