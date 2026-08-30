@@ -119,9 +119,6 @@ jobs:
       with:
         additional_args: "--exclude aws-ssm-secret-use-customer-key,aws-ssm-secret-use-customer-key,aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy,aws-mq-enable-audit-logging,aws-documentdb-encryption-customer-key"
 
-  # cmd/lerian-infra and pkg/infra, kept entirely separate from the Terraform job:
-  # they share a repository because the tool is coupled by design to this layout,
-  # not a toolchain.
   release:
     needs: [validate]  # Only run after validation succeeds
     runs-on: blacksmith-4vcpu-ubuntu-2404

@@ -3,9 +3,9 @@
 Terraform templates for the infrastructure the Lerian products run on: the network, the
 Kubernetes cluster, and the datastores each product needs.
 
-On **AWS** the templates are driven by `lerian-infra`, a CLI that ships from this
-repository. On **GCP and Azure** they are driven by `./deploy-legacy.sh`, an
-interactive script over an earlier layout.
+On **AWS** the templates are driven by [`lerian-infra`](https://github.com/LerianStudio/lerian-infra-cli),
+a CLI released from its own repository. On **GCP and Azure** they are driven by
+`./deploy-legacy.sh`, an interactive script over an earlier layout.
 
 Pick your cloud and follow that section. Read [Important
 information](#important-information) before deploying anything to production.
@@ -65,20 +65,25 @@ calls it.
 
 ## 2. Get the templates
 
-Each version of the CLI declares which tag of these templates it drives, and fetches it itself:
+The CLI fetches them itself, at the tag you name:
 
 ```bash
-lerian-infra init --env dev --clone
+lerian-infra init --env dev --clone --templates-ref v1.6.0
 ```
 
-That clones the declared tag into `~/lerian/lerian-terraform-foundation`. If you are
-already inside a checkout of this repository there is nothing to do — the CLI finds it
-by walking up from the working directory.
+That clones it into `~/lerian/lerian-terraform-foundation`. `--templates-ref` has no
+default — which release of these templates to run is your choice, and the CLI pins
+nothing. Run `--clone` without it and the error lists the tags that exist, newest
+first. Each binary does refuse anything below the oldest templates it understands;
+`lerian-infra --version` prints that floor.
 
-After upgrading the binary, move the checkout to match:
+If you are already inside a checkout of this repository there is nothing to do — the
+CLI finds it by walking up from the working directory.
+
+To move an existing checkout to another tag:
 
 ```bash
-lerian-infra init --env dev --sync
+lerian-infra init --env dev --sync --templates-ref v1.7.0
 ```
 
 Your `environments.conf` and `envs/*.tfvars` survive that: they are gitignored, and a
@@ -267,8 +272,6 @@ Read this before a production deployment.
 ## Repository layout
 
 ```
-cmd/lerian-infra/          the CLI
-pkg/infra/                 the library behind it, importable
 deploy-legacy.sh           GCP and Azure, interactive
 examples/
   aws/                     v2 layout: environment-scoped, one state per stack
