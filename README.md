@@ -58,48 +58,20 @@ the products read false rather than claiming a parity that does not exist.
 
 ## 1. Install lerian-infra
 
-Requires `terraform` >= 1.10.0, `aws`, and `git` on your `PATH` — the CLI shells out to
-all three and checks for them before doing anything. You also need `kubectl` for the
-step after the cluster exists; the CLI never calls it.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/LerianStudio/lerian-terraform-foundation/main/scripts/install.sh | sh
-```
-
-The script detects your platform, downloads the matching release, **verifies it against
-the published checksums**, and installs into the first writable directory among
-`~/.local/bin`, `~/bin` and `/usr/local/bin`. It never calls `sudo`; if none of those is
-writable it tells you what to run. Nothing is installed if the checksum does not match.
-
-| Variable | Does |
-| --- | --- |
-| `LERIAN_INFRA_VERSION` | Install a specific tag instead of the latest, e.g. `v1.6.0`. |
-| `INSTALL_DIR` | Install somewhere else. |
-
-Prefer to do it by hand, or on Windows? Take the archive from the [releases
-page](https://github.com/LerianStudio/lerian-terraform-foundation/releases) and verify
-it yourself:
-
-```bash
-tar xzf lerian-infra_<version>_Darwin_arm64.tar.gz
-sha256sum -c checksums.txt --ignore-missing
-```
-
-Then check it runs:
-
-```bash
-lerian-infra --version
-```
+The CLI lives in [LerianStudio/lerian-infra-cli](https://github.com/LerianStudio/lerian-infra-cli);
+follow its README to install. Runtime dependencies: `terraform` >= 1.10.0, `aws`, and
+`git` on your `PATH`. `kubectl` is for the step after the cluster exists; the CLI never
+calls it.
 
 ## 2. Get the templates
 
-The binary and the templates ship from the same tag, and the CLI fetches its own:
+Each version of the CLI declares which tag of these templates it drives, and fetches it itself:
 
 ```bash
 lerian-infra init --env dev --clone
 ```
 
-That clones the matching tag into `~/lerian/lerian-terraform-foundation`. If you are
+That clones the declared tag into `~/lerian/lerian-terraform-foundation`. If you are
 already inside a checkout of this repository there is nothing to do — the CLI finds it
 by walking up from the working directory.
 

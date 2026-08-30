@@ -8,7 +8,7 @@ Email **security@lerian.studio** with:
 
 - what the vulnerability allows an attacker to do
 - the steps to reproduce it
-- the affected version (`lerian-infra --version`, or the git tag of the templates)
+- the affected git tag of the templates
 
 We acknowledge within two business days.
 
@@ -18,9 +18,8 @@ We acknowledge within two business days.
 | ------- | --------- |
 | 1.x     | yes       |
 
-The binary and the Terraform templates ship from the same tag, so a fix released as
-`v1.x.y` covers both halves. Report the version you are running rather than the
-version you cloned from, if they differ — the mismatch itself may be the problem.
+The CLI that drives these templates lives in `LerianStudio/lerian-infra-cli` and has
+its own SECURITY.md; report CLI issues there.
 
 ## What this repository does and does not hold
 
@@ -39,33 +38,5 @@ plainly.
 - **Terraform state.** `*.tfstate` and `terraform.tfstate.d/` are gitignored. State
   can contain values read back from resources.
 
-**What a saved plan can contain:** `lerian-infra` writes plan files under a run
-directory created with mode `0700`, because a saved plan may embed values read from
-state. Do not archive or attach them.
-
-## The account guard
-
-Three checks run before any Terraform command, and there is deliberately **no flag to
-bypass any of them**:
-
-1. the state bucket named in `backend/<env>.hcl` ends in `-<account_id>`
-2. the region in `environments.conf` matches the one in `backend/<env>.hcl`
-3. `aws sts get-caller-identity` resolves to the declared account
-
-`--auto-approve` does not skip them. Applying a production environment into a
-development account because the wrong profile was active is the worst mistake
-available here, and these checks are what make it impossible rather than unlikely.
-If an account genuinely changed, edit `environments.conf` — a reviewable, diffable
-act — instead of passing an override.
-
-## Verifying a release
-
-Every release publishes `checksums.txt` alongside the archives:
-
-```sh
-sha256sum -c checksums.txt --ignore-missing
-```
-
-The templates a binary drives are pinned to that binary's tag. `lerian-infra` prints
-which checkout and which tag it is reading on every run, so a mismatch is visible
-rather than silent.
+**Saved Terraform plans** can embed values read from state. Do not archive or attach
+them.
