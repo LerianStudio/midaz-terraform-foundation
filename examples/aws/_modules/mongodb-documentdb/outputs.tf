@@ -2,7 +2,7 @@
 # Uniform datastore contract outputs.
 # Names are identical across postgres-rds, mongodb-documentdb,
 # valkey-elasticache, rabbitmq-amazonmq and streaming-msk so that product roots
-# and deploy.sh can treat every datastore the same way.
+# and lerian-infra can treat every datastore the same way.
 #
 # `endpoint` is the RAW AWS writer endpoint in BOTH modes. There is no dns_name
 # output and no private CNAME anywhere in this repository: the DocumentDB server

@@ -127,7 +127,7 @@ output "ingress_ports" {
 }
 
 output "admin_username" {
-  description = "Administrator username configured on the broker. Read from the stack variable rather than from the module output, which is marked sensitive and would redact anything it is merged into."
+  description = "Administrator username configured on the broker. It is the ADMIN identity, consumed by the chart's bootstrap Job as RABBITMQ_ADMIN_USER — not the user the workload authenticates as, which the Job creates. Read from the stack variable rather than from the module output, which is marked sensitive and would redact anything it is merged into."
   value       = var.mq_admin_user
 }
 
@@ -138,8 +138,13 @@ output "admin_username" {
 # not a translation. Verified against chart 8.7.0 (appVersion 3.8.0),
 # templates/ledger/configmap.yaml.
 #
-# Everything below lands on the LEDGER deployment. The CRM deployment has no
-# RabbitMQ variables.
+# KEYED BY CHART COMPONENT: the chart gives each component its own ConfigMap, so the
+# destination is part of this output. Everything here lands on the LEDGER deployment
+# — the CRM deployment has no RabbitMQ variables, which is why there is no "crm"
+# entry rather than an empty one.
+#
+# The same shape is produced by pkg/infra/chartmap.go for shared mode. The two must
+# agree: TestMidazShapeIsTheSameInBothModes fails when they drift.
 #
 # THE TWO PORT VARIABLES ARE NAMED BACKWARDS IN THE CHART. This is not a typo
 # below — it is the chart's own convention, and the ledger init container reads
@@ -162,22 +167,25 @@ output "admin_username" {
 #     they are empty, so they must be wired before the first release.
 #   RABBITMQ_VHOST — AmazonMQ creates the default "/" vhost, but which vhost the
 #     ledger should use is a chart decision, and the chart default is "".
-#   RABBITMQ_CONSUMER_USER — the module creates ONE broker user. A separate
-#     consumer user is created on the broker itself, outside Terraform; until then
-#     the admin user below serves both roles.
+#   RABBITMQ_DEFAULT_USER / RABBITMQ_CONSUMER_USER — the module creates ONE broker
+#     user, the administrator. templates/bootstrap-rabbitmq.yaml connects as it and
+#     creates the two scoped users the workload uses, "transaction" and "consumer";
+#     "transaction" is the chart default for RABBITMQ_DEFAULT_USER. Emitting the
+#     administrator here overrode that default and produced
+#     "403 username or password not allowed" against a broker that was up.
 ################################################################################
 
 output "helm_values" {
-  description = "midaz chart env vars this broker fills in, ready to merge into ledger.configmap. Pair it with rabbitmq.enabled = false so the bundled subchart is not deployed alongside AmazonMQ. Note the chart has NO rabbitmq.external key — enabled = false is the whole switch."
+  description = "midaz chart env vars this broker fills in, keyed by CHART COMPONENT. Merge each entry into the matching <component>.configmap block. `crm` is absent because the CRM deployment has no RabbitMQ variable. Pair it with rabbitmq.enabled = false so the bundled subchart is not deployed alongside AmazonMQ. Note the chart has NO rabbitmq.external key — enabled = false is the whole switch."
   value = {
-    RABBITMQ_URI      = "amqps"
-    RABBITMQ_PROTOCOL = "https"
-    RABBITMQ_HOST     = module.rabbitmq.endpoint
+    ledger = {
+      RABBITMQ_URI      = "amqps"
+      RABBITMQ_PROTOCOL = "https"
+      RABBITMQ_HOST     = module.rabbitmq.endpoint
 
-    # Named backwards on purpose — see the header.
-    RABBITMQ_PORT_HOST = tostring(module.rabbitmq.port)
-    RABBITMQ_PORT_AMQP = tostring(var.console_port)
-
-    RABBITMQ_DEFAULT_USER = var.mq_admin_user
+      # Named backwards on purpose — see the header.
+      RABBITMQ_PORT_HOST = tostring(module.rabbitmq.port)
+      RABBITMQ_PORT_AMQP = tostring(var.console_port)
+    }
   }
 }

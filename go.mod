@@ -15,8 +15,11 @@ require (
 	github.com/hashicorp/terraform-json v0.27.2
 )
 
+require golang.org/x/term v0.45.0
+
 require (
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/zclconf/go-cty v1.18.1 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 )

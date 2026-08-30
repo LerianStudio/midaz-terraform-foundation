@@ -276,3 +276,153 @@ func stageNames(stages []Stage) []string {
 	}
 	return names
 }
+
+// A composite target is what a front end needs to show one progress bar for
+// "provision the base and this product". Dependency order stays ours.
+func TestResolveComposite(t *testing.T) {
+	layout := fakeRepo(t, map[string][]string{"midaz": {"postgres", "valkey"}})
+	catalog, err := Discover(layout)
+	if err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	names := stageNames
+
+	forward, err := Resolve(layout, catalog, "infra-base,midaz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"infra-base/vpc", "infra-base/eks", "midaz"}
+	if got := names(forward); !slicesEqual(got, want) {
+		t.Errorf("infra-base,midaz = %v, want %v", got, want)
+	}
+
+	// The safety property: the order the operator types cannot reorder the run.
+	reversed, err := Resolve(layout, catalog, "midaz,infra-base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(reversed); !slicesEqual(got, want) {
+		t.Errorf("midaz,infra-base = %v, want the same canonical order %v", got, want)
+	}
+
+	// Bootstrap is not implicit: it is only in the run when it was asked for.
+	for _, name := range names(forward) {
+		if name == "bootstrap" {
+			t.Error("a composite target must not pull in bootstrap")
+		}
+	}
+}
+
+func TestResolveCompositeRejectsAllAndUnknownParts(t *testing.T) {
+	layout := fakeRepo(t, map[string][]string{"midaz": {"postgres"}})
+	catalog, err := Discover(layout)
+	if err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+
+	if _, err := Resolve(layout, catalog, "all,midaz"); err == nil {
+		t.Error("'all' combined with another target should be refused")
+	}
+	_, err = Resolve(layout, catalog, "infra-base,nope")
+	if err == nil {
+		t.Fatal("an unknown part must fail the whole target")
+	}
+	if !strings.Contains(err.Error(), "nope") {
+		t.Errorf("the error should name the bad part, got: %v", err)
+	}
+}
+
+func slicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// The shared tier holds every engine that exists in AWS, not every engine a given
+// environment wants. An installation whose products never touch Kafka has no reason
+// to configure MSK — three brokers minimum, around US$105/month — and no reason for
+// "apply the shared tier" to refuse because of it.
+func TestSkipUnconfiguredSharedDropsEnginesWithoutTfvars(t *testing.T) {
+	layout := fakeRepo(t, map[string][]string{
+		"shared-resources": {"msk", "postgres", "valkey"},
+	})
+	catalog, err := Discover(layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, err := Resolve(layout, catalog, "shared-resources")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Only two of the three are configured for this environment.
+	for _, engine := range []string{"postgres", "valkey"} {
+		dir := filepath.Join(layout.ProductsDir(), "shared-resources", engine, "envs")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "dev.tfvars"), []byte("x = 1\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	kept, skipped := SkipUnconfiguredShared(stages, "dev")
+	if len(kept) != 1 {
+		t.Fatalf("expected one stage, got %d", len(kept))
+	}
+	// The survivors stay in one stage, which is what keeps them applying in parallel.
+	if len(kept[0].Units) != 2 {
+		t.Errorf("expected 2 configured units in one stage, got %d", len(kept[0].Units))
+	}
+	if len(skipped) != 1 || !strings.HasSuffix(skipped[0], "/msk") {
+		t.Errorf("msk should be reported as skipped, got %v", skipped)
+	}
+}
+
+// A product's datastores are all required by its chart, so a missing tfvars there
+// is a real omission and must keep blocking.
+func TestSkipUnconfiguredSharedLeavesProductsAlone(t *testing.T) {
+	layout := fakeRepo(t, map[string][]string{"midaz": {"postgres", "valkey"}})
+	catalog, err := Discover(layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, err := Resolve(layout, catalog, "midaz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// No tfvars anywhere, yet nothing is dropped: this must surface as NOT READY.
+	kept, skipped := SkipUnconfiguredShared(stages, "dev")
+	if len(skipped) != 0 {
+		t.Errorf("a product must not have engines skipped: %v", skipped)
+	}
+	if len(kept) != 1 || len(kept[0].Units) != 2 {
+		t.Errorf("the product stage must be untouched: %+v", kept)
+	}
+}
+
+func TestSkipUnconfiguredSharedDropsTheStageWhenNothingIsConfigured(t *testing.T) {
+	layout := fakeRepo(t, map[string][]string{"shared-resources": {"msk"}})
+	catalog, err := Discover(layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, err := Resolve(layout, catalog, "shared-resources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kept, skipped := SkipUnconfiguredShared(stages, "dev")
+	if len(kept) != 0 {
+		t.Errorf("an entirely unconfigured tier leaves no stage: %+v", kept)
+	}
+	if len(skipped) != 1 {
+		t.Errorf("and says what it dropped: %v", skipped)
+	}
+}

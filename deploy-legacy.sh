@@ -173,7 +173,7 @@ print_message "$YELLOW" "\nAvailable cloud providers:"
 print_message "$NC" "1) Azure"
 print_message "$NC" "2) GCP"
 print_message "$NC" ""
-print_message "$NC" "AWS is not here: it moved to the v2 layout. Use ./deploy.sh --help"
+print_message "$NC" "AWS is not here: it moved to the v2 layout. Use lerian-infra --help"
 
 read -r -p "Select a cloud provider (1-2): " provider_choice
 

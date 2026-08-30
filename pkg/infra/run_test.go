@@ -405,3 +405,163 @@ func TestFileLogsGivesEachUnitItsOwnFile(t *testing.T) {
 		t.Errorf("valkey log = %q, want the slug of the unit name", logs.Path(valkey))
 	}
 }
+
+// An apply of a saved plan carries the planned counts across, in the past tense.
+// Before this was fixed, every successful apply reported "no changes", because
+// terraform apply returns no counts of its own and the closure passed Changes{}.
+func TestDescribeChangesTense(t *testing.T) {
+	changes := Changes{Create: 42, Update: 1, Delete: 2}
+
+	if got, want := describeChanges(changes, time.Second, false),
+		"42 to add, 1 to change, 2 to destroy\t1s"; got != want {
+		t.Errorf("plan tense:\n got %q\nwant %q", got, want)
+	}
+	if got, want := describeChanges(changes, time.Second, true),
+		"42 added, 1 changed, 2 destroyed\t1s"; got != want {
+		t.Errorf("apply tense:\n got %q\nwant %q", got, want)
+	}
+	for _, applied := range []bool{false, true} {
+		if got, want := describeChanges(Changes{}, time.Second, applied),
+			"no changes\t1s"; got != want {
+			t.Errorf("empty (applied=%v):\n got %q\nwant %q", applied, got, want)
+		}
+	}
+}
+
+// On a first run, only the bottom stage can be planned: every layer above resolves
+// resources the layer below creates, and a plan sees only what AWS already has.
+// Reporting those as FAILED sent operators to debug configuration that was correct,
+// so the run classifies them and exits without an error.
+func TestPlanReportsLaterStagesAsBlockedNotFailed(t *testing.T) {
+	terraform := newFakeTerraform()
+	// The bottom stage has everything still to create — nothing exists yet.
+	terraform.changes["infra-base/vpc"] = Changes{Create: 42}
+	// Which is exactly why the stage above it cannot resolve its VPC.
+	terraform.failures["plan infra-base/eks"] = errors.New("no matching EC2 VPC found")
+
+	progress := &recordingProgress{}
+	runner := newTestRunner(t, terraform, progress, 4)
+
+	stages := []Stage{
+		{Name: "infra-base/vpc", Units: units("infra-base/vpc")},
+		{Name: "infra-base/eks", Units: units("infra-base/eks")},
+		{Name: "midaz", Units: units("products/midaz/postgres")},
+	}
+
+	results, err := runner.Execute(context.Background(), stages, ActionPlan, nil)
+	if err != nil {
+		t.Fatalf("a first run is not a failure: %v", err)
+	}
+	if !Blocked(results) {
+		t.Fatal("the run should report blocked stages")
+	}
+	if len(results) != 3 {
+		t.Fatalf("every stage should be accounted for, got %d", len(results))
+	}
+	if results[0].Blocked {
+		t.Error("the bottom stage planned fine and must not be blocked")
+	}
+	for _, i := range []int{1, 2} {
+		if !results[i].Blocked {
+			t.Errorf("stage %q should be blocked", results[i].Stage.Name)
+		}
+		if results[i].BlockedBy != "infra-base/vpc" {
+			t.Errorf("stage %q blocked by %q, want infra-base/vpc",
+				results[i].Stage.Name, results[i].BlockedBy)
+		}
+	}
+
+	// The stage after the blocked one must not be attempted: it would fail for the
+	// same reason and cost another init+plan to learn nothing.
+	for _, call := range terraform.phase("plan") {
+		if call == "products/midaz/postgres" {
+			t.Error("a stage below a blocked one must not be planned")
+		}
+	}
+	if !progress.sawStatus("products/midaz/postgres", StatusSkipped) {
+		t.Error("blocked units should be reported as skipped, not left pending")
+	}
+}
+
+// The classification must not swallow real failures. With nothing pending in the
+// stage below, a plan error is exactly what it looks like.
+func TestPlanFailureIsStillAFailureWhenNothingIsPending(t *testing.T) {
+	terraform := newFakeTerraform()
+	// The bottom stage is fully applied: no creates.
+	terraform.changes["infra-base/vpc"] = Changes{}
+	terraform.failures["plan infra-base/eks"] = errors.New("invalid instance type")
+
+	runner := newTestRunner(t, terraform, &recordingProgress{}, 4)
+	stages := []Stage{
+		{Name: "infra-base/vpc", Units: units("infra-base/vpc")},
+		{Name: "infra-base/eks", Units: units("infra-base/eks")},
+	}
+
+	results, err := runner.Execute(context.Background(), stages, ActionPlan, nil)
+	if err == nil {
+		t.Fatal("a genuine plan error must still fail the run")
+	}
+	if Blocked(results) {
+		t.Error("nothing was pending below, so this is not a blocked stage")
+	}
+}
+
+// Only plan classifies. An apply that fails has really failed: apply builds each
+// stage before planning the next, so a dependency is never merely planned.
+func TestApplyFailureIsNeverClassifiedAsBlocked(t *testing.T) {
+	terraform := newFakeTerraform()
+	terraform.changes["infra-base/vpc"] = Changes{Create: 42}
+	terraform.failures["plan infra-base/eks"] = errors.New("no matching EC2 VPC found")
+
+	runner := newTestRunner(t, terraform, &recordingProgress{}, 4)
+	stages := []Stage{
+		{Name: "infra-base/vpc", Units: units("infra-base/vpc")},
+		{Name: "infra-base/eks", Units: units("infra-base/eks")},
+	}
+
+	_, err := runner.Execute(context.Background(), stages, ActionApply, nil)
+	if err == nil {
+		t.Fatal("an apply that cannot plan a stage must fail")
+	}
+}
+
+// A zero count is left out. In a list of six stacks, "0 to change, 0 to destroy"
+// on every line is what the eye has to filter before finding the number that
+// matters, and the tail of zeros pushed the timing column off narrow terminals.
+func TestDescribeChangesOmitsZeroCounts(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		changes Changes
+		applied bool
+		want    string
+	}{
+		{"only creates", Changes{Create: 42}, false, "42 to add"},
+		{"only creates, applied", Changes{Create: 42}, true, "42 added"},
+		{"creates and destroys", Changes{Create: 3, Delete: 1}, false, "3 to add, 1 to destroy"},
+		{"only updates", Changes{Update: 2}, true, "2 changed"},
+		{"nothing", Changes{}, false, "no changes"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := summarizeChanges(test.changes, test.applied)
+			if got != test.want {
+				t.Errorf("got %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// The tab is a contract with the renderer: it splits the outcome from its timing
+// so the two can be column-aligned. Losing it silently would collapse the columns.
+func TestDescribeChangesSeparatesTimingWithATab(t *testing.T) {
+	got := describeChanges(Changes{Create: 42}, 16*time.Second, false)
+	text, elapsed, found := strings.Cut(got, "\t")
+	if !found {
+		t.Fatalf("no tab in %q", got)
+	}
+	if text != "42 to add" {
+		t.Errorf("text = %q", text)
+	}
+	if elapsed != "16s" {
+		t.Errorf("elapsed = %q", elapsed)
+	}
+}

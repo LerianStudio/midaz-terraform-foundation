@@ -19,6 +19,11 @@ import (
 const (
 	helmValuesOutput       = "helm_values"
 	helmSecretValuesOutput = "helm_secret_values"
+	// secretRefsOutput is computed here rather than read from a root: it is assembled
+	// from the uniform contract (secret_name, secret_arn, endpoint, port, username),
+	// so no root has to publish it and the twenty products with no Go chart mapping
+	// get it anyway.
+	secretRefsOutput = "secret_refs"
 )
 
 // ErrValuesConflict is returned when two services of the same product emit the
@@ -32,6 +37,14 @@ type Document struct {
 	// SecretValues is the merge of every service's helm_secret_values, and is nil
 	// when no service of the product exposes one.
 	SecretValues map[string]any
+	// SecretRefs points at the ADMIN credential of each datastore in AWS Secrets
+	// Manager, one entry per service, in the order the services were read.
+	//
+	// It holds references and never a credential: nothing here is worth redacting,
+	// and a consumer that prints the whole document leaks nothing. It is separate
+	// from SecretValues for exactly that reason — one carries values and the other
+	// addresses, and a consumer must never have to guess which it is holding.
+	SecretRefs []SecretRef
 }
 
 // CollectHelmValues reads the Helm handoff of every unit and merges it.
@@ -55,6 +68,30 @@ func CollectHelmValues(
 	env string,
 	progress Progress,
 ) (Document, error) {
+	return CollectHelmValuesFrom(ctx, terraform, Layout{}, units, backend, env, progress)
+}
+
+// CollectHelmValuesFrom is CollectHelmValues with a Layout, which is what lets it
+// read a product's values from the root that actually owns the datastore.
+//
+// In shared mode a product root creates nothing: every resource is count = 0 and
+// the root exists only to compute helm_values from a datastore somebody else owns.
+// Requiring an apply of it — an apply that builds no infrastructure — just to make
+// `terraform output` work was a cost with no purchase. When the product's mapping
+// has been ported to Go (see chartmap.go), the facts are read straight from the
+// tier's state and the product root is not touched at all.
+//
+// A zero Layout disables that redirection, so the old behaviour is one call away
+// and callers that have no Layout keep working.
+func CollectHelmValuesFrom(
+	ctx context.Context,
+	terraform Terraform,
+	layout Layout,
+	units []Unit,
+	backend Backend,
+	env string,
+	progress Progress,
+) (Document, error) {
 	report := progressOr(progress)
 
 	names := make([]string, 0, len(units))
@@ -66,14 +103,29 @@ func CollectHelmValues(
 	document := Document{Values: map[string]any{}}
 	secrets := map[string]any{}
 
-	for _, unit := range units {
-		report.Update(unit.Name, StatusRunning, "lendo os outputs...", "")
+	for _, declared := range units {
+		unit := declared
+		report.Update(declared.Name, StatusRunning, "reading the outputs...", "")
+
+		// Redirect to the owner when this product delegates to the shared tier and
+		// its mapping lives in Go. Decided by reading the product's own tfvars, the
+		// same file the apply would read, so the two cannot disagree.
+		mapped := false
+		product, engine := ProductOf(declared), EngineOf(declared)
+		if layout.Root != "" && product != "" && product != sharedResources &&
+			HasChartMapper(product, engine) {
+			mode, err := readDatastoreMode(declared, env)
+			if err == nil && mode == SharedMode {
+				unit = SharedUnitFor(layout, declared)
+				mapped = true
+			}
+		}
 
 		// Read-only, but still an init: the state lives in S3 and the working
 		// directory may hold another environment's backend.
 		if err := terraform.Init(ctx, unit, initOptionsFor(unit, backend, env)); err != nil {
 			report.Update(unit.Name, StatusFail, err.Error(),
-				"Confirme que este stack já foi aplicado neste ambiente.")
+				"Confirm this stack has been applied in this environment.")
 			report.Finish(true)
 			return Document{}, err
 		}
@@ -81,25 +133,49 @@ func CollectHelmValues(
 		outputs, err := terraform.Output(ctx, unit)
 		if err != nil {
 			report.Update(unit.Name, StatusFail, err.Error(),
-				"Confirme que este stack já foi aplicado neste ambiente.")
+				"Confirm this stack has been applied in this environment.")
 			report.Finish(true)
 			return Document{}, err
 		}
 
-		values, hasValues, err := decodeObject(unit, helmValuesOutput, outputs)
-		if err != nil {
-			report.Update(unit.Name, StatusFail, err.Error(), "")
-			report.Finish(true)
-			return Document{}, err
+		// The admin credential reference is assembled for every datastore, whether or
+		// not this product has a Go chart mapping: it is built from the uniform
+		// contract, which every root exposes. In shared mode `unit` is already the
+		// tier, so the reference names the tier's secret without the caller knowing
+		// the tier exists.
+		if ref, ok := SecretRefFor(EngineOf(unit), ReadFacts(EngineOf(unit), outputs)); ok {
+			document.SecretRefs = append(document.SecretRefs, ref)
+		}
+
+		var (
+			values    map[string]any
+			hasValues bool
+		)
+		if mapped {
+			// Built here rather than read: the tier's helm_values, if it has one, is
+			// the tier's own shape and knows nothing of this product's chart.
+			built, ok := MapChartValues(product, engine, ReadFacts(engine, outputs))
+			if !ok {
+				return Document{}, fmt.Errorf("infra: no chart mapping for %s/%s", product, engine)
+			}
+			values = built
+			hasValues = len(values) > 0
+		} else {
+			values, hasValues, err = decodeObject(unit, helmValuesOutput, outputs)
+			if err != nil {
+				report.Update(declared.Name, StatusFail, err.Error(), "")
+				report.Finish(true)
+				return Document{}, err
+			}
 		}
 		if !hasValues {
-			report.Update(unit.Name, StatusWarn,
-				fmt.Sprintf("%s não expõe o output %s — ignorado.", unit.Name, helmValuesOutput),
-				"Se este serviço deveria contribuir com chaves do chart, adicione o output ao root.")
+			report.Update(declared.Name, StatusWarn,
+				fmt.Sprintf("%s exposes no %s output — ignored.", unit.Name, helmValuesOutput),
+				"If this service should contribute chart keys, add the output to its root.")
 		} else if err := mergeInto(document.Values, values, nil); err != nil {
-			wrapped := conflictError(unit, helmValuesOutput, err)
-			report.Update(unit.Name, StatusFail, wrapped.Error(),
-				"Corrija os outputs, ou agregue os serviços separadamente.")
+			wrapped := conflictError(declared, helmValuesOutput, err)
+			report.Update(declared.Name, StatusFail, wrapped.Error(),
+				"Fix the outputs, or aggregate the services separately.")
 			report.Finish(true)
 			return Document{}, wrapped
 		}
@@ -120,8 +196,11 @@ func CollectHelmValues(
 		}
 
 		if hasValues {
-			report.Update(unit.Name, StatusOK,
-				fmt.Sprintf("%d chave(s).", len(values)), "")
+			detail := fmt.Sprintf("%d key(s).", len(values))
+			if mapped {
+				detail = fmt.Sprintf("%d key(s), from %s.", len(values), unit.Name)
+			}
+			report.Update(declared.Name, StatusOK, detail, "")
 		}
 	}
 
@@ -215,7 +294,43 @@ func (d Document) envelope() map[string]any {
 	if len(d.SecretValues) > 0 {
 		envelope[helmSecretValuesOutput] = d.SecretValues
 	}
+	if refs := d.secretRefsByEngine(); len(refs) > 0 {
+		envelope[secretRefsOutput] = refs
+	}
 	return envelope
+}
+
+// secretRefsByEngine renders SecretRefs for the JSON and YAML envelopes.
+//
+// Keyed by engine rather than emitted as a list because both renderers walk
+// map[string]any, and because one product has at most one datastore per engine — so
+// the engine is already the natural identifier, and a consumer can look up
+// "postgres" instead of scanning.
+//
+// Empty fields are omitted rather than rendered as "": valkey has no admin username
+// at all, and an empty string there reads as a user whose name happens to be blank.
+func (d Document) secretRefsByEngine() map[string]any {
+	if len(d.SecretRefs) == 0 {
+		return nil
+	}
+	byEngine := make(map[string]any, len(d.SecretRefs))
+	for _, ref := range d.SecretRefs {
+		entry := map[string]any{}
+		for key, value := range map[string]string{
+			"secret_name":    ref.SecretName,
+			"secret_arn":     ref.SecretARN,
+			"property":       ref.Property,
+			"admin_username": ref.AdminUsername,
+			"host":           ref.Host,
+			"port":           ref.Port,
+		} {
+			if value != "" {
+				entry[key] = value
+			}
+		}
+		byEngine[ref.Engine] = entry
+	}
+	return byEngine
 }
 
 // bareYAMLKey matches the keys that need no quoting. Dots are in the set on

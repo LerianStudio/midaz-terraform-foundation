@@ -164,7 +164,7 @@ output "subnet_group_name" {
 ################################################################################
 
 output "helm_values" {
-  description = "Chart env vars this datastore fills in (midaz naming — see the header), ready to merge into ledger.configmap. Pair it with valkey.enabled = false and valkey.external = true so the bundled Bitnami subchart is not deployed alongside ElastiCache."
+  description = "Chart env vars this datastore fills in (midaz naming — see the header), ready to merge into ledger.configmap. Pair it with valkey.enabled = false and valkey.external = true so the bundled Bitnami subchart is not deployed alongside ElastiCache. NOTE: this map is FLAT and midaz-named, and it is operator reference only — the tier serves several products and cannot know any one chart's components. Programmatic consumers must not read it: `lerian-infra --action helm-values` builds each product's values from this root's FACTS (endpoint, port, username, secret_name) via pkg/infra/chartmap.go, keyed by that product's chart components."
   value = {
     REDIS_HOST = local.redis_host_port
     REDIS_TLS  = local.redis_tls_required ? "true" : "false"

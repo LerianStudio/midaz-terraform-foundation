@@ -60,7 +60,7 @@ variable "subnet_tag_type" {
 variable "cluster_version" {
   description = "Kubernetes <major>.<minor> version for the EKS control plane."
   type        = string
-  default     = "1.32"
+  default     = "1.36"
 }
 
 variable "cluster_endpoint_private_access" {
@@ -137,11 +137,11 @@ variable "node_groups" {
 
   type = map(object({
     instance_types = optional(list(string), ["c7g.large"])
-    ami_type       = optional(string, "AL2_ARM_64")
+    ami_type       = optional(string, "AL2023_ARM_64_STANDARD")
     capacity_type  = optional(string, "ON_DEMAND")
-    min_size       = optional(number, 1)
-    max_size       = optional(number, 3)
-    desired_size   = optional(number, 2)
+    min_size       = optional(number, 5)
+    max_size       = optional(number, 15)
+    desired_size   = optional(number, 5)
     disk_size      = optional(number)
     labels         = optional(map(string), {})
     taints = optional(map(object({
@@ -180,6 +180,13 @@ variable "node_groups" {
   validation {
     condition = alltrue([
       for k, v in var.node_groups : contains([
+        // AL2_* is kept accepted for clusters still on 1.32 or older. Amazon
+        // Linux 2 has no EKS-optimized AMI from 1.33 onward, and asking for one
+        // fails deep inside the module with an SSM ParameterNotFound that names
+        // a path, not the cause:
+        //   reading SSM Parameter (/aws/service/eks/optimized-ami/1.36/
+        //   amazon-linux-2/recommended/release_version): couldn't find resource
+        // The precondition below turns that into a sentence.
         "AL2_x86_64", "AL2_x86_64_GPU", "AL2_ARM_64",
         "AL2023_x86_64_STANDARD", "AL2023_ARM_64_STANDARD",
         "AL2023_x86_64_NVIDIA", "AL2023_x86_64_NEURON",

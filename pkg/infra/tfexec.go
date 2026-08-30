@@ -35,6 +35,12 @@ type CLI struct {
 	// what a caller that only wants the plan counts wants.
 	Logs func(unit Unit) io.Writer
 
+	// Credentials, when resolved, are exported to every Terraform process instead of
+	// AWS_PROFILE. Resolving once and sharing the result is what keeps a parallel
+	// stage from having four processes refresh the same SSO token at the same time
+	// and race over its cache file. See credentials.go.
+	Credentials Credentials
+
 	// Profile is exported as AWS_PROFILE for every Terraform process. Empty leaves
 	// the ambient credentials alone, which is the CI shape.
 	Profile string
@@ -114,7 +120,16 @@ func (c *CLI) terraform(unit Unit) (*tfexec.Terraform, error) {
 			}
 		}
 		c.envCache = tfexec.CleanEnv(environment)
-		if c.Profile != "" {
+
+		// Concrete credentials win over the profile, and the profile is then left
+		// out entirely: a child that saw both would resolve the profile and go
+		// straight back to the SSO cache this exists to avoid.
+		if resolved := c.Credentials.Environment(); resolved != nil {
+			for key, value := range resolved {
+				c.envCache[key] = value
+			}
+			delete(c.envCache, "AWS_PROFILE")
+		} else if c.Profile != "" {
 			c.envCache["AWS_PROFILE"] = c.Profile
 		}
 	}

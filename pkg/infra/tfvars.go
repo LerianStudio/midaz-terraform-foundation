@@ -59,16 +59,16 @@ func checkUnitReadiness(unit Unit, env string) Readiness {
 		if _, exampleErr := os.Stat(example); exampleErr == nil {
 			return Readiness{
 				Unit:    unit,
-				Problem: fmt.Sprintf("falta envs/%s.tfvars", env),
-				Remediation: fmt.Sprintf("*.tfvars é gitignored e *.tfvars-example é o template versionado:\n"+
+				Problem: fmt.Sprintf("missing envs/%s.tfvars", env),
+				Remediation: fmt.Sprintf("*.tfvars is gitignored and *.tfvars-example is the committed template:\n"+
 					"  cp %s \\\n     %s\n  $EDITOR %s", example, path, path),
 			}
 		}
 		return Readiness{
 			Unit:    unit,
-			Problem: fmt.Sprintf("falta envs/%s.tfvars e não há %s.tfvars-example", env, env),
-			Remediation: fmt.Sprintf("Este stack pode ainda não suportar o ambiente '%s'. "+
-				"Veja o que existe em %s.", env, filepath.Join(unit.Dir, "envs")),
+			Problem: fmt.Sprintf("missing envs/%s.tfvars, and there is no %s.tfvars-example either", env, env),
+			Remediation: fmt.Sprintf("This stack may not support the '%s' environment yet. "+
+				"See what exists in %s.", env, filepath.Join(unit.Dir, "envs")),
 		}
 	}
 
@@ -76,16 +76,16 @@ func checkUnitReadiness(unit Unit, env string) Readiness {
 	if err != nil {
 		return Readiness{
 			Unit:        unit,
-			Problem:     fmt.Sprintf("não consegui ler envs/%s.tfvars: %v", env, err),
-			Remediation: "Confirme as permissões do arquivo.",
+			Problem:     fmt.Sprintf("cannot read envs/%s.tfvars: %v", env, err),
+			Remediation: "Check the permissions of the file.",
 		}
 	}
 	if len(lines) > 0 {
 		return Readiness{
 			Unit: unit,
-			Problem: fmt.Sprintf("placeholder(s) não resolvido(s) em %d linha(s) de envs/%s.tfvars",
+			Problem: fmt.Sprintf("unresolved placeholder(s) on %d line(s) of envs/%s.tfvars",
 				len(lines), env),
-			Remediation: "Substitua cada token <...> por um valor real antes de aplicar:\n  " +
+			Remediation: "Replace every <...> token with a real value before applying:\n  " +
 				strings.Join(lines, "\n  "),
 		}
 	}

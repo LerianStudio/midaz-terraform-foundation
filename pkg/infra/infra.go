@@ -2,9 +2,9 @@
 // resolves what to run, refuses to run it against the wrong AWS account, and walks
 // the roots in dependency order.
 //
-// It is the Go port of this repository's deploy.sh. It does NOT replace that
-// script yet: deploy.sh stays the supported path until the CLI has been exercised
-// against real AWS, and only then does the script go away.
+// It began as the Go port of this repository's deploy.sh, which it has replaced;
+// the script's flag surface was kept so that anything written against it keeps
+// working.
 //
 // It exists as a package rather than a program because two faces need it:
 // cmd/lerian-infra, which is the terminal face, and the wizard

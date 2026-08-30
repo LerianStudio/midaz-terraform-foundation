@@ -16,7 +16,7 @@ terraform.tfstate.d/
 # examples/aws/backend/README.md and .gitkeep remain tracked.
 examples/aws/backend/*.hcl
 
-# Environment -> AWS account mapping consumed by deploy.sh. Carries the client's
+# Environment -> AWS account mapping, written by lerian-infra init. Carries the client's
 # account ids and profile names, for the same reason the backend config above is
 # excluded. examples/aws/environments.conf.example remains tracked and is the
 # template operators copy.
@@ -93,3 +93,7 @@ package-lock.json
 *.test
 coverage.out
 coverage.html
+
+# goreleaser build output. Holds compiled binaries and archives, which are release
+# artifacts published to GitHub rather than repository content.
+dist/

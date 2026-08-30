@@ -1,17 +1,18 @@
 ################################################################################
 # environments.conf — environment -> AWS account mapping
 #
-# Copy to `environments.conf` (gitignored, it carries account ids) and edit:
+# `lerian-infra init --env <env>` writes environments.conf for you, from this file.
+# It is gitignored because it carries account ids. Copying it by hand still works:
 #
 #   cp examples/aws/environments.conf.example examples/aws/environments.conf
 #
-# `deploy.sh` reads this file to answer three questions before it runs anything:
+# lerian-infra reads it to answer three questions before it runs anything:
 #
 #   1. Which AWS credentials should this environment use?   -> profile
 #   2. Which account MUST those credentials resolve to?     -> account_id
 #   3. Which region is this environment in?                 -> region
 #
-# Question 2 is the important one. The script calls
+# Question 2 is the important one. lerian-infra calls
 # `aws sts get-caller-identity` and refuses to continue when the account it gets
 # back is not the one declared here. Applying prd into a dev account because the
 # wrong profile was active is the worst mistake available in this repository, and

@@ -105,7 +105,7 @@ output "database_name" {
 }
 
 output "username" {
-  description = "Master username. Feeds DB_ONBOARDING_USER / DB_TRANSACTION_USER unless the chart is given per-database roles created outside Terraform."
+  description = "Master username. It is the ADMIN identity, consumed by the chart's bootstrap Job as DB_USER_ADMIN — not the user the workload authenticates as, which the Job creates. See helm_values for why no DB_*_USER key is emitted."
   value       = module.postgres.username
 }
 
@@ -131,9 +131,15 @@ output "subnet_group_name" {
 # not a translation. Verified against chart 8.7.0 (appVersion 3.8.0),
 # templates/ledger/configmap.yaml.
 #
-# Everything below lands on the LEDGER deployment. There is no separate
+# KEYED BY CHART COMPONENT. The chart declares
+# lerian.studio/chart-type: multi-component and gives each component its own
+# ConfigMap, so the destination is part of this output rather than a note in this
+# comment. Everything here lands on the LEDGER deployment: there is no separate
 # onboarding and transaction deployment — the ledger container is unified and
 # carries both sets of variables, pointed at the same instance.
+#
+# The same shape is produced by pkg/infra/chartmap.go for shared mode. The two must
+# agree: TestMidazShapeIsTheSameInBothModes fails when they drift.
 #
 # Values are strings because they end up in a ConfigMap, which has no other type.
 #
@@ -142,26 +148,37 @@ output "subnet_group_name" {
 #     "onboarding" and "transaction"; RDS creates a single initial database and
 #     the second is created by the application migration, so Terraform does not
 #     know these and must not guess them.
-#   DB_*_PASSWORD — read from secret_name by External Secrets, never an output.
+#
+# NO *_USER KEY IS EMITTED, and that is deliberate. The username above is the
+# MASTER, and the workload does not authenticate as the master: the chart ships
+# bootstrap Jobs (templates/bootstrap-postgres.yaml, bootstrap-mongodb.yaml,
+# bootstrap-rabbitmq.yaml) that connect as the master, create a scoped user, and
+# exit. The chart's own defaults for these keys are those scoped users — "midaz"
+# for postgres and mongo, "transaction" for rabbitmq — so emitting the master here
+# overrode a correct default with an identity whose password the release does not
+# have. The master travels instead as the admin credential of the bootstrap Job,
+# via `secret_name` below.
+#
+# NOT emitted here either, on purpose:
+#   DB_*_PASSWORD — the application's password, chosen by whoever runs the bootstrap
+#     Job. It is not in state and not in this secret, which holds the master.
 #   DB_*_SSLMODE  — a client policy decision, not an infrastructure fact. RDS
 #     accepts TLS on every instance; the chart default is "disable".
 ################################################################################
 
 output "helm_values" {
-  description = "midaz chart env vars this datastore fills in, ready to merge into ledger.configmap. Pair it with postgresql.enabled = false (and postgresql.external = true) so the bundled Bitnami subchart is not deployed alongside RDS."
+  description = "midaz chart env vars this datastore fills in, keyed by CHART COMPONENT. Merge each entry into the matching <component>.configmap block. `crm` is absent because the CRM deployment reads no DB_* variable. Pair it with postgresql.enabled = false (and postgresql.external = true) so the bundled Bitnami subchart is not deployed alongside RDS."
   value = {
-    DB_ONBOARDING_HOST  = module.postgres.endpoint
-    DB_ONBOARDING_PORT  = tostring(module.postgres.port)
-    DB_ONBOARDING_USER  = module.postgres.username
-    DB_TRANSACTION_HOST = module.postgres.endpoint
-    DB_TRANSACTION_PORT = tostring(module.postgres.port)
-    DB_TRANSACTION_USER = module.postgres.username
+    ledger = {
+      DB_ONBOARDING_HOST  = module.postgres.endpoint
+      DB_ONBOARDING_PORT  = tostring(module.postgres.port)
+      DB_TRANSACTION_HOST = module.postgres.endpoint
+      DB_TRANSACTION_PORT = tostring(module.postgres.port)
 
-    DB_ONBOARDING_REPLICA_HOST  = local.helm_replica_host
-    DB_ONBOARDING_REPLICA_PORT  = tostring(module.postgres.port)
-    DB_ONBOARDING_REPLICA_USER  = module.postgres.username
-    DB_TRANSACTION_REPLICA_HOST = local.helm_replica_host
-    DB_TRANSACTION_REPLICA_PORT = tostring(module.postgres.port)
-    DB_TRANSACTION_REPLICA_USER = module.postgres.username
+      DB_ONBOARDING_REPLICA_HOST  = local.helm_replica_host
+      DB_ONBOARDING_REPLICA_PORT  = tostring(module.postgres.port)
+      DB_TRANSACTION_REPLICA_HOST = local.helm_replica_host
+      DB_TRANSACTION_REPLICA_PORT = tostring(module.postgres.port)
+    }
   }
 }

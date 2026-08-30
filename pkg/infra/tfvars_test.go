@@ -56,7 +56,7 @@ func TestCheckReadinessSaysSoWhenThereIsNoTemplateEither(t *testing.T) {
 	if report[0].Ready() {
 		t.Fatal("reported ready with no prd.tfvars at all")
 	}
-	if !strings.Contains(report[0].Problem, "não há prd.tfvars-example") {
+	if !strings.Contains(report[0].Problem, "no prd.tfvars-example") {
 		t.Errorf("problem = %q, want it to say the stack may not support prd", report[0].Problem)
 	}
 }
@@ -77,7 +77,7 @@ instance_class = "db.t4g.medium"
 	if report[0].Ready() {
 		t.Fatal("a file full of placeholders was reported as ready")
 	}
-	if !strings.Contains(report[0].Problem, "2 linha(s)") {
+	if !strings.Contains(report[0].Problem, "2 line(s)") {
 		t.Errorf("problem = %q, want exactly the two non-comment placeholder lines", report[0].Problem)
 	}
 	// Naming the lines is what turns the report into something to act on.

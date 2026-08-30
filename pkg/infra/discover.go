@@ -96,6 +96,14 @@ func (c Catalog) ProductNames() []string {
 // vpc is a hard prerequisite for everything below it, because every datastore
 // resolves the VPC and its Type=database subnets by tag.
 func Resolve(layout Layout, catalog Catalog, target string) ([]Stage, error) {
+	// A comma-separated target is the shape a front end needs: "provision the base
+	// and this product" is one operation with one progress bar, not two runs the
+	// operator has to sequence correctly. Dependency order is still ours, so the
+	// parts are reordered canonically — "midaz,infra-base" and "infra-base,midaz"
+	// resolve identically, and neither can put a datastore before its VPC.
+	if strings.Contains(target, ",") {
+		return resolveComposite(layout, catalog, target)
+	}
 	unit := func(dir string) Unit {
 		return Unit{Dir: dir, Name: layout.rel(dir), Bootstrap: dir == layout.BootstrapDir()}
 	}
@@ -167,6 +175,78 @@ func Resolve(layout Layout, catalog Catalog, target string) ([]Stage, error) {
 		target, product, service, strings.Join(services, ", "))
 }
 
+// resolveComposite resolves each comma-separated part and returns their union in
+// canonical dependency order.
+//
+// The order comes from resolving "all" and filtering it, rather than from the
+// order the parts were typed. That is the whole safety property: no spelling of a
+// composite target can produce a run that applies a product before infra-base.
+func resolveComposite(layout Layout, catalog Catalog, target string) ([]Stage, error) {
+	wanted := map[string]bool{}
+	var parts []string
+	for _, part := range strings.Split(target, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if part == "all" {
+			return nil, fmt.Errorf("infra: 'all' cannot be combined with another target\n"+
+				"'all' already includes everything. Use it on its own, or list the parts:\n"+
+				"  --target %s", strings.ReplaceAll(target, "all,", ""))
+		}
+		parts = append(parts, part)
+	}
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("infra: --target is empty")
+	}
+	if len(parts) == 1 {
+		return Resolve(layout, catalog, parts[0])
+	}
+
+	// Resolve each part for its side effect: it validates the name and produces the
+	// stages that part contributes. Collect their names.
+	for _, part := range parts {
+		stages, err := Resolve(layout, catalog, part)
+		if err != nil {
+			return nil, err
+		}
+		for _, stage := range stages {
+			wanted[stage.Name] = true
+		}
+	}
+
+	everything, err := Resolve(layout, catalog, "all")
+	if err != nil {
+		return nil, err
+	}
+
+	// A single-service target names a stage that "all" does not contain, because
+	// "all" groups a product's services into one stage. Keep those verbatim, after
+	// the canonical stages they cannot precede.
+	ordered := make([]Stage, 0, len(wanted))
+	for _, stage := range everything {
+		if wanted[stage.Name] {
+			ordered = append(ordered, stage)
+			delete(wanted, stage.Name)
+		}
+	}
+	if len(wanted) > 0 {
+		for _, part := range parts {
+			stages, err := Resolve(layout, catalog, part)
+			if err != nil {
+				return nil, err
+			}
+			for _, stage := range stages {
+				if wanted[stage.Name] {
+					ordered = append(ordered, stage)
+					delete(wanted, stage.Name)
+				}
+			}
+		}
+	}
+	return ordered, nil
+}
+
 // ForDestroy walks the dependency graph backwards and takes bootstrap out of it.
 //
 // The bucket and the lock table carry prevent_destroy = true, so a destroy of
@@ -208,4 +288,41 @@ func ForDestroy(stages []Stage, target string) ([]Stage, []BackendWarning, error
 		reversed = append(reversed, kept[i])
 	}
 	return reversed, warnings, nil
+}
+
+// SkipUnconfiguredShared drops shared-tier engines that have no tfvars for this
+// environment, and returns what it dropped.
+//
+// The shared tier is opt-in per engine, and the tfvars is how that opt-in is
+// expressed: it holds five engines because five exist in AWS, not because any given
+// environment wants all five. An installation whose products never touch Kafka has
+// no reason to configure MSK — whose floor is three brokers, around US$105/month —
+// and no reason to have "apply the shared tier" refuse to run because of it.
+//
+// This applies to the shared tier ONLY. For a product, every datastore under it is
+// required by its chart, so a missing tfvars there is a real omission and stays an
+// error.
+func SkipUnconfiguredShared(stages []Stage, env string) ([]Stage, []string) {
+	var skipped []string
+	out := make([]Stage, 0, len(stages))
+
+	for _, stage := range stages {
+		if stage.Name != sharedResources {
+			out = append(out, stage)
+			continue
+		}
+		units := make([]Unit, 0, len(stage.Units))
+		for _, unit := range stage.Units {
+			if _, err := os.Stat(VarFile(unit, env)); err != nil {
+				skipped = append(skipped, unit.Name)
+				continue
+			}
+			units = append(units, unit)
+		}
+		if len(units) == 0 {
+			continue
+		}
+		out = append(out, Stage{Name: stage.Name, Units: units})
+	}
+	return out, skipped
 }

@@ -369,3 +369,21 @@ module "eks" {
 
   tags = module.naming.tags
 }
+
+# Amazon Linux 2 reached the end of its EKS life at 1.33: from that version on
+# there is no AL2 EKS-optimized AMI, and the node group's own SSM lookup fails
+# with "couldn't find resource" against a path nobody typed. Caught here, at plan
+# time, against the version actually being asked for.
+check "ami_family_supports_cluster_version" {
+  assert {
+    condition = alltrue([
+      for name, group in var.node_groups :
+      !startswith(group.ami_type, "AL2_") ||
+      tonumber(split(".", var.cluster_version)[1]) < 33
+    ])
+    error_message = format(
+      "Kubernetes %s has no Amazon Linux 2 node AMI: AL2 was dropped from EKS 1.33 onward. Use AL2023_x86_64_STANDARD or AL2023_ARM_64_STANDARD in node_groups.",
+      var.cluster_version
+    )
+  }
+}

@@ -1,499 +1,339 @@
-# Midaz Terraform Foundation
+# Lerian Terraform Foundation
 
-This repository provides Terraform examples for clients and open-source users to deploy foundation infrastructure on major cloud providers (AWS, GCP, and Azure). Each resource includes comprehensive Terraform documentation and state files. The templates follow cloud provider best practices and use official Terraform modules whenever available.
+Terraform templates for the infrastructure the Lerian products run on: the network, the
+Kubernetes cluster, and the datastores each product needs.
 
-## Prerequisites
+On **AWS** the templates are driven by `lerian-infra`, a CLI that ships from this
+repository. On **GCP and Azure** they are driven by `./deploy-legacy.sh`, an
+interactive script over an earlier layout.
 
-- Terraform >= 1.0.0
-- A cloud provider account (AWS, GCP or Azure)
-- Storage bucket for Terraform state files (see below for creation instructions)
-- Cloud provider CLI tools configured:
-  - `aws` for Amazon Web Services
-  - `gcloud` for Google Cloud Platform
-  - `az` for Azure
+Pick your cloud and follow that section. Read [Important
+information](#important-information) before deploying anything to production.
 
-## Important Note
+## Support matrix
 
-This repository provides Terraform examples for deploying foundation infrastructure. Please note that we do not provide a CI/CD pipeline implementation for these Terraform configurations. Users must implement their own CI/CD pipelines according to their specific needs and requirements.
+| Stack | AWS | GCP | Azure | Creates |
+| --- | --- | --- | --- | --- |
+| `bootstrap` | true | false | partial | Versioned state bucket, lock table, generated backend config |
+| `infra-base` | true | true | true | Network with public/private subnets, Kubernetes cluster, DNS zone |
+| `shared-resources` | true | false | false | PostgreSQL, DocumentDB, Valkey, RabbitMQ, Kafka — one instance each, shared by every product in the environment |
+| `br-consignado-gw` | true | false | false | PostgreSQL, Valkey |
+| `br-sfn` | true | false | false | PostgreSQL, Valkey, RabbitMQ, Kafka, S3 |
+| `br-sisbajud` | true | false | false | PostgreSQL, Valkey, Kafka |
+| `fetcher` | true | false | false | DocumentDB, Valkey, RabbitMQ, S3 |
+| `flowker` | true | false | false | DocumentDB, Valkey |
+| `matcher` | true | false | false | PostgreSQL, Valkey, RabbitMQ |
+| `midaz` | true | false | false | PostgreSQL, DocumentDB, Valkey, RabbitMQ |
+| `notifications` | true | false | false | PostgreSQL, Valkey, RabbitMQ |
+| `plugin-access-manager` | true | false | false | PostgreSQL, Valkey |
+| `plugin-bc-correios` | true | false | false | PostgreSQL, Valkey, RabbitMQ, S3 |
+| `plugin-br-bank-transfer` | true | false | false | PostgreSQL, DocumentDB, Valkey, RabbitMQ |
+| `plugin-br-payments` | true | false | false | PostgreSQL |
+| `plugin-br-pix-direct-jd` | true | false | false | PostgreSQL |
+| `plugin-br-pix-indirect-btg` | true | false | false | PostgreSQL, DocumentDB, Valkey |
+| `plugin-br-pix-jd` | true | false | false | PostgreSQL |
+| `plugin-br-pix-switch` | true | false | false | PostgreSQL, DocumentDB, Valkey, RabbitMQ |
+| `plugin-fees` | true | false | false | DocumentDB, Valkey, Kafka |
+| `product-console` | true | false | false | DocumentDB |
+| `reporter` | true | false | false | DocumentDB, Valkey, RabbitMQ, S3 |
+| `tracer` | true | false | false | PostgreSQL, Valkey |
+| `underwriter` | true | false | false | PostgreSQL, Valkey |
 
-### Instance Types Disclaimer
+On AWS: PostgreSQL is RDS, DocumentDB is Amazon DocumentDB, Valkey is ElastiCache,
+RabbitMQ is AmazonMQ, Kafka is MSK. Each product datastore can be **dedicated** or
+resolve the **shared** tier — except S3, which is never shared.
 
-The instance types specified in the example `.tfvars` files are provided as starting points and examples only. Users are **fully responsible** for selecting appropriate instance types based on their specific workload requirements.
+Azure `bootstrap` is partial: `base-resources` creates the storage account for state. Azure
+locks state with a blob lease, so there is no lock table. On GCP you create the bucket
+yourself, shown below.
 
-**Key considerations:**
+**GCP and Azure have no per-product stacks.** They carry generic `cloud-sql`,
+`valkey`, `database`, `redis` and `cosmosdb` roots, written for a single deployment and
+hardcoded to Midaz. There is no product-scoped root and no shared/dedicated switch, so
+the products read false rather than claiming a parity that does not exist.
 
-- **Production Workloads:** The default instance types in examples may not be suitable for production environments. Always evaluate your expected transaction volume, concurrent connections, and data size before deploying.
+---
 
-- **High TPS Requirements:** If your application requires high transactions per second (TPS), you must select appropriately sized instances. Consider CPU cores, memory, network bandwidth, and storage IOPS for your expected workload.
+# AWS
 
-- **Cost Optimization:** Larger instances provide more resources but at higher cost. Start with your expected workload profile and scale as needed.
+## 1. Install lerian-infra
 
-Before selecting instance types, review the official documentation for your chosen cloud provider (AWS, GCP, or Azure) regarding instance/machine type specifications and recommendations.
-
-**Disclaimer:** Lerian Studio is not responsible for performance issues, costs, or other impacts resulting from instance type selections.
-
-## Project Structure
-
-```
-.
-├── deploy.sh                            # AWS v2, flag-driven
-├── deploy-legacy.sh                     # GCP and Azure, interactive
-├── examples/
-    ├── aws/
-    │   ├── environments.conf.example    # env -> AWS account map (copy, edit)
-    │   ├── backend/                     # <env>.hcl, generated by bootstrap
-    │   ├── bootstrap/
-    │   ├── infra-base/                  # mandatory foundation
-    │   │   ├── vpc/
-    │   │   └── eks/
-    │   ├── products/
-    │   │   ├── shared-resources/        # OPTIONAL, opt-in per directory
-    │   │   │   ├── postgres/
-    │   │   │   ├── documentdb/
-    │   │   │   ├── valkey/
-    │   │   │   ├── rabbitmq/
-    │   │   │   └── msk/
-    │   │   └── midaz/
-    │   └── _modules/
-    ├── gcp/
-    │   ├── vpc/
-    │   ├── cloud-dns/
-    │   ├── cloud-sql/
-    │   ├── valkey/
-    │   └── gke/
-    └── azure/
-        ├── network/
-        ├── dns/
-        ├── database/
-        ├── redis/
-        └── aks/
-        └── cosmosdb/
-```
-
-**Note**: Components must be created in the following order:
-1. VPC/Network
-2. DNS (GCP and Azure only — the AWS examples have no DNS stack)
-3. Database
-4. Valkey
-5. Kubernetes Cluster
-
-On AWS the order is `bootstrap` → `infra-base/vpc` → `infra-base/eks` →
-`[products/shared-resources/* if you opted in]` → product stacks.
-
-`infra-base` is only what **every** deployment needs: the VPC and the EKS
-cluster. The shared datastore tier is **optional** and lives under
-`products/shared-resources/`, one root stack per service — apply a directory to
-enable that datastore, leave it unapplied to not have it. Shared datastores are
-resolved by resource name and Secrets Manager name, never through a private DNS
-zone — see `examples/aws/products/shared-resources/README.md`.
-
-## Creating State Storage
-
-### AWS — do not create it by hand
-
-The manual `aws s3api create-bucket` / `aws dynamodb create-table` dance is gone.
-`examples/aws/bootstrap` is a Terraform stack that creates the state bucket and
-the lock table **per environment**, with versioning, encryption, public access
-block, a TLS-only bucket policy, lifecycle rules and PITR already configured —
-and then writes the `examples/aws/backend/<env>.hcl` every other stack consumes.
+Requires `terraform` >= 1.10.0, `aws`, and `git` on your `PATH` — the CLI shells out to
+all three and checks for them before doing anything. You also need `kubectl` for the
+step after the cluster exists; the CLI never calls it.
 
 ```bash
-cp examples/aws/environments.conf.example examples/aws/environments.conf
-$EDITOR examples/aws/environments.conf         # declare the account per environment
-
-cp examples/aws/bootstrap/envs/dev.tfvars-example examples/aws/bootstrap/envs/dev.tfvars
-./deploy.sh --env dev --target bootstrap --action apply
+curl -fsSL https://raw.githubusercontent.com/LerianStudio/lerian-terraform-foundation/main/scripts/install.sh | sh
 ```
 
-State is segregated per environment: dev, stg and prd each get their own bucket
-(`lerian-tfstate-{env}-{account_id}`) and their own lock table
-(`lerian-tfstate-lock-{env}`), so a dev apply cannot touch prd state **even when
-all three environments live in the same AWS account**.
+The script detects your platform, downloads the matching release, **verifies it against
+the published checksums**, and installs into the first writable directory among
+`~/.local/bin`, `~/bin` and `/usr/local/bin`. It never calls `sudo`; if none of those is
+writable it tells you what to run. Nothing is installed if the checksum does not match.
 
-See `examples/aws/bootstrap/README.md` for the local-state/workspace model and
-for how to tear a validation environment down (`prevent_destroy` is on).
+| Variable | Does |
+| --- | --- |
+| `LERIAN_INFRA_VERSION` | Install a specific tag instead of the latest, e.g. `v1.6.0`. |
+| `INSTALL_DIR` | Install somewhere else. |
 
-### Google Cloud Platform
-```bash
-# Create a GCS bucket
-gsutil mb -l us-central1 gs://your-terraform-state-bucket
-
-# Enable versioning
-gsutil versioning set on gs://your-terraform-state-bucket
-```
-
-### Azure
-```bash
-# Create a resource group
-az group create --name terraform-state-rg --location eastus
-
-# Create a storage account
-az storage account create --name tfstate$RANDOM --resource-group terraform-state-rg --sku Standard_LRS
-
-# Create a container
-az storage container create --name terraform-state --account-name <storage-account-name>
-```
-
-## Configuration Requirements
-
-### AWS
-
-Every stack is environment-scoped and takes its variables from
-`envs/<env>.tfvars` inside its own directory. `*.tfvars` is gitignored;
-`*.tfvars-example` is the committed template:
+Prefer to do it by hand, or on Windows? Take the archive from the [releases
+page](https://github.com/LerianStudio/lerian-terraform-foundation/releases) and verify
+it yourself:
 
 ```bash
-cp examples/aws/infra-base/vpc/envs/dev.tfvars-example \
-   examples/aws/infra-base/vpc/envs/dev.tfvars
+tar xzf lerian-infra_<version>_Darwin_arm64.tar.gz
+sha256sum -c checksums.txt --ignore-missing
 ```
 
-`deploy.sh` refuses to run a stack whose `envs/<env>.tfvars` is missing or still
-contains a `<PUT-YOUR-...>` placeholder. `./deploy.sh --env dev --target all
---dry-run` lists every stack that is not ready yet, without touching AWS.
+Then check it runs:
 
-### GCP and Azure
+```bash
+lerian-infra --version
+```
 
-Still on the pre-v2 flat layout: one `midaz.tfvars` per component directory, and
-placeholders inside a committed `backend.tf`.
+## 2. Get the templates
+
+The binary and the templates ship from the same tag, and the CLI fetches its own:
+
+```bash
+lerian-infra init --env dev --clone
+```
+
+That clones the matching tag into `~/lerian/lerian-terraform-foundation`. If you are
+already inside a checkout of this repository there is nothing to do — the CLI finds it
+by walking up from the working directory.
+
+After upgrading the binary, move the checkout to match:
+
+```bash
+lerian-infra init --env dev --sync
+```
+
+Your `environments.conf` and `envs/*.tfvars` survive that: they are gitignored, and a
+checkout does not touch untracked files.
+
+## 3. Deploy an environment
+
+Four commands, in this order. Each one must finish before the next.
+
+```bash
+# Write the configuration: which AWS account this environment lives in, and the
+# tfvars of every stack you named. Touches no AWS resource.
+lerian-infra init --env dev --targets bootstrap,infra-base,midaz
+
+# State bucket and lock table. Once per environment, ever.
+lerian-infra --env dev --target bootstrap --action apply
+
+# VPC, then EKS.
+lerian-infra --env dev --target infra-base --action apply
+
+# The product's datastores.
+lerian-infra --env dev --target midaz --action apply
+```
+
+`init` asks what it cannot discover — AWS profile, region, account — and every question
+has a flag, so a pipeline never hits a prompt. It lists the profiles it found with the
+account each one reaches, and detects your egress address for the cluster's API
+allow-list.
+
+Before every run the CLI verifies that the state bucket, the region and the live
+credentials all agree on which account this environment is. There is no flag to bypass
+it.
+
+Useful along the way:
+
+| Command | Does |
+| --- | --- |
+| `lerian-infra --list` | Every deployable target. No AWS call. |
+| `lerian-infra --env dev --target all --dry-run` | The whole execution plan: order, state keys, account. No AWS call. |
+| `lerian-infra --env dev --target midaz --action destroy` | Reverse order, one confirmation. |
+| `lerian-infra --help` | The full flag reference. |
+
+Once EKS is up, the CLI prints the `aws eks update-kubeconfig` command for your
+cluster.
+
+## 4. Hand off to Helm
+
+```bash
+lerian-infra --env dev --target midaz --action helm-values --format yaml \
+  > midaz-dev-values.yaml
+```
+
+This reads every stack of the product and merges their outputs into one values
+document, keyed by the chart's own components, ready for `helm install -f`. No
+credential is in it: it carries `secret_arn` and `secret_name`, while the passwords
+stay in AWS Secrets Manager.
+
+The charts are at **[LerianStudio/helm](https://github.com/LerianStudio/helm)**.
+
+---
+
+# GCP and Azure
+
+These use the pre-v2 flat layout: one `midaz.tfvars` per component directory, and an
+interactive script. Requires `terraform` plus `gcloud` or `az`.
+
+## 1. Create the state bucket
+
+**GCP:**
+
+```bash
+gsutil mb -p PROJECT_ID -l REGION gs://BUCKET_NAME
+gsutil versioning set on gs://BUCKET_NAME
+```
+
+**Azure:**
+
+```bash
+az group create --name RESOURCE_GROUP --location LOCATION
+az storage account create --name STORAGE_ACCOUNT --resource-group RESOURCE_GROUP \
+  --location LOCATION --sku Standard_LRS
+az storage container create --name CONTAINER --account-name STORAGE_ACCOUNT
+```
+
+## 2. Configure
+
+Each component keeps its own `backend.tf` and `midaz.tfvars`, both edited by hand:
 
 ```bash
 cd examples/<gcp|azure>/<component>
+$EDITOR backend.tf                        # bucket, prefix, credentials
 cp midaz.tfvars-example midaz.tfvars
+$EDITOR midaz.tfvars
 ```
 
-## Deployment Helper Scripts
+The script refuses to deploy a component whose `backend.tf` still holds a
+`<PUT-YOUR-...>` placeholder.
 
-Two scripts, because the two layouts share no mechanism.
-
-### `./deploy.sh` — AWS
-
-Non-interactive and flag-driven. `./deploy.sh --help` teaches the whole flow;
-`./deploy.sh --list` prints every discoverable target.
-
-```bash
-./deploy.sh --env dev --target bootstrap        --action apply
-./deploy.sh --env dev --target infra-base       --action apply
-./deploy.sh --env dev --target shared-resources --action apply   # optional tier
-./deploy.sh --env dev --target midaz            --action plan
-./deploy.sh --env dev --target midaz            --action apply
-```
-
-| Flag | Meaning |
-| --- | --- |
-| `--env dev\|stg\|prd` | **Required.** Selects the account, the backend file and the tfvars. |
-| `--target` | `bootstrap`, `infra-base[/vpc\|/eks]`, `shared-resources`, `<product>`, `<product>/<service>`, `all`. |
-| `--action` | `plan` (default), `apply`, `destroy`, `helm-values`, `output`. |
-| `--auto-approve` | Skip the single confirmation before applying the saved plans. |
-| `--jobs <n>` | Services of one product run in parallel. Default 4; `1` streams output. |
-| `--dry-run` | Print the resolved execution plan. Makes **no** AWS call. |
-| `--list` | List discoverable targets. Makes no AWS call. |
-
-What it does that the old script did not:
-
-- **Environment → account mapping with a hard guard.** `examples/aws/environments.conf`
-  declares the AWS account each environment lives in. Before anything runs, the
-  script calls `aws sts get-caller-identity` and aborts if the live account is
-  not the declared one. There is no flag to bypass it. Copy
-  `environments.conf.example` and edit; point all three environments at the same
-  `account_id` for a single-account deployment, or at three different ones for
-  separate accounts.
-- **Ordering.** `bootstrap → infra-base/vpc → infra-base/eks → shared-resources/* → products/*`,
-  reversed for destroy.
-- **Discovery, not a hardcoded list.** Products and services come from
-  `examples/aws/products/*/*/main.tf`. A new product works the moment its
-  directory exists.
-- **Parallelism.** Services inside a product have separate state and separate
-  locks, so they run concurrently.
-- **`-reconfigure` on every init.** `.terraform/` caches the bucket of whichever
-  environment was initialised last; without this, switching environments in the
-  same checkout dies with a `403 Forbidden` at apply time.
-- **A placeholder check that runs.** It validates `backend/<env>.hcl` and every
-  `envs/<env>.tfvars` that the run will actually use.
-- **`--action helm-values`.** A product's outputs now live in one state file per
-  service. This merges every `helm_values` (and `helm_secret_values`) into a
-  single document, JSON or YAML, and hard-fails on a conflicting key instead of
-  silently picking one:
-
-  ```bash
-  ./deploy.sh --env dev --target midaz --action helm-values --format yaml \
-    > midaz-dev-values.yaml
-  ```
-
-  Products whose chart is split per component — `plugin-br-pix-indirect-btg` —
-  emit `helm_values` keyed by component; the merge preserves that nesting, so
-  each entry drops into the matching `<component>.configmap` block.
-
-### `./deploy-legacy.sh` — GCP and Azure
-
-The original interactive menu, unchanged in behaviour, carrying only the two
-providers that still use the layout it was written for. AWS was removed from it:
-all nine of its AWS paths pointed at pre-v2 directories that no longer exist.
+## 3. Deploy
 
 ```bash
 ./deploy-legacy.sh
 ```
 
-## Production Credentials & Deployment
+Interactive: pick the provider, pick deploy or destroy, pick the components. Order
+matters — network first, then the cluster, then the datastores.
 
-When deploying infrastructure in production environments, proper credential management is crucial for security. Here's how to handle credentials securely:
+| Component | GCP | Azure |
+| --- | --- | --- |
+| network | `vpc` | `network` |
+| dns | `cloud-dns` | `dns` |
+| kubernetes | `gke` | `aks` |
+| database | `cloud-sql` | `database` |
+| valkey | `valkey` | `redis` |
+| mongodb | — | `cosmosdb` |
 
-### Cloud Provider Authentication
+Take the endpoints from `terraform output` and wire them into the charts at
+**[LerianStudio/helm](https://github.com/LerianStudio/helm)**.
 
-When using the deploy script locally, we strongly recommend using cloud provider CLI authentication tools instead of raw credentials. This approach is more secure as it handles credential rotation, MFA, and token refresh automatically:
+---
 
-```bash
-# AWS: Use AWS CLI to assume a role
-aws sso login --profile your-profile
-# or
-aws sts assume-role --role-arn arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME --role-session-name terraform
+# Important information
 
-# GCP: Use gcloud authentication
-gcloud auth application-default login
-# For service accounts
-gcloud auth activate-service-account --key-file=path/to/service-account.json
+Read this before a production deployment.
 
-# Azure: Use Azure CLI
-az login
-# For service principals
-az login --service-principal
+- **Instance sizing is your responsibility.** The classes in the example `.tfvars` are
+  starting points, not a capacity plan. The prd examples step up to multi-AZ and larger
+  classes, but only you know your transaction volume, peak concurrency and growth.
+  Review instance classes, storage, IOPS and connection limits before applying. Lerian
+  is not responsible for performance or cost resulting from those choices.
+
+- **Clusters are created with a public API endpoint, restricted by CIDR.** That is the
+  default for dev and staging. `lerian-infra init --api-cidr auto` fills the allow-list
+  with your egress address. For a private endpoint, set
+  `cluster_endpoint_private_access = true` and `cluster_endpoint_public_access = false`;
+  the allow-list then has no effect.
+
+- **A VPN and a private cluster are yours to build and operate.** These templates create
+  neither. If you go that route: the VPN server needs a Network ACL and a security group
+  rule to reach the database subnets on the service port, and a security group rule on
+  the control plane to reach the Kubernetes API. Note that `lerian-infra` itself must
+  then run from inside the network.
+
+- **There is no default StorageClass.** The `aws-ebs-csi-driver` add-on installs the
+  driver, not a StorageClass, and the `gp2` class EKS ships is not marked default. A PVC
+  without an explicit `storageClassName` stays `Pending`. Create a default `gp3` class
+  with `volumeBindingMode: WaitForFirstConsumer` before installing anything that needs a
+  volume — `Immediate` binds the volume to an AZ before the scheduler picks a node.
+
+- **EBS cannot serve `ReadWriteMany`.** That needs the `aws-efs-csi-driver` add-on,
+  which these templates do not install.
+
+- **Cluster add-ons beyond the basics are yours.** `infra-base/eks` installs `coredns`,
+  `kube-proxy`, `vpc-cni`, `metrics-server` and `aws-ebs-csi-driver`. Cluster
+  Autoscaler, the [AWS Load Balancer
+  Controller](https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller) and
+  an [ingress
+  controller](https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx) are
+  installed by you. The IRSA roles for the first two already exist in
+  `examples/aws/infra-base/eks/iam.tf`, and the subnets are already tagged for LB
+  discovery — point the service accounts at the role ARNs rather than creating your own.
+
+- **AmazonMQ speaks AMQPS only.** Any component connecting to it needs
+  `RABBITMQ_URI: "amqps"`. `--action helm-values` emits that already.
+
+- **State is segregated per environment.** dev, stg and prd each get their own bucket
+  (`lerian-tfstate-{env}-{account_id}`) and lock table, so a dev apply cannot reach prd
+  state even when all three live in the same AWS account.
+
+- **Secrets never leave the cloud.** Passwords and auth tokens are generated by Terraform
+  into AWS Secrets Manager and never read back. Outputs carry references, so the whole
+  Helm handoff can be printed or logged safely. Saved plan files are a different matter
+  — they can embed values read from state, and `lerian-infra` writes them into a `0700`
+  directory for that reason. Do not archive them.
+
+- **Bringing your own pipeline?** `lerian-infra` is built to run from one: every decision
+  is a flag, and outside a terminal a missing one is an error naming the flag rather
+  than a guess. Two things to know: `--auto-approve` skips the confirmation but never
+  the account guard, and it does not authorise a clone — pin the templates in your image
+  or point at them with `$LERIAN_TF_REPO`. If you would rather drive Terraform directly,
+  copy the roots into your own repository; note that the Helm handoff has no equivalent
+  outside the CLI.
+
+# Reference
+
+## Repository layout
+
+```
+cmd/lerian-infra/          the CLI
+pkg/infra/                 the library behind it, importable
+deploy-legacy.sh           GCP and Azure, interactive
+examples/
+  aws/                     v2 layout: environment-scoped, one state per stack
+    environments.conf      env -> AWS account map (gitignored, written by init)
+    backend/<env>.hcl      generated by bootstrap
+    bootstrap/
+    infra-base/{vpc,eks}
+    products/<product>/<engine>/
+    _modules/              shared datastore modules
+  gcp/, azure/             v1 layout: one directory per resource
 ```
 
-This approach provides several benefits:
-- Automatic token refresh
-- Integration with SSO and MFA
-- Credential rotation handling
-- Secure credential storage
-- Audit trail of authentication events
-
-### CI/CD Integration
-
-If you have an existing Terraform CI/CD pipeline:
-1. Do not use the deploy script
-2. Copy the relevant examples to your private Infrastructure as Code repository
-3. Integrate the Terraform configurations with your existing pipeline
-4. Use your CI/CD platform's secure secret management features
-
-### Best Practices Documentation
-
-Follow these official guides for credential management best practices:
-- AWS: [Best practices for managing AWS access keys](https://docs.aws.amazon.com/general/latest/gr/aws-access-keys-best-practices.html)
-- GCP: [Best practices for managing service account keys](https://cloud.google.com/iam/docs/best-practices-for-managing-service-account-keys)
-- Azure: [Azure identity management security best practices](https://learn.microsoft.com/en-us/azure/security/fundamentals/identity-management-best-practices)
-
-Key recommendations:
-- Rotate credentials regularly
-- Use role-based access control (RBAC)
-- Enable MFA for user accounts
-- Use temporary credentials when possible
-- Monitor and audit credential usage
-- Never commit credentials to version control
-
-### Using the Script
-
-#### AWS
-
-```bash
-chmod +x deploy.sh
-
-# 1. Declare which AWS account each environment lives in. Nothing runs until the
-#    live credentials resolve to the account declared here.
-cp examples/aws/environments.conf.example examples/aws/environments.conf
-$EDITOR examples/aws/environments.conf
-
-# 2. See what would run, without touching AWS.
-./deploy.sh --env dev --target all --dry-run
-
-# 3. State backend, then foundation, then products.
-./deploy.sh --env dev --target bootstrap  --action apply
-./deploy.sh --env dev --target infra-base --action apply
-./deploy.sh --env dev --target midaz      --action apply
-```
-
-`apply` and `destroy` always run `terraform plan -out` first, print a per-stack
-create/update/delete table, ask for one confirmation, and then apply the **saved
-plan files** — what executes is exactly what was shown. `--auto-approve` skips
-only the prompt, never the plan.
-
-#### GCP and Azure
-
-```bash
-chmod +x deploy-legacy.sh
-./deploy-legacy.sh          # interactive: pick provider, pick deploy or destroy
-```
-
-### Error Handling
-
-Both scripts stop on the first failure and never start a later stage.
-`deploy.sh` additionally:
-
-- refuses to run when the live AWS account is not the one declared for the
-  environment, before any Terraform process starts;
-- refuses to run when `examples/aws/backend/<env>.hcl` is missing, or when its
-  bucket name or region disagrees with `environments.conf` — both checked
-  offline;
-- refuses to run a stack whose `envs/<env>.tfvars` is missing or still holds a
-  `<PUT-YOUR-...>` placeholder;
-- refuses to destroy `bootstrap` (the state bucket carries `prevent_destroy`) and
-  points at the teardown procedure instead;
-- prints the tail of the failing stack's log inline and keeps the full logs in a
-  run directory whose path it reports.
-
-## Installing Midaz
-
-After deploying the foundation infrastructure, you can install Midaz using Helm. The Helm charts are available in the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
-
-### Prerequisites
-
-- Kubernetes cluster (EKS, GKE, or AKS) up and running
-- `kubectl` configured to access your cluster
-- Helm v3.x installed
-- Access to Midaz Helm repository
-
-### Installation Steps
-
-1. Add the Midaz Helm repository:
-   ```bash
-   helm repo add midaz https://lerianstudio.github.io/helm
-   helm repo update
-   ```
-
-2. Create a values file (`values.yaml`) with your configuration. The hostnames
-   below are placeholders: on AWS, take every host and port from `terraform
-   output` on the datastore stack you deployed — those outputs carry the raw AWS
-   endpoints, which is what the TLS certificate of each service actually covers.
-   ```yaml
-   # Example values.yaml
-   # Disable default dependencies
-   valkey:
-      enabled: false
-
-   postgresql:
-      enabled: false
-
-   ## Configure external PostgreSQL
-   onboarding:
-     configmap:
-       DB_HOST: "postgresql.midaz.internal."
-       DB_USER: "midaz"
-       DB_PORT: "5432"
-       DB_REPLICA_HOST: "postgresql-replica.midaz.internal."
-       DB_REPLICA_USER: "midaz"
-       DB_REPLICA_PORT: "5432"
-       REDIS_HOST: "valkey.midaz.internal"
-       REDIS_PORT: "6379"
-     secrets:
-        DB_PASSWORD: "<your-db-password>"
-        DB_REPLICA_PASSWORD: "<your-replica-db-password>"
-        REDIS_PASSWORD: "<your-redis-password>"
-
-   transaction:
-     configmap:
-       DB_HOST: "postgresql.midaz.internal."
-       DB_USER: "midaz"
-       DB_PORT: "5432"
-       DB_REPLICA_HOST: "postgresql-replica.midaz.internal."
-       DB_REPLICA_USER: "midaz"
-       DB_REPLICA_PORT: "5432"
-       REDIS_HOST: "valkey.midaz.internal"
-       REDIS_PORT: "6379"
-     secrets:
-       DB_PASSWORD: "<your-db-password>"
-       DB_REPLICA_PASSWORD: "<your-replica-db-password>"
-       REDIS_PASSWORD: "<your-redis-password>"
-   ```
-
-3. Install Midaz:
-   ```bash
-   helm install midaz midaz/midaz -f values.yaml
-   ```
-
-For detailed configuration options and advanced setup, please refer to the [Midaz Helm Repository](https://github.com/LerianStudio/helm).
-
-## Security Considerations
-
-- All Kubernetes clusters (EKS, GKE, AKS) are public by default with IP whitelisting, but we strongly recommend:
-  - Using private clusters
-  - Accessing Kubernetes API via VPN
-  - Implementing proper RBAC
-- All sensitive data should be stored in cloud provider secret management services
-- Follow the principle of least privilege for service accounts
-
-## AWS Requirements
-
-When deploying on AWS, please note the following important requirements:
-
-- **Cluster Autoscaler**, **AWS Load Balancer Controller**, and **NGINX Ingress Controller** (if required by the client) **must be installed and managed manually or by GitOps or any pipeline that the client uses**.
-- It is **not possible to configure cluster autoscaler, AWS Load Balancer Controller, and NGINX ingress by default** via the `addons` block in `main.tf`.
-- These components require manual installation using their respective Helm charts after the EKS cluster is deployed.
-- **AWS Load Balancer Controller** is required if the client wants to expose Midaz APIs inside the VPC (internal ALB) or to the internet (public ALB - not recommended). The IAM role for the AWS Load Balancer Controller is automatically created in `eks/iam.tf` and should be used by the controller's service account. VPC subnets are already tagged with the required tags (`kubernetes.io/role/elb` for public subnets and `kubernetes.io/role/internal-elb` for private subnets) for automatic subnet discovery by the controller.
-- If the client is deploying **Midaz or plugins** using **Amazon MQ**, they **must set `RABBITMQ_URI: "amqps"`** in Helm values for any component that uses cloud AMQP.
-- If the client wants a **private EKS cluster**, they need to set these variables in their `midaz.tfvars` file: `cluster_endpoint_private_access = true`, `cluster_endpoint_public_access = false`, and there is **no need to set `allowed_api_access_cidrs`**.
-
-### Manual Installation Resources
-
-For installation guidance, please refer to the official Helm charts:
-
-- [Cluster Autoscaler Helm Chart](https://artifacthub.io/packages/helm/cluster-autoscaler/cluster-autoscaler)
-- [AWS Load Balancer Controller Helm Chart](https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller)
-- [NGINX Ingress Controller Helm Chart](https://artifacthub.io/packages/helm/ingress-nginx/ingress-nginx)
-
-## VPN and Private Kubernetes Access
-
-When implementing VPN access and private Kubernetes clusters, please consider the following client responsibilities:
-
-### Client Responsibilities
-
-- If the client wants to use a **VPN** and make the **Kubernetes cluster private**, **it is their responsibility** to configure and manage the VPN and related infrastructure.
-- To **access databases** through a VPN, the client must create a **Network ACL (NACL)** (in the case of AWS) that allows the **VPN server to reach the database subnets**.
-- The **database must have a security group rule** that allows the **VPN server to reach the database** on the appropriate database port.
-- To allow the VPN server to access the **EKS control plane endpoint**, the client must add a **security group rule** to the **control plane's security group** permitting traffic from the VPN server over the VPN network.
-
-### Security Group Configuration Example
-
-Below is an example of how to add a security group rule to allow VPN server access to the EKS control plane. **This must be used in `main.tf` inside the `module.eks` block when the client is creating a private EKS cluster and will access the cluster over a VPN:**
-
-```hcl
-  security_group_additional_rules = {
-    ingress_vpn_and_network_vpc = {
-      description                   = "Access EKS from Midaz VPN and Network VPC"
-      type                          = "ingress"
-      from_port                     = 0
-      to_port                       = 65535
-      protocol                      = "tcp"
-      cidr_blocks                   = ["<VPN_SERVER_CIDR>"]
-      source_cluster_security_group = true
-    }
-  }
-```
-
-📌 **Important:** Replace `<VPN_SERVER_CIDR>` with your actual VPN server CIDR block before applying this configuration.
+Every root under `examples/aws/` carries a README describing what it creates, what it
+costs and how it is configured. Start there for anything this page does not cover.
 
 ## Contributing
 
-**IMPORTANT**: Git hooks MUST be set up before making any code changes. This ensures all commits follow our conventions and pass necessary checks.
+Install the git hooks before your first commit — they enforce the commit conventions
+this repository releases from:
 
-1. First, install git hooks (required):
-   ```bash
-   make hooks
-   ```
+```bash
+make hooks
+```
 
-2. Create a new feature branch:
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-3. Make changes and commit following [conventional commits](https://www.conventionalcommits.org/)
-4. Create a PR to the `develop` branch
-5. After testing, changes will be merged to `main`
+Branch from `develop`, commit with [conventional
+commits](https://www.conventionalcommits.org/), and open a PR against `develop`. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+## Security
+
+Report vulnerabilities per [SECURITY.md](SECURITY.md) — not through public issues.
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Apache 2.0. See [LICENSE](LICENSE).
 
 ## Support
 
-For support, please:
-1. Check the component-specific README
-2. Search existing [issues](https://github.com/LerianStudio/lerian-terraform-foundation/issues)
-3. Create a new issue if needed
+Check the README of the root you are deploying, then search
+[issues](https://github.com/LerianStudio/lerian-terraform-foundation/issues).

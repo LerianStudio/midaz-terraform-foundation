@@ -125,7 +125,7 @@ output "kms_key_arn" {
 }
 
 output "master_username" {
-  description = "Master username configured on the cluster. Read from the stack variable rather than from the module output, which is marked sensitive and would redact anything it is merged into."
+  description = "Master username configured on the cluster. It is the ADMIN identity, consumed by the chart's bootstrap Job as MONGO_ROOT_USER — not the user the workload authenticates as, which the Job creates. Read from the stack variable rather than from the module output, which is marked sensitive and would redact anything it is merged into."
   value       = var.master_username
 }
 
@@ -141,9 +141,17 @@ output "tls_enabled" {
 # not a translation. Verified against chart 8.7.0 (appVersion 3.8.0),
 # templates/ledger/configmap.yaml.
 #
-# Everything below lands on the LEDGER deployment. There is no separate
-# onboarding and transaction deployment — the ledger container is unified and
-# carries both sets of variables, pointed at the same cluster.
+# KEYED BY CHART COMPONENT, and this is the output where that matters most: the
+# suffixed and unsuffixed Mongo keys differ only by prefix and go to two DIFFERENT
+# ConfigMaps. Flattened into one map, that routing existed only in prose, and every
+# consumer had to re-derive it from a comment.
+#
+# The ledger keys land on the LEDGER deployment. There is no separate onboarding and
+# transaction deployment — the ledger container is unified and carries both sets of
+# variables, pointed at the same cluster.
+#
+# The same shape is produced by pkg/infra/chartmap.go for shared mode. The two must
+# agree: TestMidazShapeIsTheSameInBothModes fails when they drift.
 #
 # MONGO_ONBOARDING_URI / MONGO_TRANSACTION_URI are NOT connection strings. The
 # chart uses them for the SCHEME alone and the application assembles the URI from
@@ -155,35 +163,51 @@ output "tls_enabled" {
 #   MONGO_*_NAME     — the chart defaults are "onboarding" and "transaction";
 #     DocumentDB creates a database lazily on first write, so Terraform never
 #     creates them and must not claim to know them.
-#   MONGO_*_PASSWORD — read from secret_name by External Secrets, never an output.
+#
+# NO *_USER KEY IS EMITTED, and that is deliberate. The username above is the
+# MASTER, and the workload does not authenticate as the master: the chart ships
+# bootstrap Jobs (templates/bootstrap-postgres.yaml, bootstrap-mongodb.yaml,
+# bootstrap-rabbitmq.yaml) that connect as the master, create a scoped user, and
+# exit. The chart's own defaults for these keys are those scoped users — "midaz"
+# for postgres and mongo, "transaction" for rabbitmq — so emitting the master here
+# overrode a correct default with an identity whose password the release does not
+# have. The master travels instead as the admin credential of the bootstrap Job,
+# via `secret_name` below.
+#
+# NOT emitted here either, on purpose:
+#   MONGO_*_PASSWORD — the application's password, chosen by whoever runs the
+#     bootstrap Job. It is not in state and not in this secret, which holds the
+#     master.
 #   MONGO_*_TLS_CA_CERT — the global RDS CA bundle, distributed with the chart or
 #     mounted from a ConfigMap, not produced by Terraform.
 #
 # CRM (crm.enabled, false by default) reads the UNSUFFIXED MONGO_HOST / MONGO_PORT
-# / MONGO_USER / MONGO_URI instead. They are included below so turning CRM on does
-# not need a second lookup; they are harmless when it is off.
+# / MONGO_USER / MONGO_URI instead — see templates/crm/configmap.yaml. They are
+# emitted under the "crm" component below so turning CRM on does not need a second
+# lookup; they are harmless when it is off.
 ################################################################################
 
 output "helm_values" {
-  description = "midaz chart env vars this datastore fills in, ready to merge into ledger.configmap (and crm.configmap for the unsuffixed keys). Pair it with mongodb.enabled = false and mongodb.external = true so the bundled Bitnami subchart is not deployed alongside DocumentDB."
+  description = "midaz chart env vars this datastore fills in, keyed by CHART COMPONENT. Merge each entry into the matching <component>.configmap block: the suffixed keys are read by templates/ledger/configmap.yaml and the unsuffixed ones by templates/crm/configmap.yaml. Pair it with mongodb.enabled = false and mongodb.external = true so the bundled Bitnami subchart is not deployed alongside DocumentDB."
   value = {
-    MONGO_ONBOARDING_URI        = "mongodb"
-    MONGO_ONBOARDING_HOST       = module.documentdb.endpoint
-    MONGO_ONBOARDING_PORT       = tostring(module.documentdb.port)
-    MONGO_ONBOARDING_USER       = var.master_username
-    MONGO_ONBOARDING_PARAMETERS = local.mongo_parameters
+    ledger = {
+      MONGO_ONBOARDING_URI        = "mongodb"
+      MONGO_ONBOARDING_HOST       = module.documentdb.endpoint
+      MONGO_ONBOARDING_PORT       = tostring(module.documentdb.port)
+      MONGO_ONBOARDING_PARAMETERS = local.mongo_parameters
 
-    MONGO_TRANSACTION_URI        = "mongodb"
-    MONGO_TRANSACTION_HOST       = module.documentdb.endpoint
-    MONGO_TRANSACTION_PORT       = tostring(module.documentdb.port)
-    MONGO_TRANSACTION_USER       = var.master_username
-    MONGO_TRANSACTION_PARAMETERS = local.mongo_parameters
+      MONGO_TRANSACTION_URI        = "mongodb"
+      MONGO_TRANSACTION_HOST       = module.documentdb.endpoint
+      MONGO_TRANSACTION_PORT       = tostring(module.documentdb.port)
+      MONGO_TRANSACTION_PARAMETERS = local.mongo_parameters
+    }
 
-    # crm.configmap — only rendered when crm.enabled is true.
-    MONGO_URI        = "mongodb"
-    MONGO_HOST       = module.documentdb.endpoint
-    MONGO_PORT       = tostring(module.documentdb.port)
-    MONGO_USER       = var.master_username
-    MONGO_PARAMETERS = local.mongo_parameters
+    # Only rendered when crm.enabled is true, and inert until then.
+    crm = {
+      MONGO_URI        = "mongodb"
+      MONGO_HOST       = module.documentdb.endpoint
+      MONGO_PORT       = tostring(module.documentdb.port)
+      MONGO_PARAMETERS = local.mongo_parameters
+    }
   }
 }

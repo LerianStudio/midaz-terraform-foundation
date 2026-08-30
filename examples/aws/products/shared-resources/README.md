@@ -439,9 +439,8 @@ gone. Whether a datastore exists is now "was this directory applied", which
 `terraform output` in that directory answers by succeeding or by reporting no
 state at all.
 
-**`shared_datastores`, the aggregate map.** It existed so `deploy.sh` and
-operator scripts could iterate five `count`-gated modules living in **one**
-state file. There are five state files now, so no single `terraform output` can
+**`shared_datastores`, the aggregate map.** It existed so a deployment script could
+iterate five `count`-gated modules living in **one** state file. There are five state files now, so no single `terraform output` can
 produce it. The equivalent is a loop over the directories:
 
 ```bash

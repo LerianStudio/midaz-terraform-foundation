@@ -13,7 +13,7 @@ product     = "lerian"
 environment = "prd"
 
 # Network
-vpc_cidr           = "10.52.0.0/16"
+vpc_cidr           = "10.60.0.0/16"
 availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
 
 # NAT: one per AZ. An AZ outage takes down that AZ's egress only, and no

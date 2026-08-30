@@ -6,7 +6,21 @@ package main
 const usage = `lerian-infra — deploy the AWS v2 stacks of lerian-terraform-foundation
 
 USAGE
+  lerian-infra init --env <dev|stg|prd> [flags]        write the configuration
   lerian-infra --env <dev|stg|prd> [--target <target>] [--action <action>] [options]
+
+FIRST RUN
+  A fresh checkout has no configuration: environments.conf and every
+  envs/<env>.tfvars are gitignored, because they carry an AWS account id. The init
+  subcommand writes them, asking for what it cannot discover:
+
+    lerian-infra init --env dev
+
+  It lists the AWS profiles it found with the account each one reaches, detects
+  this machine's egress address for the cluster's API allow-list, and materialises
+  one tfvars per root from the committed *.tfvars-example next to it. Nothing it
+  does touches an AWS resource. Run 'lerian-infra init --help' for its flags —
+  every question it asks has one, so CI never has to answer a prompt.
 
 FLAGS
   --repo <path>           The lerian-terraform-foundation checkout to drive.
@@ -18,8 +32,14 @@ FLAGS
                             3. walk up from the working directory until a
                                directory holding examples/aws/_modules and
                                examples/aws/backend is found.
-                          Use --repo or the variable for a go-installed copy run
-                          from outside a checkout.
+                            4. the managed checkout, ~/lerian/lerian-terraform-foundation
+                          The managed checkout is LAST on purpose: an operator
+                          working inside a development checkout must keep driving
+                          that one, not the managed tree that also happens to
+                          exist. Only init may create it — a run that downloaded
+                          a repository halfway through would be a surprise.
+
+  --templates-dir <path>  Where the managed checkout lives, when not the default.
 
   --env <dev|stg|prd>     REQUIRED. Selects the AWS account from
                           examples/aws/environments.conf, the backend file
@@ -36,6 +56,11 @@ FLAGS
                             <product>                every service of one product
                             <product>/<service>      one service
                             all                      everything, in order
+                          Several targets can be combined with commas:
+                            --target infra-base,midaz
+                          The parts are reordered into dependency order, so
+                          "midaz,infra-base" and "infra-base,midaz" run the same
+                          way and neither can put a datastore before its VPC.
                           Products and services are DISCOVERED from
                           examples/aws/products/*/*/main.tf. A new product works
                           the moment its directory exists. Run --list to see them.
@@ -82,6 +107,29 @@ THE ACCOUNT GUARD
   reviewable, diffable act — instead of typing an override at the end of a long
   day.
 
+THE SHARED TIER IS OPT-IN PER ENGINE
+  shared-resources holds five engines because five exist in AWS, not because any
+  environment wants all five. An engine with no envs/<env>.tfvars is skipped and
+  reported by name, so "apply the shared tier" is not refused because of a
+  datastore nobody uses — MSK, whose floor is three brokers, being the usual one.
+
+  For a PRODUCT this does not apply: every datastore under it is required by its
+  chart, so a missing tfvars there stays an error.
+
+  S3 is never shared, and that is why the tier has no s3 root. A bucket holds one
+  application's objects under one policy, one lifecycle and one key, so the roots
+  that own one — br-sfn, fetcher, plugin-bc-correios, reporter — carry no mode
+  switch. Shared mode leaves them alone: they still create a real bucket, and they
+  still need to be applied along with the product.
+
+WHERE helm-values READS FROM
+  A product in shared mode creates nothing: its roots resolve the tier that owns
+  the datastores. For products whose chart mapping has been ported into this
+  binary, helm-values reads the tier's state directly and never touches the
+  product root, so there is no apply of a root that would build nothing. For every
+  other product it reads the product root's own helm_values output, which requires
+  that root to have been applied.
+
 ORDER
   apply    bootstrap -> infra-base/vpc -> infra-base/eks
                      -> shared-resources/* -> products/*
@@ -96,7 +144,21 @@ WHY -reconfigure IS ALWAYS PASSED
   in the same checkout keeps the stale bucket and the run dies with a 403 at apply
   time — long after the plan looked fine. Every init here passes it.
 
+ENVIRONMENT VARIABLES
+  LERIAN_TF_REPO      The checkout to drive, when not running inside one.
+  LERIAN_TEMPLATES_REPO
+                      Where init --clone clones from, for an air-gapped client
+                      with an internal mirror or an organisation that vendors the
+                      templates into its own git server.
+  NO_COLOR            Set to anything to disable bold and colour. Colour is also
+                      off automatically when the output is not a terminal, so a
+                      redirected file or a CI log never contains escape codes.
+  LERIAN_SPINNER      ascii falls back from the braille progress spinner to
+                      | / - \\, for a terminal or font that renders braille as
+                      empty boxes.
+
 EXAMPLES
+  lerian-infra init --env dev
   lerian-infra --list
   lerian-infra --env dev --target all --dry-run
   lerian-infra --env dev --target bootstrap --action apply
@@ -105,4 +167,12 @@ EXAMPLES
   lerian-infra --env dev --target midaz/postgres --action destroy
   lerian-infra --env dev --target reporter --action helm-values --format yaml \
     > reporter-dev-values.yaml
+
+  A whole environment on shared datastores, from an empty account:
+    lerian-infra init --env dev                       # answer: shared
+    lerian-infra --env dev --target bootstrap        --action apply
+    lerian-infra --env dev --target infra-base       --action apply
+    lerian-infra --env dev --target shared-resources --action apply
+    lerian-infra --env dev --target midaz --action helm-values --format yaml \
+      > midaz-dev-values.yaml
 `

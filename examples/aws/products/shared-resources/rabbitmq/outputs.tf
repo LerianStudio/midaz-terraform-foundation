@@ -169,7 +169,7 @@ output "admin_username" {
 ################################################################################
 
 output "helm_values" {
-  description = "Chart env vars this broker fills in (midaz naming — see the header), ready to merge into ledger.configmap. Pair it with rabbitmq.enabled = false so the bundled subchart is not deployed alongside AmazonMQ. Note the chart has NO rabbitmq.external key — enabled = false is the whole switch."
+  description = "Chart env vars this broker fills in (midaz naming — see the header), ready to merge into ledger.configmap. Pair it with rabbitmq.enabled = false so the bundled subchart is not deployed alongside AmazonMQ. Note the chart has NO rabbitmq.external key — enabled = false is the whole switch. NOTE: this map is FLAT and midaz-named, and it is operator reference only — the tier serves several products and cannot know any one chart's components. Programmatic consumers must not read it: `lerian-infra --action helm-values` builds each product's values from this root's FACTS (endpoint, port, username, secret_name) via pkg/infra/chartmap.go, keyed by that product's chart components."
   value = {
     RABBITMQ_URI      = "amqps"
     RABBITMQ_PROTOCOL = "https"
@@ -179,6 +179,9 @@ output "helm_values" {
     RABBITMQ_PORT_HOST = tostring(module.rabbitmq.port)
     RABBITMQ_PORT_AMQP = tostring(var.console_port)
 
-    RABBITMQ_DEFAULT_USER = var.mq_admin_user
+
+    # No *_USER key here either: this is the MASTER identity, and the chart's
+    # bootstrap Jobs create the scoped user the workload authenticates as.
+    # See products/midaz/<engine>/outputs.tf for the full reasoning.
   }
 }

@@ -1,0 +1,62 @@
+name: Go Release
+
+# Attaches the lerian-infra binaries to a release that already exists.
+#
+# The release itself is created by the `release` job in ci.yml, which runs
+# semantic-release on a push to main or develop. That job publishes the tag and the
+# release notes; this one reacts to the publication and uploads the artifacts, which
+# is why .goreleaser.yml runs in `mode: append` with its changelog disabled.
+#
+# WHY GORELEASER IS CALLED DIRECTLY AND NOT THROUGH THE SHARED WORKFLOW
+#
+# LerianStudio/github-actions-shared-workflows/.github/workflows/go-release.yml was a
+# goreleaser workflow at v1.3.5 — which is what lerian-cli still pins — and has since
+# been repurposed. At v1.58.1 the same filename is a container-image and GitOps
+# umbrella (changes -> release -> build -> gitops-update) with no goreleaser step in
+# it at all, and no other workflow in that repository provides one. Pinning v1.3.5
+# would tie this release to a contract its owners have moved off, roughly fifty
+# releases back, including the pinned action versions inside it.
+#
+# Switching to the shared workflow later is a small change: replace the job below
+# with `uses:` plus the goreleaser_* inputs. It is worth doing the moment that
+# repository publishes a current goreleaser workflow.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and attach binaries
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # goreleaser derives the version from the tag, so it needs the tags.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Read from go.mod so the version lives in exactly one place. Hardcoding it
+          # here is how a release ends up built by a different toolchain than the one
+          # CI tested with.
+          go-version-file: go.mod
+          cache: true
+
+      # The release must not ship a binary the test suite has not passed. ci.yml
+      # gates the tag, but a release can also be published by hand.
+      - name: Test
+        run: go test ./... -cover
+
+      - name: Release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

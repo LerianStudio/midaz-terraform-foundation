@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -74,6 +75,17 @@ type StageResult struct {
 	Plans []UnitResult
 	// Applies is empty for ActionPlan and for a stage that was never confirmed.
 	Applies []UnitResult
+	// Blocked marks a stage that could not be planned because an earlier stage in
+	// this same run still has resources to create.
+	//
+	// This is not a failure. Every layer here resolves the one below it in AWS — eks
+	// finds the VPC by tag, the datastores find its database subnets — and a plan
+	// sees only what AWS already has, never what an earlier stage of the same run
+	// has merely planned. On a first run that is the normal state of affairs, and
+	// reporting it as FAILED sent operators to debug a configuration that was right.
+	Blocked bool
+	// BlockedBy names the stage whose pending creations explain it.
+	BlockedBy string
 }
 
 // Changed reports whether any plan in the stage holds a change.
@@ -126,10 +138,35 @@ func (r *Runner) Execute(
 		result := StageResult{Stage: stage}
 		result.Plans = r.runUnits(ctx, stage.Units, func(ctx context.Context, unit Unit) (Changes, error) {
 			return r.planUnit(ctx, unit, destroy)
-		}, planVerb(destroy))
+		}, planVerb(destroy), false)
 
 		results = append(results, result)
 		if err := firstError(result.Plans); err != nil {
+			// Before calling this a failure, ask whether it could have succeeded at
+			// all. If an earlier stage of this same run still has resources to create,
+			// the things this stage looks up do not exist yet, and no configuration
+			// could have planned. That is the normal first run, not a fault.
+			if blocker := pendingCreator(results[:len(results)-1]); action == ActionPlan && blocker != "" {
+				results[len(results)-1].Blocked = true
+				results[len(results)-1].BlockedBy = blocker
+				for _, unit := range stage.Units {
+					progress.Update(unit.Name, StatusSkipped,
+						fmt.Sprintf("cannot be planned until %s is applied.", blocker), "")
+				}
+				// Everything below this stage is blocked for the same reason, so say
+				// so instead of attempting each one and collecting identical failures.
+				for _, later := range stages[index+1:] {
+					blockedResult := StageResult{Stage: later, Blocked: true, BlockedBy: blocker}
+					results = append(results, blockedResult)
+					for _, unit := range later.Units {
+						progress.Update(unit.Name, StatusSkipped,
+							fmt.Sprintf("cannot be planned until %s is applied.", blocker), "")
+					}
+				}
+				progress.Finish(false)
+				return results, nil
+			}
+
 			progress.Finish(true)
 			return results, fmt.Errorf("infra: plan failed in stage %q (%d of %d); nothing was applied "+
 				"and later stages were not started: %w", stage.Name, index+1, len(stages), err)
@@ -143,15 +180,24 @@ func (r *Runner) Execute(
 			if err := confirm(stage, result.Plans); err != nil {
 				progress.Finish(true)
 				for _, unit := range stage.Units {
-					progress.Update(unit.Name, StatusSkipped, "não confirmado.", "")
+					progress.Update(unit.Name, StatusSkipped, "not confirmed.", "")
 				}
 				return results, err
 			}
 		}
 
+		// terraform apply of a saved plan reports no counts of its own, but it
+		// does not need to: applying a saved plan performs exactly the changes
+		// that plan described. Carrying the planned counts across is what lets
+		// the apply line say what happened instead of "no changes".
+		planned := make(map[string]Changes, len(result.Plans))
+		for _, plan := range result.Plans {
+			planned[plan.Unit.Name] = plan.Changes
+		}
+
 		applies := r.runUnits(ctx, stage.Units, func(ctx context.Context, unit Unit) (Changes, error) {
-			return Changes{}, r.opts.Terraform.Apply(ctx, unit, r.PlanFile(unit))
-		}, applyVerb(destroy))
+			return planned[unit.Name], r.opts.Terraform.Apply(ctx, unit, r.PlanFile(unit))
+		}, applyVerb(destroy), true)
 		results[len(results)-1].Applies = applies
 
 		if err := firstError(applies); err != nil {
@@ -193,17 +239,17 @@ func (r *Runner) Outputs(ctx context.Context, units []Unit) (map[string]map[stri
 
 	outputs := make(map[string]map[string]json.RawMessage, len(units))
 	for _, unit := range units {
-		progress.Update(unit.Name, StatusRunning, "lendo os outputs...", "")
+		progress.Update(unit.Name, StatusRunning, "reading the outputs...", "")
 		if err := r.opts.Terraform.Init(ctx, unit, initOptionsFor(unit, r.opts.Backend, r.opts.Env)); err != nil {
 			progress.Update(unit.Name, StatusFail, err.Error(),
-				"Confirme que este stack já foi aplicado neste ambiente.")
+				"Confirm this stack has been applied in this environment.")
 			progress.Finish(true)
 			return outputs, err
 		}
 		values, err := r.opts.Terraform.Output(ctx, unit)
 		if err != nil {
 			progress.Update(unit.Name, StatusFail, err.Error(),
-				"Confirme que este stack já foi aplicado neste ambiente.")
+				"Confirm this stack has been applied in this environment.")
 			progress.Finish(true)
 			return outputs, err
 		}
@@ -216,7 +262,11 @@ func (r *Runner) Outputs(ctx context.Context, units []Unit) (map[string]map[stri
 
 // HelmValues merges the Helm handoff of every unit into one document.
 func (r *Runner) HelmValues(ctx context.Context, units []Unit) (Document, error) {
-	return CollectHelmValues(ctx, r.opts.Terraform, units, r.opts.Backend, r.opts.Env, r.opts.Progress)
+	// The Layout travels through so a product in shared mode can have its values
+	// built from the tier that owns its datastore, instead of requiring an apply of
+	// a root that creates nothing.
+	return CollectHelmValuesFrom(ctx, r.opts.Terraform, r.opts.Layout, units,
+		r.opts.Backend, r.opts.Env, r.opts.Progress)
 }
 
 // PlanFile is where the saved plan of one unit lives for this run.
@@ -231,6 +281,7 @@ func (r *Runner) runUnits(
 	units []Unit,
 	work func(context.Context, Unit) (Changes, error),
 	verb string,
+	applied bool,
 ) []UnitResult {
 	progress := r.opts.Progress
 	results := make([]UnitResult, len(units))
@@ -253,22 +304,59 @@ func (r *Runner) runUnits(
 
 			if err != nil {
 				progress.Update(unit.Name, StatusFail, err.Error(),
-					"Veja o log completo deste stack no diretório da execução.")
+					"See this stack's full log in the run directory.")
 				return
 			}
-			progress.Update(unit.Name, StatusOK, describeChanges(changes, result.Elapsed), "")
+			progress.Update(unit.Name, StatusOK, describeChanges(changes, result.Elapsed, applied), "")
 		}(i, unit)
 	}
 	wg.Wait()
 	return results
 }
 
-func describeChanges(changes Changes, elapsed time.Duration) string {
+// describeChanges renders one unit's outcome.
+//
+// Two conventions, both for the reader. The tense follows Terraform's own: a plan
+// says what it would do, an apply says what it did. And a count of zero is left
+// out entirely — "42 to add, 0 to change, 0 to destroy" spends most of its width
+// on the two facts that did not happen, and in a list of six stacks that is what
+// the eye has to filter before finding the number that matters.
+//
+// The elapsed time is separated by a tab so a renderer can column-align it. A
+// consumer that does not care can print the string as it is; the tab reads as
+// whitespace.
+func describeChanges(changes Changes, elapsed time.Duration, applied bool) string {
+	return summarizeChanges(changes, applied) + "\t" + roundElapsed(elapsed)
+}
+
+// summarizeChanges is the counts alone, without timing.
+func summarizeChanges(changes Changes, applied bool) string {
 	if changes.Empty() {
-		return fmt.Sprintf("sem mudanças (%s).", elapsed.Round(time.Second))
+		return "no changes"
 	}
-	return fmt.Sprintf("%d criar, %d alterar, %d destruir (%s).",
-		changes.Create, changes.Update, changes.Delete, elapsed.Round(time.Second))
+	verbs := [3]string{"to add", "to change", "to destroy"}
+	if applied {
+		verbs = [3]string{"added", "changed", "destroyed"}
+	}
+	counts := [3]int{changes.Create, changes.Update, changes.Delete}
+
+	parts := make([]string, 0, 3)
+	for i, count := range counts {
+		if count == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", count, verbs[i]))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// roundElapsed keeps the timing column narrow: whole seconds under a minute, and
+// no sub-second noise above it.
+func roundElapsed(d time.Duration) string {
+	if d < time.Minute {
+		return d.Round(time.Second).String()
+	}
+	return d.Round(time.Second).String()
 }
 
 func firstError(results []UnitResult) error {
@@ -282,16 +370,16 @@ func firstError(results []UnitResult) error {
 
 func planVerb(destroy bool) string {
 	if destroy {
-		return "planejando a destruição"
+		return "planning destroy"
 	}
-	return "planejando"
+	return "planning"
 }
 
 func applyVerb(destroy bool) string {
 	if destroy {
-		return "destruindo"
+		return "destroying"
 	}
-	return "aplicando"
+	return "applying"
 }
 
 // initOptionsFor picks how a root is initialised. bootstrap is the exception in
@@ -355,4 +443,32 @@ func (l *FileLogs) Close() error {
 	}
 	l.files = map[string]*os.File{}
 	return err
+}
+
+// pendingCreator names the earliest stage that still has resources to create, or
+// "" when everything above has already been applied.
+//
+// It is the whole test for "this stage never had a chance": a stage that resolves
+// its VPC by tag cannot plan while the stage that creates that VPC has 42 things
+// still to add.
+func pendingCreator(earlier []StageResult) string {
+	for _, result := range earlier {
+		for _, plan := range result.Plans {
+			if plan.Err == nil && plan.Changes.Create > 0 {
+				return result.Stage.Name
+			}
+		}
+	}
+	return ""
+}
+
+// Blocked reports whether any stage could not be planned because a stage above it
+// has not been applied yet.
+func Blocked(results []StageResult) bool {
+	for _, result := range results {
+		if result.Blocked {
+			return true
+		}
+	}
+	return false
 }

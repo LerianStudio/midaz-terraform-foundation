@@ -16,7 +16,7 @@ product     = "lerian"
 environment = "stg"
 
 # Network
-vpc_cidr           = "10.51.0.0/16"
+vpc_cidr           = "10.55.0.0/16"
 availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
 
 # NAT: one per AZ, same as prd, so an AZ failure drill in stg is meaningful.

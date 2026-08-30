@@ -10,8 +10,8 @@
 #     -backend-config="key=aws/infra-base/vpc/terraform.tfstate"
 #
 # Do NOT add placeholder values (<PUT-YOUR-BUCKET-NAME-HERE> and friends). The
-# placeholder check in deploy.sh greps for "<...>" in backend files and aborts
-# the deployment when it finds one.
+# placeholder check in lerian-infra greps for "<...>" in backend files and
+# aborts the run when it finds one.
 ################################################################################
 
 terraform {

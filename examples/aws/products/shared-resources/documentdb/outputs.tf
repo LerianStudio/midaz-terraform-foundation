@@ -158,25 +158,26 @@ output "tls_enabled" {
 ################################################################################
 
 output "helm_values" {
-  description = "Chart env vars this datastore fills in (midaz naming — see the header), ready to merge into ledger.configmap (and crm.configmap for the unsuffixed keys). Pair it with mongodb.enabled = false and mongodb.external = true so the bundled Bitnami subchart is not deployed alongside DocumentDB."
+  description = "Chart env vars this datastore fills in (midaz naming — see the header), ready to merge into ledger.configmap (and crm.configmap for the unsuffixed keys). Pair it with mongodb.enabled = false and mongodb.external = true so the bundled Bitnami subchart is not deployed alongside DocumentDB. NOTE: this map is FLAT and midaz-named, and it is operator reference only — the tier serves several products and cannot know any one chart's components. Programmatic consumers must not read it: `lerian-infra --action helm-values` builds each product's values from this root's FACTS (endpoint, port, username, secret_name) via pkg/infra/chartmap.go, keyed by that product's chart components."
   value = {
     MONGO_ONBOARDING_URI        = "mongodb"
     MONGO_ONBOARDING_HOST       = module.documentdb.endpoint
     MONGO_ONBOARDING_PORT       = tostring(module.documentdb.port)
-    MONGO_ONBOARDING_USER       = var.master_username
     MONGO_ONBOARDING_PARAMETERS = local.mongo_parameters
 
     MONGO_TRANSACTION_URI        = "mongodb"
     MONGO_TRANSACTION_HOST       = module.documentdb.endpoint
     MONGO_TRANSACTION_PORT       = tostring(module.documentdb.port)
-    MONGO_TRANSACTION_USER       = var.master_username
     MONGO_TRANSACTION_PARAMETERS = local.mongo_parameters
 
     # crm.configmap — only rendered when crm.enabled is true.
     MONGO_URI        = "mongodb"
     MONGO_HOST       = module.documentdb.endpoint
     MONGO_PORT       = tostring(module.documentdb.port)
-    MONGO_USER       = var.master_username
     MONGO_PARAMETERS = local.mongo_parameters
+
+    # No *_USER key here either: this is the MASTER identity, and the chart's
+    # bootstrap Jobs create the scoped user the workload authenticates as.
+    # See products/midaz/<engine>/outputs.tf for the full reasoning.
   }
 }

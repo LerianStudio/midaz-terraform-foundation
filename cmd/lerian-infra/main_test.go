@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/LerianStudio/lerian-terraform-foundation/pkg/infra"
 )
@@ -263,7 +265,9 @@ func TestInvalidFlagValuesAreRejected(t *testing.T) {
 		{"format", []string{"--format", "toml", "--action", "helm-values", "--target", "midaz"}, "invalid --format"},
 		{"jobs", []string{"--jobs", "0"}, "invalid --jobs"},
 		{"environment", []string{"--env", "prod"}, `invalid --env "prod"`},
-		{"positional argument", []string{"aws"}, "unexpected argument"},
+		// Not a provider name: aws/azure/gcp carry their own redirects, asserted
+		// by TestProviderPositionalRedirect.
+		{"positional argument", []string{"midaz"}, "unexpected argument"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -277,4 +281,164 @@ func TestInvalidFlagValuesAreRejected(t *testing.T) {
 			}
 		})
 	}
+}
+
+// deploy.sh took the provider positionally and pointed azure/gcp at the legacy
+// script. Removing it did not remove that signpost, and must not: examples/gcp and
+// examples/azure are still on the pre-v2 layout, and only deploy-legacy.sh reaches
+// them.
+func TestProviderPositionalRedirect(t *testing.T) {
+	for _, tc := range []struct{ arg, want string }{
+		{"gcp", "deploy-legacy.sh"},
+		{"azure", "deploy-legacy.sh"},
+		{"aws", "--env dev"},
+	} {
+		var out, errOut bytes.Buffer
+		err := run(context.Background(), []string{tc.arg}, &out, &errOut)
+		if err == nil {
+			t.Fatalf("%s: expected an error", tc.arg)
+		}
+		if !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: error should mention %q, got:\n%s", tc.arg, tc.want, err)
+		}
+	}
+}
+
+// checkoutTree builds a minimal directory that IsCheckout recognises.
+func checkoutTree(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, dir := range [][]string{
+		{"examples", "aws", "_modules"},
+		{"examples", "aws", "backend"},
+	} {
+		if err := os.MkdirAll(filepath.Join(append([]string{root}, dir...)...), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// The managed checkout is LAST on purpose. An operator inside a development
+// checkout must keep driving that one: resolving to the managed tree because it
+// also happens to exist would run their command against different templates than
+// the ones they are editing, and nothing in the output would say so.
+func TestResolveLayoutPrefersTheWorkingDirectoryOverTheManagedCheckout(t *testing.T) {
+	managed := checkoutTree(t)
+	working := checkoutTree(t)
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	if err := os.Chdir(working); err != nil {
+		t.Fatal(err)
+	}
+
+	layout, source, err := resolveLayout("", "", managed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source != sourceWorkingIn {
+		t.Errorf("source = %q, want %q", source, sourceWorkingIn)
+	}
+	// macOS resolves TempDir through /var -> /private/var, so compare by suffix.
+	if !strings.HasSuffix(layout.Root, filepath.Base(working)) {
+		t.Errorf("layout.Root = %q, want the working checkout %q", layout.Root, working)
+	}
+}
+
+// With nothing named and nothing nearby, the managed checkout is the fallback —
+// which is what makes a binary downloaded from the releases page usable from any
+// directory.
+func TestResolveLayoutFallsBackToTheManagedCheckout(t *testing.T) {
+	managed := checkoutTree(t)
+
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	// A directory that is NOT inside any checkout.
+	outside := t.TempDir()
+	if err := os.Chdir(outside); err != nil {
+		t.Fatal(err)
+	}
+
+	layout, source, err := resolveLayout("", "", managed)
+	if err != nil {
+		t.Fatalf("expected the managed checkout to resolve: %v", err)
+	}
+	if source != sourceManaged {
+		t.Errorf("source = %q, want %q", source, sourceManaged)
+	}
+	if !strings.HasSuffix(layout.Root, filepath.Base(managed)) {
+		t.Errorf("layout.Root = %q, want %q", layout.Root, managed)
+	}
+}
+
+// "Not found" without "here is where I looked" leaves the operator guessing which
+// of four mechanisms they got wrong. The failure must name all four AND show the
+// value each one had.
+func TestResolveLayoutFailureNamesEveryPlaceItLooked(t *testing.T) {
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(previous) })
+	outside := t.TempDir()
+	if err := os.Chdir(outside); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = resolveLayout("", "", filepath.Join(t.TempDir(), "absent"))
+	if err == nil {
+		t.Fatal("expected a failure with no checkout anywhere")
+	}
+	for _, want := range []string{
+		"--repo", "$LERIAN_TF_REPO", "the working directory and parents",
+		"the managed checkout", "init --clone",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the failure must mention %q:\n%v", want, err)
+		}
+	}
+}
+
+// A path the operator named that is not a checkout is a different failure from
+// having named nothing — and it must still list every way of pointing at one.
+func TestNotACheckoutStillListsAllFourOptions(t *testing.T) {
+	empty := t.TempDir()
+	_, _, err := resolveLayout(empty, "", "")
+	if err == nil {
+		t.Fatal("an empty directory is not a checkout")
+	}
+	if !strings.Contains(err.Error(), "init --clone") {
+		t.Errorf("the fourth option must be offered here too:\n%v", err)
+	}
+	if !strings.Contains(err.Error(), "--repo") {
+		t.Errorf("the failure must name the source it resolved from:\n%v", err)
+	}
+}
+
+// The spinner repaints, so it must run only where a repaint means something. This
+// was a documented invariant every caller had to remember, and the second caller
+// forgot it: piping the output produced every frame on its own line, which in a CI
+// log is hundreds of lines of carriage-return debris. The constructor enforces it
+// now, so no future caller can reintroduce it.
+func TestSpinnerIsInertWhenTheDestinationCannotRepaint(t *testing.T) {
+	var mu sync.Mutex
+	out := &bytes.Buffer{}
+
+	spin := newSpinner(&mu, out, "cloning v1.6.0")
+	// Long enough that a live spinner would have painted several frames.
+	time.Sleep(150 * time.Millisecond)
+	spin.Stop()
+
+	if out.Len() != 0 {
+		t.Errorf("a buffer is not a terminal, so nothing should have been painted:\n%q", out.String())
+	}
+	// Stop must be safe, and safe twice: the inert path closes no channel.
+	spin.Stop()
 }

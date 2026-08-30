@@ -147,20 +147,20 @@ output "subnet_group_name" {
 ################################################################################
 
 output "helm_values" {
-  description = "Chart env vars this datastore fills in (midaz naming — see the header), ready to merge into ledger.configmap. Pair it with postgresql.enabled = false and postgresql.external = true so the bundled Bitnami subchart is not deployed alongside RDS."
+  description = "Chart env vars this datastore fills in (midaz naming — see the header), ready to merge into ledger.configmap. Pair it with postgresql.enabled = false and postgresql.external = true so the bundled Bitnami subchart is not deployed alongside RDS. NOTE: this map is FLAT and midaz-named, and it is operator reference only — the tier serves several products and cannot know any one chart's components. Programmatic consumers must not read it: `lerian-infra --action helm-values` builds each product's values from this root's FACTS (endpoint, port, username, secret_name) via pkg/infra/chartmap.go, keyed by that product's chart components."
   value = {
     DB_ONBOARDING_HOST  = module.postgres.endpoint
     DB_ONBOARDING_PORT  = tostring(module.postgres.port)
-    DB_ONBOARDING_USER  = module.postgres.username
     DB_TRANSACTION_HOST = module.postgres.endpoint
     DB_TRANSACTION_PORT = tostring(module.postgres.port)
-    DB_TRANSACTION_USER = module.postgres.username
 
     DB_ONBOARDING_REPLICA_HOST  = local.helm_replica_host
     DB_ONBOARDING_REPLICA_PORT  = tostring(module.postgres.port)
-    DB_ONBOARDING_REPLICA_USER  = module.postgres.username
     DB_TRANSACTION_REPLICA_HOST = local.helm_replica_host
     DB_TRANSACTION_REPLICA_PORT = tostring(module.postgres.port)
-    DB_TRANSACTION_REPLICA_USER = module.postgres.username
+
+    # No *_USER key here either: this is the MASTER identity, and the chart's
+    # bootstrap Jobs create the scoped user the workload authenticates as.
+    # See products/midaz/<engine>/outputs.tf for the full reasoning.
   }
 }

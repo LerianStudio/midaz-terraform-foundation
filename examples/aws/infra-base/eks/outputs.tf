@@ -158,3 +158,13 @@ output "update_kubeconfig" {
   description = "Ready to run command that writes this cluster into the local kubeconfig."
   value       = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.region}"
 }
+
+# Exposed so a consumer can name the address in a message rather than describe the
+# concept. The commonest failure after this stack applies is kubectl hanging
+# because the operator's egress address moved since the apply — a timeout, not a
+# refusal, which explains nothing on its own. Reporting the allow-list next to the
+# symptom turns it into an instruction.
+output "allowed_api_access_cidrs" {
+  description = "CIDRs permitted to reach the public Kubernetes API endpoint."
+  value       = var.allowed_api_access_cidrs
+}

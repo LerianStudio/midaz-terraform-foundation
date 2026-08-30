@@ -142,8 +142,13 @@ output "subnet_group_name" {
 # not a translation. Verified against chart 8.7.0 (appVersion 3.8.0),
 # templates/ledger/configmap.yaml.
 #
-# Everything below lands on the LEDGER deployment. The CRM deployment has no
-# Redis variables at all.
+# KEYED BY CHART COMPONENT: the chart gives each component its own ConfigMap, so the
+# destination is part of this output. Everything here lands on the LEDGER deployment
+# — the CRM deployment has no Redis variables at all, which is why there is no "crm"
+# entry rather than an empty one.
+#
+# The same shape is produced by pkg/infra/chartmap.go for shared mode. The two must
+# agree: TestMidazShapeIsTheSameInBothModes fails when they drift.
 #
 # Two shapes that look like mistakes and are not:
 #   REDIS_HOST carries "host:port" — the chart dropped REDIS_PORT in 3.0.
@@ -159,14 +164,16 @@ output "subnet_group_name" {
 ################################################################################
 
 output "helm_values" {
-  description = "midaz chart env vars this datastore fills in, ready to merge into ledger.configmap. Pair it with valkey.enabled = false and valkey.external = true so the bundled Bitnami subchart is not deployed alongside ElastiCache."
+  description = "midaz chart env vars this datastore fills in, keyed by CHART COMPONENT. Merge each entry into the matching <component>.configmap block. `crm` is absent because the CRM deployment has no Redis variable at all. Pair it with valkey.enabled = false and valkey.external = true so the bundled Bitnami subchart is not deployed alongside ElastiCache."
   value = {
-    REDIS_HOST = local.redis_host_port
-    REDIS_TLS  = local.redis_tls_required ? "true" : "false"
-    REDIS_DB   = tostring(var.redis_db_index)
+    ledger = {
+      REDIS_HOST = local.redis_host_port
+      REDIS_TLS  = local.redis_tls_required ? "true" : "false"
+      REDIS_DB   = tostring(var.redis_db_index)
 
-    MULTI_TENANT_REDIS_HOST = module.valkey.endpoint
-    MULTI_TENANT_REDIS_PORT = tostring(module.valkey.port)
-    MULTI_TENANT_REDIS_TLS  = local.redis_tls_required ? "true" : "false"
+      MULTI_TENANT_REDIS_HOST = module.valkey.endpoint
+      MULTI_TENANT_REDIS_PORT = tostring(module.valkey.port)
+      MULTI_TENANT_REDIS_TLS  = local.redis_tls_required ? "true" : "false"
+    }
   }
 }
