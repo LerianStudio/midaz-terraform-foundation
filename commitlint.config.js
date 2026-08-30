@@ -32,6 +32,10 @@ module.exports = {
         'test',
       ],
     ],
-    'scope-enum': [2, 'always', ['release']],
+    // The cloud a change belongs to is the one fact worth carrying in a scope here:
+    // this repository holds three layouts side by side, and "which cloud" is the
+    // first thing a reader of the log wants to know. 'release' stays for the tags
+    // semantic-release cuts.
+    'scope-enum': [2, 'always', ['release', 'aws', 'gcp', 'azure']],
   },
 };
