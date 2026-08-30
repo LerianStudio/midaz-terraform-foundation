@@ -77,3 +77,6 @@ package-lock.json
 
 # Beads issue tracker (local only)
 .beads/
+
+# Working documents: plans and notes, local only.
+/docs/
