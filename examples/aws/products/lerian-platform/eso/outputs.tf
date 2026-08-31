@@ -34,8 +34,13 @@ output "service_account" {
 }
 
 output "secret_arn_patterns" {
-  description = "Resource ARN patterns the policy was rendered with. An ExternalSecret stuck in SecretSyncedError is almost always a path outside these, or a CMK missing from kms_key_arns."
+  description = "Resource ARN patterns the policy was rendered with. AN ExternalSecret STUCK IN SecretSyncedError IS ALMOST ALWAYS A PATH OUTSIDE THESE — check that before checking KMS. The commonest miss is the datastore family ({product}-{env}-postgres/password and friends), which looks nothing like the tenants/ and clusters/ paths and is easy to leave out of the list."
   value       = module.secrets.secret_arn_patterns
+}
+
+output "denied_arn_patterns" {
+  description = "Paths this role is explicitly denied, Deny beating every Allow. The Dataprev custody path is here: ESO must not be able to project a tenant's credential into a Secret. An ExternalSecret targeting one of these will fail, and that is the design."
+  value       = module.secrets.denied_arn_patterns
 }
 
 ################################################################################

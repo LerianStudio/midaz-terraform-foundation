@@ -95,11 +95,15 @@ module "secrets" {
   oidc_provider_arn = local.oidc_provider_arn
   service_account   = var.service_account
 
-  secret_path_prefixes = var.secret_path_prefixes
-  read_actions         = var.read_actions
-  write_actions        = var.write_actions
-  allow_list_secrets   = var.allow_list_secrets
-  kms_key_arns         = var.kms_key_arns
+  secret_path_prefixes      = var.secret_path_prefixes
+  read_actions              = var.read_actions
+  write_actions             = var.write_actions
+  deny_secret_path_patterns = var.deny_secret_path_patterns
+  deny_actions              = var.deny_actions
 
+  allow_list_secrets = var.allow_list_secrets
+  kms_key_arns       = var.kms_key_arns
+
+  additional_policy_names = var.additional_policy_names
   extra_policy_statements = var.extra_policy_statements
 }

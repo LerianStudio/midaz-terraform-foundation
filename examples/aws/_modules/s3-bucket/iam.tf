@@ -71,18 +71,27 @@ data "aws_iam_policy_document" "bucket_access" {
     }
   }
 
+  # s3:DeleteObject is withheld on a WORM bucket. COMPLIANCE protects the object
+  # VERSIONS — nobody can remove them — but DeleteObject on a versioned bucket
+  # still writes a DELETE MARKER, and a delete marker hides the artefact from an
+  # unversioned GET and from a plain ListObjectsV2. The bytes survive; the evidence
+  # stops being findable by anyone who does not know to look at versions. No Lerian
+  # retained-storage caller invokes DeleteObject, so nothing legitimate loses a
+  # capability here.
   statement {
     sid    = "ObjectLevelAccess"
     effect = "Allow"
 
-    actions = [
-      "s3:GetObject",
-      "s3:GetObjectVersion",
-      "s3:PutObject",
-      "s3:DeleteObject",
-      "s3:AbortMultipartUpload",
-      "s3:ListMultipartUploadParts",
-    ]
+    actions = concat(
+      [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts",
+      ],
+      each.value.object_lock_enabled ? [] : ["s3:DeleteObject"],
+    )
 
     resources = ["${module.buckets[each.key].s3_bucket_arn}/*"]
   }

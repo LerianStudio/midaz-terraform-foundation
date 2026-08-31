@@ -23,6 +23,16 @@ output "secret_arn_patterns" {
   value       = local.secret_arns
 }
 
+output "denied_arn_patterns" {
+  description = "Resource ARN patterns carved out by the explicit Deny, if any. A Deny beats every Allow in IAM, so these are unreachable by this role no matter what else is attached to it — including a policy somebody adds later."
+  value       = local.denied_arns
+}
+
+output "attached_policy_names" {
+  description = "Customer-managed policies borrowed from other roots and attached to this role. This is how a service holds one role instead of one per concern."
+  value       = var.additional_policy_names
+}
+
 output "list_secrets_granted" {
   description = "Whether the account-wide secretsmanager:ListSecrets statement was emitted. streaming-hub refuses to boot without it in multi-tenant mode, and reports the refusal as a crashloop rather than as a permission error."
   value       = var.allow_list_secrets

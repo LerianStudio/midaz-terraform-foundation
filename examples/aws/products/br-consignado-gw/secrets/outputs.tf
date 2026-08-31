@@ -41,24 +41,34 @@ output "secret_arn_patterns" {
 ################################################################################
 # Helm handoff
 #
-# Verified against br-consignado-gw's env contract (internal/bootstrap/config.go),
-# not against a chart: the gateway HAS NO HELM CHART in its repository, so these
-# key names come from the application's own configuration surface, which is the
-# only authority there is.
+# Verified against br-consignado-gw's env contract (internal/bootstrap/config.go).
+# A published chart exists (br-consignado-gw-helm 1.0.1, ghcr helm-internal) and
+# was not read while authoring this root, so these key names are the contract the
+# chart has to satisfy — reconcile against the real values.yaml in the helmfile
+# phase rather than trusting either side alone.
 #
-# AWS_REGION IS DELIBERATELY EMITTED EMPTY. The gateway's config declares, with the
-# reason written down, that a literal region is an OVERRIDE rather than a fallback,
-# and that for a regulated institution the region is data residency. Left blank, the
-# SDK resolves it from the pod's own environment, which is the account and region
-# the workload actually runs in. An operator who hardcodes a region here can silently
-# move a Dataprev credential to another jurisdiction.
+# AWS_REGION IS OMITTED, NOT EMITTED EMPTY, AND THE DIFFERENCE IS NOT COSMETIC.
+#
+# The gateway's config declares, with the reason written down, that a literal region
+# is an OVERRIDE rather than a fallback, and that for a regulated institution the
+# region is data residency. So the right value is "whatever the pod resolves", and
+# the way to express that is to say nothing.
+#
+# An empty string does NOT say nothing. AWS_REGION present-and-empty in the pod spec
+# stops the EKS pod-identity webhook from injecting the real region — the webhook
+# does not overwrite an env var that is already defined — so resolution falls
+# through to AWS_DEFAULT_REGION and then to IMDS, neither of which is guaranteed on
+# a cluster with a hop limit of 1. The result is a region lookup that fails at
+# runtime, on the custody path.
+#
+# The sibling s3 root already omitted it and said why. This one now agrees.
 ################################################################################
 
 output "helm_values" {
-  description = "Chart values this role fills in. CREDENTIALS_STORE_ENABLED must be true — the gateway refuses to boot with the custody store off in a managed deployment. AWS_REGION is intentionally the empty string: a literal is an override, not a fallback, and region is data residency here."
+  description = "Chart values this role fills in. CREDENTIALS_STORE_ENABLED must be true — the gateway refuses to boot with the custody store off in a managed deployment. ENV_NAME is the segment inside every custody reference and is immutable from the first write. AWS_REGION is deliberately ABSENT rather than empty: an empty value blocks the pod-identity webhook from injecting the real region."
   value = {
     "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn" = module.secrets.iam_role_arn
     CREDENTIALS_STORE_ENABLED                                   = "true"
-    AWS_REGION                                                  = ""
+    ENV_NAME                                                    = var.app_env_name
   }
 }

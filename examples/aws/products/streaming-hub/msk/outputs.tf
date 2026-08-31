@@ -150,9 +150,14 @@ output "topic_subscription_patterns" {
 
 output "helm_values" {
   description = "Chart env vars this cluster fills in. Verified against streaming-hub's configuration loader, not against a chart — the service has none. Note the STREAMING_HUB_ prefix: the unprefixed STREAMING_* names are lib-streaming's producer surface and the hub does not read them. The SCRAM username and password are omitted on purpose; they are required together and both arrive from the vault via External Secrets."
-  value = {
-    STREAMING_HUB_KAFKA_BROKERS         = module.msk.endpoint
-    STREAMING_HUB_KAFKA_TLS_ENABLED     = "true"
-    STREAMING_HUB_KAFKA_SCRAM_MECHANISM = var.enable_sasl_scram ? "SCRAM-SHA-512" : ""
-  }
+  value = merge(
+    {
+      STREAMING_HUB_KAFKA_BROKERS     = module.msk.endpoint
+      STREAMING_HUB_KAFKA_TLS_ENABLED = "true"
+    },
+    # OMITTED, NOT EMPTIED, when SCRAM is off. The hub reads an empty mechanism as
+    # "no SASL" and then fails authentication against a broker that requires it —
+    # an error about the broker, not about the configuration.
+    var.enable_sasl_scram ? { STREAMING_HUB_KAFKA_SCRAM_MECHANISM = "SCRAM-SHA-512" } : {},
+  )
 }

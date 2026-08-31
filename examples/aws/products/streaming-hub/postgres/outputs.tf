@@ -68,7 +68,7 @@ output "secret_arn" {
 }
 
 output "secret_name" {
-  description = "Name of the Secrets Manager secret holding the master credentials. See the DB_PASSWORD note in helm_values: with the bundled subchart disabled, the chart resolves the password through auth.secrets.DB_PASSWORD or through auth-database.auth.existingSecret, and the External Secrets Operator ExternalSecret targets whichever of the two the release is configured for."
+  description = "Name of the Secrets Manager secret holding the master credentials: streaming-hub-{env}-postgres/password. There is no DB_PASSWORD on this service and no bundled subchart to disable — it reads ONE DSN string, and the ExternalSecret templates that DSN from this secret's JSON payload {username,password,engine,host,port,dbname}. See dsn_template_hint. THIS NAME MUST APPEAR IN THE ESO ROLE'S secret_path_prefixes, and note that it starts with neither tenants/ nor clusters/."
   value       = module.postgres.secret_name
 }
 
@@ -109,8 +109,9 @@ output "subnet_group_name" {
 ################################################################################
 # Helm handoff
 #
-# streaming-hub HAS NO HELM CHART — not in its repository, not in the deployer's
-# chart directory. The key names below come from the service's own configuration
+# streaming-hub has no chart in its repository and none in the deployer's chart
+# directory — the one service of this wire where the absence was actually measured.
+# The key names below come from the service's own configuration
 # loader (internal/bootstrap/config_load.go:21-24), which is the only authority
 # there is and the one a future chart will have to match.
 #

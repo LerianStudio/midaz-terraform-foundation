@@ -51,9 +51,34 @@ variable "service_account" {
 }
 
 variable "secret_path_prefixes" {
-  description = "Vault prefixes ESO may read. Broad on purpose: the operator projects secrets for every workload, so a per-product scope defeats it. Narrow it only to carve the estate into several ClusterSecretStores with a role each."
-  type        = list(string)
-  default     = ["tenants/", "clusters/"]
+  description = <<-EOT
+    Vault prefixes ESO may read. NO TRAILING "*" — the module appends one.
+
+    THERE ARE TWO UNRELATED NAMING FAMILIES IN THIS VAULT AND A LIST THAT COVERS
+    ONLY ONE OF THEM PRODUCES AN OPERATOR THAT CANNOT READ A SINGLE DATABASE
+    PASSWORD:
+
+      application secrets   tenants/{env}/...    written by tenant-manager and by
+                            clusters/{env}/...   the gateway, at runtime
+      datastore secrets     {product}-{env}-postgres/password
+                            {product}-{env}-valkey/auth-token
+                            {product}-{env}-docdb/password
+                            AmazonMSK_{name}      written by THIS repository's
+                                                  datastore modules, at apply time
+
+    The second family is every credential Terraform itself generates
+    (_modules/postgres-rds/main.tf:255, valkey-elasticache/main.tf:226,
+    mongodb-documentdb/main.tf:177, streaming-msk/main.tf:88-92). None of them
+    starts with tenants/ or clusters/.
+
+    DEFAULT IS EMPTY, DELIBERATELY. The module refuses to build a role whose read
+    actions have no resource, so an unset list fails the plan instead of producing
+    an operator that syncs nothing. The list belongs in the tfvars, where adding a
+    product is a reviewable line.
+  EOT
+
+  type    = list(string)
+  default = []
 }
 
 variable "read_actions" {
@@ -61,6 +86,35 @@ variable "read_actions" {
   type        = list(string)
   default = [
     "secretsmanager:GetSecretValue",
+    "secretsmanager:DescribeSecret",
+  ]
+}
+
+variable "deny_secret_path_patterns" {
+  description = <<-EOT
+    Paths ESO may NOT touch, whatever the Allow says. A Deny beats every Allow in
+    IAM, including one attached later.
+
+    THE DATAPREV CUSTODY PATH BELONGS HERE. ESO's Allow has to be broad — it
+    projects for every workload — and broad over tenants/ swallows
+    tenants/{env}/{org}/{app}/external/{target}/credentials/versions/{uuid}, which
+    is a tenant's Dataprev credential. Anyone able to create an ExternalSecret in
+    any namespace could then project that credential into a Secret they read. The
+    gateway reads its own custody store with its OWN role and does not need ESO for
+    it, so denying the path costs nothing and closes an exfiltration route that no
+    amount of write-side hardening would have caught.
+  EOT
+
+  type    = list(string)
+  default = []
+}
+
+variable "deny_actions" {
+  description = "Actions denied on deny_secret_path_patterns. For ESO the denial that matters is the READ — it has no write actions to deny. GetSecretValue alone would leave DescribeSecret and BatchGetSecretValue open, and BatchGetSecretValue returns values."
+  type        = list(string)
+  default = [
+    "secretsmanager:GetSecretValue",
+    "secretsmanager:BatchGetSecretValue",
     "secretsmanager:DescribeSecret",
   ]
 }
@@ -82,6 +136,10 @@ variable "kms_key_arns" {
     other secret projects fine.
 
     Take the value from the msk root's scram_kms_key_arn output.
+
+    THIS IS NOT THE ONLY CAUSE OF SecretSyncedError, and it is not the first one to
+    check. A path outside secret_path_prefixes produces the same symptom and is far
+    more common — see that variable's two naming families.
   EOT
 
   type    = list(string)

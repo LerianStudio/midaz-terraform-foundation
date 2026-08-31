@@ -126,6 +126,60 @@ variable "write_actions" {
   }
 }
 
+variable "deny_secret_path_patterns" {
+  description = <<-EOT
+    Secret name patterns this role is explicitly DENIED on, whatever else it is
+    granted. Same no-trailing-"*" rule as secret_path_prefixes; the module appends
+    one. Empty emits no Deny statement.
+
+    AN EXPLICIT DENY IS NOT THE SAME AS A NARROWER ALLOW, and that is the whole
+    reason this variable exists. Two roles on this estate need a broad Allow for
+    reasons that are measured and not negotiable — tenant-manager because its own
+    path builders emit three degenerate shapes that an environment-scoped prefix
+    does not match, and External Secrets because it projects for every workload —
+    and both of those broad Allows swallow the custody credential path as a side
+    effect. A Deny is the only construct that carves a hole out of a wildcard, and
+    in IAM it beats every Allow, including one attached later by somebody else.
+
+    The pattern to use for the Dataprev custody path is
+    "tenants/*/*/*/external/" (four segments before "external"). It matches
+    tenants/{env}/{org}/{app}/external/... and NOT
+    tenants/{env}/{tenantId}/{module}/kafka — including the case where a module is
+    itself named "external", which a shorter pattern would catch by accident.
+  EOT
+
+  type    = list(string)
+  default = []
+
+  validation {
+    condition = alltrue([
+      for pattern in var.deny_secret_path_patterns : !endswith(pattern, "*")
+    ])
+    error_message = "Do not write a trailing \"*\" in deny_secret_path_patterns: the module appends one."
+  }
+}
+
+variable "deny_actions" {
+  description = "Actions denied on deny_secret_path_patterns. Defaults to every mutating action: a Deny that only covered reads would leave the path writable, which is the property that matters for a custody trail. Narrow it to the read actions instead for a role that must not READ the path (External Secrets), or list both."
+  type        = list(string)
+  default = [
+    "secretsmanager:CreateSecret",
+    "secretsmanager:PutSecretValue",
+    "secretsmanager:UpdateSecret",
+    "secretsmanager:RestoreSecret",
+    "secretsmanager:DeleteSecret",
+    "secretsmanager:TagResource",
+    "secretsmanager:UntagResource",
+  ]
+
+  validation {
+    condition = alltrue([
+      for action in var.deny_actions : startswith(action, "secretsmanager:")
+    ])
+    error_message = "Every entry in deny_actions must be a secretsmanager: action."
+  }
+}
+
 variable "allow_list_secrets" {
   description = <<-EOT
     Grant secretsmanager:ListSecrets. SEPARATE FROM EVERYTHING ELSE BECAUSE IT
@@ -177,6 +231,40 @@ variable "extra_policy_statements" {
       values   = list(string)
     }))
   }))
+  default = []
+
+  # A Sid colliding with one of the module's own produces a policy document with a
+  # duplicate Sid, which AWS rejects at APPLY time with a MalformedPolicyDocument
+  # that names neither statement. Caught here instead.
+  validation {
+    condition = alltrue([
+      for statement in var.extra_policy_statements :
+      !contains(["ScopedSecretAccess", "DenyScopedSecretPaths", "ListSecretsAccountWide", "SecretEncryptionKey"], statement.sid)
+    ])
+    error_message = "The sids ScopedSecretAccess, DenyScopedSecretPaths, ListSecretsAccountWide and SecretEncryptionKey are reserved by this module. A duplicate Sid is rejected by AWS at apply time with an error that names neither statement."
+  }
+}
+
+variable "additional_policy_names" {
+  description = <<-EOT
+    Names of EXISTING customer-managed IAM policies to attach to this role, in
+    addition to the one this module writes. Names, not ARNs: the module resolves
+    the account and partition, so nothing here carries an account id.
+
+    THIS IS HOW A SERVICE ENDS UP WITH ONE ROLE INSTEAD OF TWO. A Kubernetes
+    ServiceAccount carries exactly one eks.amazonaws.com/role-arn annotation, so a
+    service needing both the vault and an S3 bucket cannot have a role per concern
+    — one of the two grants would be unreachable, and the symptom is an
+    AccessDenied on whichever path nobody tested. _modules/s3-bucket already emits
+    its grant as a standalone attachable policy named
+    "{product}-{env}-{logical}-s3-access" for exactly this.
+
+    THE POLICY MUST ALREADY EXIST. An attachment to a name that is not there fails
+    with NoSuchEntity, which is loud and fixable; it does not fail silently. Apply
+    the s3 root first — see its README.
+  EOT
+
+  type    = list(string)
   default = []
 }
 

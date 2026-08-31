@@ -7,6 +7,38 @@ Every datastore module generates a strong password and writes it to Secrets Mana
 None of them delivers it to a pod. Apply the whole estate without this and every
 workload boots without its database password.
 
+## The prefix list has two naming families, and missing one is silent
+
+The application secrets live under `tenants/` and `clusters/`. The credentials **this
+repository generates** do not:
+
+| Shape | Written by |
+|---|---|
+| `{product}-{env}-postgres/password` | `_modules/postgres-rds/main.tf:255` |
+| `{product}-{env}-valkey/auth-token` | `_modules/valkey-elasticache/main.tf:226` |
+| `{product}-{env}-docdb/password` | `_modules/mongodb-documentdb/main.tf:177` |
+| `AmazonMSK_{name}` | `_modules/streaming-msk/main.tf:88-92` |
+
+A list covering only the first family produces an operator that syncs every
+application secret and **not one database password**. The symptom is
+`SecretSyncedError` on exactly the ExternalSecrets the estate cannot boot without —
+and it looks identical to a missing KMS grant, so check the prefixes first.
+
+`secret_path_prefixes` defaults to empty: the module refuses to build a role whose
+read actions have no resource, so an unset list fails the plan rather than producing
+an operator that reads nothing.
+
+## The custody path is denied
+
+The broad Allow over `tenants/` would otherwise cover
+`tenants/{env}/{org}/{app}/external/.../credentials/versions/{uuid}`. Anyone able to
+create an ExternalSecret in any namespace could project a tenant's Dataprev
+credential into a Secret they read — read-only stops the operator destroying
+credentials and does nothing about exfiltrating one.
+
+`deny_secret_path_patterns = ["tenants/*/*/*/external/"]` closes it. The gateway
+reads its own custody store with its own role, so ESO loses nothing.
+
 ## Read-only, account-wide
 
 No `CreateSecret`, no `PutSecretValue`, no `DeleteSecret`. A compromise of the

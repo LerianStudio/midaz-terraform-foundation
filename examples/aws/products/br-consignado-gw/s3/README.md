@@ -40,11 +40,17 @@ An expiration rule cannot delete a COMPLIANCE-locked object; it only accumulates
 silent, repeated lifecycle failures while looking like a working retention policy.
 Retention is the policy here.
 
-## The two-roles question
+## One role, decided
 
-This root creates an IRSA role for the bucket; `../secrets` creates another for the
-vault. A ServiceAccount carries exactly **one** `role-arn` annotation. Either attach
-this root's policy (`iam_policy_arns`) to the vault role and set
-`irsa_enabled = false`, or give the chart two service accounts. Applying both and
-annotating with one produces a gateway that reads the vault and cannot write custody
-artefacts — discovered on the first averbação.
+This root runs with `irsa_enabled = false`: it creates the bucket and the attachable
+policy, and **no role**. The policy is attached to the vault role by
+`../secrets`, through `additional_policy_names`.
+
+A ServiceAccount carries exactly one `role-arn` annotation, so two roles was never a
+workable end state — applying both and annotating with one produces a gateway that
+reads the vault and cannot write custody artefacts, discovered on the first
+averbação.
+
+Two consequences: **apply this root before `../secrets`** (an attachment to a policy
+that does not exist fails with `NoSuchEntity`), and with no role to create there is
+no OIDC lookup, so this root no longer depends on `infra-base/eks`.

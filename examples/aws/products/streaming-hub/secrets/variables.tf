@@ -94,3 +94,27 @@ variable "kms_key_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "app_env_name" {
+  description = <<-EOT
+    The APPLICATION's environment name — the ENV_NAME the service boots with, and
+    the segment inside every Secrets Manager path. "production" on this estate,
+    while var.environment is "prd". They are different vocabularies and both are
+    load-bearing: var.environment names the IAM objects, this names the vault.
+
+    IT IS IMMUTABLE FROM THE FIRST WRITE. Credential references are re-parsed on
+    read and demand exact scope equality, so renaming the environment makes every
+    credential already stored unreadable.
+
+    Emitted into helm_values because the chart cannot derive it and getting it
+    wrong fails in a place that does not mention it.
+  EOT
+
+  type    = string
+  default = "production"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]*$", var.app_env_name))
+    error_message = "The app_env_name must be a lowercase name, e.g. production."
+  }
+}

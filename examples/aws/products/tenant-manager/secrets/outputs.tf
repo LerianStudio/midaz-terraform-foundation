@@ -41,9 +41,10 @@ output "secret_arn_patterns" {
 ################################################################################
 # Helm handoff
 #
-# tenant-manager HAS NO HELM CHART in its repository either — the chart lives in
-# the internal gitops repo. These keys come from the service's own configuration
-# struct (internal/bootstrap/config.go), which is the authority.
+# tenant-manager's chart is not in its repository — it lives in the internal gitops
+# repo and was not read here. These keys come from the service's own configuration
+# struct (internal/bootstrap/config.go), which is the contract that chart has to
+# satisfy. Reconcile in the helmfile phase.
 #
 # ENV_NAME is a HARD BOOT REQUIREMENT and its only valid values are "staging" and
 # "production". It is also the segment that selects the production fork in the
@@ -54,6 +55,7 @@ output "helm_values" {
   description = "Chart env vars this role fills in. ENV_NAME must be \"production\" on this estate: it is a hard boot requirement AND the switch that selects clusters/production/{dbType}/{service}/shared/admin over the shorter non-production form."
   value = {
     "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn" = module.secrets.iam_role_arn
+    ENV_NAME                                                    = var.app_env_name
     AWS_REGION                                                  = var.region
   }
 }

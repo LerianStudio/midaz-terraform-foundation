@@ -239,7 +239,7 @@ variable "enabled_cloudwatch_logs_exports" {
 }
 
 variable "parameters" {
-  description = "DB parameters applied to the parameter group, as a list of {name, value} (and optionally apply_method for a static parameter that needs a reboot). THIS IS WHERE TLS IS ENFORCED: rds.force_ssl = \"1\" makes the server REFUSE any non-TLS connection, and it is the only place in this repository that can state it — the module ships an empty parameter list and RDS defaults force_ssl to 0 on the postgres families, so a database with no entry here accepts plaintext from anything inside the security group. Encryption in transit is a client policy decision everywhere else in this repo; on a money path it is not."
+  description = "DB parameters applied to the parameter group, as a list of {name, value} (and optionally apply_method for a static parameter that needs a reboot). THIS IS WHERE TLS IS ENFORCED: rds.force_ssl = \"1\" makes the server REFUSE any non-TLS connection, and until this variable existed no root wrapper could state it at all — the module ships an empty parameter list and nothing populated it. Set it EXPLICITLY rather than inheriting: the RDS default for force_ssl varies by engine major (0 on the older postgres families, 1 from postgres15 on), so a database with no entry here has a posture that depends on which version it happened to be created at, and silently loosens on a downgrade or a restore into an older family. Encryption in transit is a client policy decision everywhere else in this repo; on a money path it is not."
   type = list(object({
     name         = string
     value        = string

@@ -1,60 +1,54 @@
 ################################################################################
-# products/br-consignado-gw/msk — the Kafka broker of the br-sfn product
+# products/br-consignado-gw/msk — the Kafka the gateway PUBLISHES the consignado
+# fact stream to
 #
-# br-sfn is the Brazilian SFN rails MONOREPO. The chart's infra contract states
-# that Postgres, Valkey/Redis, RabbitMQ, RedPanda AND IBM MQ are all EXTERNAL,
-# pre-provisioned services (Chart.yaml:43-45, README.md:76). RedPanda is the
-# Kafka API that contract refers to, and on AWS the managed implementation of it
-# is MSK. IBM MQ is a different rail and is NOT provisioned by this repository at
-# all — see ../README.md.
+# br-consignado-gw is the Dataprev gateway: the money path at the border. It
+# produces every consignado fact — all 21 definitions ride one route — and it
+# consumes the lender command plane.
 #
-# ONE ROOT STACK PER SERVICE. This directory owns exactly one datastore and one
-# state file (aws/products/br-consignado-gw/msk/terraform.tfstate). Its siblings —
-# postgres, valkey and rabbitmq — are independent roots with independent state.
-# That matters most here: an MSK broker replacement is by far the slowest apply
-# of the four.
+# THE DEFAULT MODE HERE IS "shared", AND THAT IS THE LOAD-BEARING DECISION.
 #
-#   mode = "dedicated"  -> creates br-sfn-{env}-msk, its security group, its two
-#                          CMKs and its Secrets Manager entry.
+# streaming-hub consumes what this gateway produces, and it subscribes BY REGEX:
+# ^lerian\.streaming\.<app>$, where <app> is the producer's ce-source verbatim. A
+# regex can only match a topic on the SAME CLUSTER. Give the gateway a dedicated
+# broker and it publishes happily into a broker nobody reads — a Kafka producer is
+# never told whether anyone is listening, and an empty regex match on the consumer
+# side is not a failure condition either. Both ends report healthy and no fact is
+# ever delivered.
+#
 #   mode = "shared"     -> creates NOTHING. Resolves the cluster owned by
 #                          products/shared-resources/msk by name: shared-{env}-msk
-#                          plus the secret AmazonMSK_shared-{env}-msk.
+#                          plus the secret AmazonMSK_shared-{env}-msk. THE DEFAULT.
+#   mode = "dedicated"  -> creates br-consignado-gw-{env}-msk, isolated from the
+#                          hub. Only correct to run the gateway as an island for
+#                          testing.
 #
-# READ THIS BEFORE PICKING dedicated.
+# Cost reinforces the same answer. MSK has no cheap corner: kafka.t3.small is the
+# smallest broker AWS offers, and the broker count must be a MULTIPLE of the number
+# of client subnets — infra-base/vpc tags THREE as Type=database, so the real floor
+# is three brokers, roughly USD 105/month, per product, before a single message.
 #
-# MSK HAS NO CHEAP CORNER. kafka.t3.small is the smallest broker AWS offers, the
-# minimum is two brokers, AND the broker count must be a MULTIPLE of the number
-# of client subnets. infra-base/vpc tags THREE subnets Type=database, so the
-# valid values are 3, 6, 9 — the real floor is THREE brokers, roughly
-# USD 105/month, per product, before a single message is published.
+# ONE ROOT STACK PER SERVICE. This directory owns one state file
+# (aws/products/br-consignado-gw/msk/terraform.tfstate); postgres, valkey, s3 and
+# secrets are independent roots with independent state.
 #
-# mode = "shared" against products/shared-resources/msk is therefore the NORMAL
-# choice and mode = "dedicated" is the justified exception. What could justify it
-# here is regulatory isolation: br-sfn speaks directly to BACEN and Nuclea over
-# RSFN (SPB/STR, SPI/Pix, SILOC, SCR), and a SHARED Kafka cluster is one topic
-# namespace, one set of ACLs and one retention budget for every product on it.
+# TOPICS ARE NOT CREATED HERE, by anything. auto.create.topics.enable is false so a
+# typo fails loudly instead of producing a live topic with broker defaults that
+# nobody consumes. Provisioning is an rpk Job in the helmfile phase; the list this
+# estate needs is in ../../lerian-platform/README.md and in the `topics` output.
 #
-# BUT NOTE HOW WEAK THE CHART-SIDE EVIDENCE IS, compared with br-sisbajud.
-# br-sfn names NO streaming variable anywhere: no STREAMING_BROKERS, no
-# STREAMING_ENABLED, nothing. The only chart-side statement about Kafka is that
-# it is external and that "RedPanda topics for spb/spi are an environment
-# concern (the compose redpanda-topics one-shot is dev-only)" (README.md:78-79).
-# Which rails publish, what they publish and whether a broker is needed at all in
-# a given deployment are decisions that live in the br-sfn application repository
-# — confirm them with the service owners before paying for a dedicated cluster.
+# THE SASL CREDENTIALS ARE FILE PATHS, NOT VALUES. See README.md — this is the one
+# service on the estate that reads them from disk, so the projected secret has to
+# be a mounted volume rather than environment variables.
 #
-# TOPICS ARE NOT CREATED HERE, by anything. Unlike br-sisbajud, which ships an
-# ArgoCD PreSync `rpk topic create` Job, br-sfn ships no topic provisioning at
-# all and explicitly calls it an environment concern. See README.md.
-#
-# Deploy order: infra-base/vpc -> this stack. infra-base/eks can come before or
-# after; see check "eks_node_security_group_resolved" in the network module.
+# Deploy order: infra-base/vpc -> products/shared-resources/msk -> this stack. In
+# shared mode it resolves nothing and plans to zero resources.
 #
 # This stack does NOT call the naming module. It creates no AWS resource of its
 # own, and the two cross-stack names it derives (VPC, EKS cluster) belong to
 # infra-base and carry the "lerian" product label — deriving them from a naming
-# module seeded with product = "br-consignado-gw" would produce br-sfn-{env}-vpc and
-# br-sfn-{env}-eks, which do not exist.
+# module seeded with product = "br-consignado-gw" would produce
+# br-consignado-gw-{env}-vpc and -eks, which do not exist.
 ################################################################################
 
 ################################################################################
@@ -97,9 +91,9 @@ module "network" {
 }
 
 ################################################################################
-# MSK — br-sfn-{environment}-msk
+# MSK — shared-{environment}-msk in the default shared mode
 #
-# Secret: AmazonMSK_br-sfn-{env}-msk. THE PREFIX IS NOT THE USUAL SHAPE.
+# Secret: AmazonMSK_shared-{env}-msk. THE PREFIX IS NOT THE USUAL SHAPE.
 # Every other Lerian datastore writes {name}/password or {name}/auth-token; AWS
 # REQUIRES the literal AmazonMSK_ prefix on any secret associated with an MSK
 # cluster through aws_msk_scram_secret_association, and requires it to be
@@ -139,11 +133,10 @@ module "msk" {
   scram_username         = var.scram_username
   enable_unauthenticated = var.enable_unauthenticated
 
-  # auto.create.topics.enable is the ONE knob that deserves a second look on
-  # br-sfn. Unlike br-sisbajud, this chart provisions NO topics — it calls that
-  # an environment concern. Leaving auto-create false (the default, and what the
-  # tfvars set) means the topics have to be created by something else before the
-  # rails publish. See README.md before flipping it.
+  # Kept FALSE. Nothing on this estate creates topics implicitly, so a typo in a
+  # producer topic name fails loudly instead of silently creating a live topic
+  # with broker defaults that the hub's regex never matches. The rpk Job in the
+  # helmfile phase owns creation; see README.md before flipping it.
   auto_create_topics_enable  = var.auto_create_topics_enable
   default_replication_factor = var.default_replication_factor
   extra_server_properties    = var.extra_server_properties

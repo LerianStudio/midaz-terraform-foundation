@@ -35,14 +35,18 @@ environment = "prd"
 ################################################################################
 # IRSA
 #
-# NOTE THE TWO-ROLES QUESTION, same as the gateway has: this root creates a role for
-# the buckets and products/tenant-manager/secrets creates another for the vault. A
-# ServiceAccount carries exactly ONE role-arn annotation. Attach this root's policy
-# (iam_policy_arns output) to the vault role and set irsa_enabled = false, or give
-# the chart two service accounts.
+# irsa_enabled = false: THIS ROOT CREATES NO ROLE, only the attachable policies.
+#
+# Same decision as the gateway: a ServiceAccount carries exactly ONE role-arn
+# annotation, so the bucket grant is attached to the vault role rather than living
+# on a second role nobody can annotate. products/tenant-manager/secrets takes the
+# policy NAMES in additional_policy_names.
+#
+# Apply this root BEFORE the secrets root — an attachment to a policy that does not
+# exist yet fails with NoSuchEntity.
 ################################################################################
 
-irsa_enabled    = true
+irsa_enabled    = false
 service_account = "platform:tenant-manager"
 
 ################################################################################

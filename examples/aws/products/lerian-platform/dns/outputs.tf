@@ -52,7 +52,10 @@ output "certificate_arn" {
 
 output "certificate_domains" {
   description = "Names the certificate covers: the apex and one wildcard label. It matches gw.{zone} and does NOT match a.b.{zone} — a wildcard covers exactly one label."
-  value       = concat([aws_acm_certificate.this.domain_name], tolist(aws_acm_certificate.this.subject_alternative_names))
+  # distinct(): some provider versions report domain_name inside
+  # subject_alternative_names, and a duplicated apex here reads as a second
+  # certificate name that does not exist.
+  value = distinct(concat([aws_acm_certificate.this.domain_name], tolist(aws_acm_certificate.this.subject_alternative_names)))
 }
 
 output "certificate_validated" {

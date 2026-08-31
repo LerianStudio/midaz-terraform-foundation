@@ -31,12 +31,53 @@ service_account = "external-secrets:external-secrets"
 ################################################################################
 
 secret_path_prefixes = [
+  # --- application secrets, written at runtime by tenant-manager and the gateway
   "tenants/",
   "clusters/",
+
+  # --- datastore secrets, written at APPLY TIME by this repository's own modules.
+  # A list without these reads every application secret and NOT ONE DATABASE
+  # PASSWORD, and the symptom is SecretSyncedError on exactly the ExternalSecrets
+  # the estate cannot boot without. One line per product with a datastore root;
+  # adding a product means adding a line here, and forgetting is the failure above.
+  #
+  #   {product}-{env}-postgres/password      _modules/postgres-rds/main.tf:255
+  #   {product}-{env}-valkey/auth-token      _modules/valkey-elasticache/main.tf:226
+  #   {product}-{env}-docdb/password         _modules/mongodb-documentdb/main.tf:177
+  #   AmazonMSK_{name}                       _modules/streaming-msk/main.tf:88-92
+  "plugin-access-manager-prd-",
+  "tenant-manager-prd-",
+  "br-consignado-gw-prd-",
+  "streaming-hub-prd-",
+  "shared-prd-",
+  "AmazonMSK_",
 ]
 
 read_actions = [
   "secretsmanager:GetSecretValue",
+  "secretsmanager:DescribeSecret",
+]
+
+################################################################################
+# The hole carved back out of the broad Allow
+#
+# tenants/ above covers the Dataprev custody path. Without this Deny, anyone able
+# to create an ExternalSecret in any namespace could project a tenant's Dataprev
+# credential into a Secret they read — the operator is read-only, which stops it
+# destroying credentials and does nothing about exfiltrating one.
+#
+# The gateway reads its own custody store with its OWN role, so ESO loses nothing.
+#
+# Four segments before "external" on purpose: it matches
+# tenants/{env}/{org}/{app}/external/... and not tenants/{env}/{tid}/{module}/kafka,
+# including the case of a module literally named "external".
+################################################################################
+
+deny_secret_path_patterns = ["tenants/*/*/*/external/"]
+
+deny_actions = [
+  "secretsmanager:GetSecretValue",
+  "secretsmanager:BatchGetSecretValue",
   "secretsmanager:DescribeSecret",
 ]
 
@@ -58,6 +99,10 @@ allow_list_secrets = true
 # The placeholder below is intentional and BREAKS THE PLAN: lerian-infra aborts on
 # any "<...>" token outside a comment. Replace it, or delete the entry entirely if
 # MSK has not been applied yet and the Kafka projection can wait.
+#
+# THIS IS NOT THE FIRST THING TO SUSPECT ON A SecretSyncedError. A path missing from
+# secret_path_prefixes produces the identical symptom and is far more common. Check
+# the prefixes before the key.
 ################################################################################
 
 kms_key_arns = ["<MSK-SCRAM-CMK-ARN>"]

@@ -37,7 +37,21 @@ locals {
     "arn:${data.aws_partition.current.partition}:secretsmanager:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:secret:${prefix}*"
   ]
 
+  denied_arns = [
+    for pattern in var.deny_secret_path_patterns :
+    "arn:${data.aws_partition.current.partition}:secretsmanager:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:secret:${pattern}*"
+  ]
+
   scoped_actions = concat(var.read_actions, var.write_actions)
+
+  # A role that writes nothing has no business holding kms:GenerateDataKey — that
+  # is the permission to ENCRYPT, and External Secrets only ever decrypts.
+  writes = length(var.write_actions) > 0
+
+  kms_actions = concat(
+    ["kms:Decrypt", "kms:DescribeKey"],
+    local.writes ? ["kms:GenerateDataKey"] : [],
+  )
 }
 
 ################################################################################
@@ -117,6 +131,21 @@ data "aws_iam_policy_document" "this" {
     }
   }
 
+  # Deny beats every Allow in IAM, including one attached to this role later by
+  # somebody else, which is why carving the custody path out of a broad Allow has
+  # to be a Deny rather than a narrower prefix. Ordering inside the document is
+  # irrelevant; evaluation is not order-sensitive.
+  dynamic "statement" {
+    for_each = length(local.denied_arns) > 0 ? [1] : []
+
+    content {
+      sid       = "DenyScopedSecretPaths"
+      effect    = "Deny"
+      actions   = var.deny_actions
+      resources = local.denied_arns
+    }
+  }
+
   # Resource "*" is not a shortcut here, it is the only legal form: AWS does not
   # evaluate ListSecrets against a resource. The caller sees every secret NAME in
   # the account and no value. Gated behind its own variable so it is a decision.
@@ -138,11 +167,8 @@ data "aws_iam_policy_document" "this" {
       sid    = "SecretEncryptionKey"
       effect = "Allow"
 
-      actions = [
-        "kms:Decrypt",
-        "kms:DescribeKey",
-        "kms:GenerateDataKey",
-      ]
+      # GenerateDataKey only for a role that writes. See local.kms_actions.
+      actions = local.kms_actions
 
       resources = var.kms_key_arns
     }
@@ -181,4 +207,14 @@ resource "aws_iam_policy" "this" {
 resource "aws_iam_role_policy_attachment" "this" {
   role       = aws_iam_role.this.name
   policy_arn = aws_iam_policy.this.arn
+}
+
+# Policies this role borrows from another root, so the service ends up with ONE
+# role rather than one per concern — a ServiceAccount carries exactly one
+# role-arn annotation. See var.additional_policy_names.
+resource "aws_iam_role_policy_attachment" "additional" {
+  for_each = toset(var.additional_policy_names)
+
+  role       = aws_iam_role.this.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:policy/${each.value}"
 }

@@ -57,20 +57,29 @@ snapshot_retention_limit   = 7
 ################################################################################
 # Security
 #
-# Both switches stay permissive, and here the reason is hard: REDIS_HOST
-# (values.yaml:61) is the ONLY Redis key the chart defines. There is no
-# REDIS_PASSWORD and no REDIS_TLS to configure, so an enforced auth token has
-# no way to reach the client and a required-TLS listener has no way to be
-# negotiated. Closing this gap needs a chart change first.
+# BOTH SWITCHES ARE TIGHTENED HERE, AND THE EARLIER JUSTIFICATION FOR LEAVING
+# THEM LOOSE WAS WRONG.
 #
-# The token IS generated and stored at br-consignado-gw-prd-valkey/auth-token
-# regardless. Until the chart grows the knobs, the cache is protected by the
-# security group and the private subnets alone.
+# That justification said REDIS_HOST was the only Redis key the chart defined, so
+# an enforced auth token had nowhere to go. It cited a values.yaml inherited from
+# the br-sfn donor root — not this service. The gateway's actual configuration
+# surface reads REDIS_HOST, REDIS_PASSWORD, REDIS_TLS and REDIS_CA_CERT
+# (internal/bootstrap/config.go:166-171), exactly like tenant-manager.
+#
+# What "preferred" means is worth stating plainly: it is not weaker TLS, it is
+# OPTIONAL TLS — the listener accepts a plaintext client. Combined with no auth
+# token, any pod that can reach the cache's security group (which is every node in
+# the cluster) reads and writes the cache of a money-path service with no
+# credential at all. On a shared cluster that is not a posture to inherit from a
+# donor file nobody re-measured.
+#
+# The chart must project REDIS_PASSWORD (from br-consignado-gw-prd-valkey/auth-token)
+# and REDIS_TLS=true. The service already reads both.
 ################################################################################
 
 transit_encryption_enabled = true
-transit_encryption_mode    = "preferred"
-auth_token_enabled         = false
+transit_encryption_mode    = "required"
+auth_token_enabled         = true
 
 maintenance_window = "mon:00:00-mon:03:00"
 apply_immediately  = false

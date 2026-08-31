@@ -15,11 +15,25 @@
 # each secret into a Kubernetes Secret the workload mounts or reads as an env var.
 # Without it the estate has strong credentials nobody can use.
 #
-# IT IS READ-ONLY, AND IT IS ACCOUNT-WIDE. ESO must be able to project any secret
-# any workload asks for, so scoping it to one product's prefix defeats it. What is
-# NOT granted is every write action: ESO never creates, updates or deletes a
-# secret, and a compromise of the operator therefore cannot destroy a credential,
-# only read it. That asymmetry is the whole security value of a separate role.
+# IT IS READ-ONLY, AND IT IS BROAD. ESO must be able to project any secret any
+# workload asks for, so scoping it to one product's prefix defeats it. What is NOT
+# granted is every write action: ESO never creates, updates or deletes a secret, so
+# a compromise of the operator reads credentials and cannot destroy them. That
+# asymmetry is the whole security value of a separate role.
+#
+# TWO NAMING FAMILIES, AND MISSING EITHER ONE IS SILENT UNTIL THE FIRST DEPLOY.
+# The application secrets live under tenants/ and clusters/; the credentials THIS
+# REPOSITORY generates do not — they are {product}-{env}-postgres/password,
+# {product}-{env}-valkey/auth-token, {product}-{env}-docdb/password and
+# AmazonMSK_{name}. A prefix list covering only the first family produces an
+# operator that syncs every application secret and not one database password, and
+# the symptom is SecretSyncedError on exactly the ExternalSecrets the estate cannot
+# boot without. See var.secret_path_prefixes.
+#
+# AND ONE HOLE IS CARVED BACK OUT. The broad Allow over tenants/ would otherwise
+# cover the Dataprev custody path, letting anyone who can create an ExternalSecret
+# project a tenant's credential into a Secret they read. var.deny_secret_path_patterns
+# denies it; the gateway reads its own custody store with its own role.
 #
 # ListSecrets is granted because ESO's ClusterSecretStore validation and its
 # find-by-name/find-by-tag ExternalSecrets enumerate. It cannot be scoped by AWS.
@@ -81,6 +95,9 @@ module "secrets" {
 
   # Never. ESO projects secrets; it does not author them.
   write_actions = []
+
+  deny_secret_path_patterns = var.deny_secret_path_patterns
+  deny_actions              = var.deny_actions
 
   allow_list_secrets = var.allow_list_secrets
   kms_key_arns       = var.kms_key_arns

@@ -109,6 +109,44 @@ variable "write_actions" {
   ]
 }
 
+variable "deny_secret_path_patterns" {
+  description = <<-EOT
+    Paths this role may NOT write, whatever the Allow says.
+
+    THE CUSTODY PATH GOES HERE, AND IT IS NOT OPTIONAL. The Allow above has to
+    reach all of tenants/ — three measured path shapes make anything narrower a 404
+    mid-provisioning — and tenants/ swallows
+    tenants/{env}/{org}/{app}/external/{target}/credentials/versions/{uuid}, which
+    is a tenant's Dataprev credential.
+
+    The gateway pays for that credential to be IMMUTABLE: a variable validation
+    refuses it PutSecretValue, so a rotation writes a new version path and the
+    audit trail cannot be rewritten. That property is worth nothing if the control
+    plane next door holds PutSecretValue and DeleteSecret over the same ARNs — a
+    compromised or merely buggy tenant-manager would overwrite or force-delete a
+    custody version without ever touching the gateway's audited API.
+
+    tenant-manager never writes under {app}/external/. It writes {module}/kafka,
+    m2m/... and admin. So the Deny costs it nothing and makes the gateway's
+    immutability an invariant of the estate rather than of one role.
+  EOT
+
+  type    = list(string)
+  default = []
+}
+
+variable "deny_actions" {
+  description = "Actions denied on deny_secret_path_patterns. The mutating set: a Deny that covered only reads would leave the custody credential writable, which is the property that matters. Reads are left alone — tenant-manager has no reason to read a custody credential either, but denying the read would be a behaviour change without a measured caller behind it."
+  type        = list(string)
+  default = [
+    "secretsmanager:CreateSecret",
+    "secretsmanager:PutSecretValue",
+    "secretsmanager:UpdateSecret",
+    "secretsmanager:RestoreSecret",
+    "secretsmanager:DeleteSecret",
+  ]
+}
+
 variable "allow_list_secrets" {
   description = "Grant account-wide secretsmanager:ListSecrets. TRUE: the readiness probe lists unscoped. AWS does not evaluate ListSecrets against a resource, so this necessarily carries Resource \"*\"."
   type        = bool
@@ -117,6 +155,12 @@ variable "allow_list_secrets" {
 
 variable "kms_key_arns" {
   description = "Customer managed keys the role may use for Decrypt/GenerateDataKey. Needed the day a CMK backs the vault; CreateSecret fails on the encrypt without it."
+  type        = list(string)
+  default     = []
+}
+
+variable "additional_policy_names" {
+  description = "Existing customer-managed policies attached to this role by name. THIS IS THE ONE-ROLE DECISION: tenant-manager needs the vault AND its two S3 buckets, and a ServiceAccount carries exactly one role-arn annotation, so the bucket grant is attached here rather than living on a second role nobody can annotate. The name comes from products/tenant-manager/s3, which must be applied first — see the runbook."
   type        = list(string)
   default     = []
 }
@@ -152,4 +196,28 @@ variable "extra_policy_statements" {
     }))
   }))
   default = []
+}
+
+variable "app_env_name" {
+  description = <<-EOT
+    The APPLICATION's environment name — the ENV_NAME the service boots with, and
+    the segment inside every Secrets Manager path. "production" on this estate,
+    while var.environment is "prd". They are different vocabularies and both are
+    load-bearing: var.environment names the IAM objects, this names the vault.
+
+    IT IS IMMUTABLE FROM THE FIRST WRITE. Credential references are re-parsed on
+    read and demand exact scope equality, so renaming the environment makes every
+    credential already stored unreadable.
+
+    Emitted into helm_values because the chart cannot derive it and getting it
+    wrong fails in a place that does not mention it.
+  EOT
+
+  type    = string
+  default = "production"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]*$", var.app_env_name))
+    error_message = "The app_env_name must be a lowercase name, e.g. production."
+  }
 }

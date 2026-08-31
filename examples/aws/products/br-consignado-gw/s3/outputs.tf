@@ -87,9 +87,11 @@ output "service_account" {
 ################################################################################
 # Helm handoff
 #
-# br-consignado-gw ships no Helm chart, so these key names come from its own
-# configuration surface (internal/bootstrap/config.go:311-317), which is the
-# authority the chart will have to match.
+# These key names come from the service's own configuration surface
+# (internal/bootstrap/config.go:311-317). A published chart exists
+# (br-consignado-gw-helm 1.0.1, ghcr helm-internal) and its values.yaml was not
+# read here, so these are the contract the chart has to satisfy — reconcile them
+# against the real values.yaml in the helmfile phase.
 #
 # AWS_REGION IS DELIBERATELY OMITTED HERE. The gateway reads ONE region variable
 # for the whole process, and products/br-consignado-gw/secrets emits it as the

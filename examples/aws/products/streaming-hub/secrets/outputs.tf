@@ -46,8 +46,8 @@ output "list_secrets_granted" {
 ################################################################################
 # Helm handoff
 #
-# streaming-hub HAS NO HELM CHART anywhere — not in its repository, not in the
-# deployer's chart directory. These key names come from the service's own
+# streaming-hub has no chart in its repository and none in the deployer's chart
+# directory — the one service of this wire where the absence was actually measured. These key names come from the service's own
 # configuration loader (internal/bootstrap/config_load.go), which is the only
 # authority that exists, and the chart that eventually gets written has to match
 # them rather than the other way round.
@@ -68,6 +68,7 @@ output "helm_values" {
   value = {
     "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn" = module.secrets.iam_role_arn
     MULTI_TENANT_ENABLED                                        = var.allow_list_secrets ? "true" : "false"
+    ENV_NAME                                                    = var.app_env_name
     AWS_REGION                                                  = var.region
   }
 }

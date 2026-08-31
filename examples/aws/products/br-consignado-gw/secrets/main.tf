@@ -87,4 +87,6 @@ module "secrets" {
   write_actions        = var.write_actions
   allow_list_secrets   = var.allow_list_secrets
   kms_key_arns         = var.kms_key_arns
+
+  additional_policy_names = var.additional_policy_names
 }

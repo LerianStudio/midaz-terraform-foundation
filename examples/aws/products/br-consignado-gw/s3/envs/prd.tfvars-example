@@ -54,8 +54,9 @@ buckets = {
 ################################################################################
 # IRSA
 #
-# CONFIRM service_account AGAINST THE CHART. The gateway has no chart in its
-# repository, so this is the intended convention, not a measured fact.
+# CONFIRM service_account AGAINST THE CHART. A published chart exists
+# (br-consignado-gw-helm 1.0.1, ghcr helm-internal) and was not read here, so this
+# is the intended convention, not a measured fact.
 #
 # AND DECIDE THE TWO-ROLES QUESTION BEFORE THE HELMFILE PHASE: this root creates a
 # role for the bucket, and products/br-consignado-gw/secrets creates another for
@@ -66,7 +67,22 @@ buckets = {
 # vault and cannot write custody artefacts — discovered on the first averbação.
 ################################################################################
 
-irsa_enabled    = true
+# irsa_enabled = false: THIS ROOT CREATES NO ROLE, only the attachable policy.
+#
+# A ServiceAccount carries exactly ONE eks.amazonaws.com/role-arn annotation, so a
+# service that needs both the vault and this bucket cannot have a role per concern
+# — one of the two grants would be unreachable, and the symptom is an AccessDenied
+# on whichever path nobody exercised first. The bucket policy is therefore attached
+# to the vault role instead: products/br-consignado-gw/secrets takes its NAME in
+# additional_policy_names.
+#
+# Side effect worth knowing: with no role to create there is no OIDC lookup, so this
+# root no longer depends on infra-base/eks existing. It does have to be applied
+# BEFORE the secrets root, which attaches a policy that must already exist.
+#
+# service_account is left set, unused, so flipping irsa_enabled back to true does
+# not require rediscovering the value.
+irsa_enabled    = false
 service_account = "consignado:br-consignado-gw"
 
 require_latest_tls_policy = true

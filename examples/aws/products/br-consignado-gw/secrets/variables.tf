@@ -101,8 +101,38 @@ variable "allow_list_secrets" {
   default     = false
 }
 
+variable "additional_policy_names" {
+  description = "Existing customer-managed policies attached to this role by name. THIS IS THE ONE-ROLE DECISION: the gateway needs the vault AND the WORM custody bucket, and a ServiceAccount carries exactly one role-arn annotation. Applying two roles and annotating with one produces a gateway that reads the vault and cannot write custody artefacts, discovered on the first averbação. The name comes from products/br-consignado-gw/s3, which must be applied first — see the runbook."
+  type        = list(string)
+  default     = []
+}
+
 variable "kms_key_arns" {
   description = "Customer managed keys the role may use. Empty is correct while the vault uses the AWS-managed aws/secretsmanager key — the gateway makes no explicit KMS call anywhere (no kms SDK import, no SSEKMSKeyId). Populate it the day a CMK backs these secrets, or CreateSecret starts failing on the encrypt."
   type        = list(string)
   default     = []
+}
+
+variable "app_env_name" {
+  description = <<-EOT
+    The APPLICATION's environment name — the ENV_NAME the service boots with, and
+    the segment inside every Secrets Manager path. "production" on this estate,
+    while var.environment is "prd". They are different vocabularies and both are
+    load-bearing: var.environment names the IAM objects, this names the vault.
+
+    IT IS IMMUTABLE FROM THE FIRST WRITE. Credential references are re-parsed on
+    read and demand exact scope equality, so renaming the environment makes every
+    credential already stored unreadable.
+
+    Emitted into helm_values because the chart cannot derive it and getting it
+    wrong fails in a place that does not mention it.
+  EOT
+
+  type    = string
+  default = "production"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]*$", var.app_env_name))
+    error_message = "The app_env_name must be a lowercase name, e.g. production."
+  }
 }

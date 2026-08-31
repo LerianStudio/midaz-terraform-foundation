@@ -82,9 +82,17 @@ resource "aws_route53_zone" "this" {
     # the domain until somebody notices the delegation is dangling.
     prevent_destroy = true
 
+    # The dot matters. endswith(zone, parent) alone accepts "xlerian.dev" against
+    # parent "lerian.dev", because it has no notion of a label boundary; requiring
+    # ".{parent}" pins the boundary. And the check has to be a real conjunction —
+    # an earlier version wrote it as a disjunction, which only rejected
+    # zone == parent and let a wholly unrelated domain through. A typo that gets
+    # past here creates an orphan zone and then stalls the apply for 45 minutes in
+    # an ACM validation that can never complete, which is precisely the class of
+    # error a plan-time guard exists to catch.
     precondition {
-      condition     = !endswith(trimsuffix(var.zone_name, "."), var.parent_zone_name) || var.zone_name != var.parent_zone_name
-      error_message = "zone_name must be a SUBDOMAIN of parent_zone_name, not the parent itself. This root delegates a child zone; it never takes over the apex."
+      condition     = endswith(trimsuffix(var.zone_name, "."), ".${var.parent_zone_name}")
+      error_message = "zone_name must be a SUBDOMAIN of parent_zone_name, ending in \".${var.parent_zone_name}\". This root delegates a child zone from a parent held in another account; it never takes over an apex, and it cannot delegate from a parent that is not actually the parent."
     }
   }
 }

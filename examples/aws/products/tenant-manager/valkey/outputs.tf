@@ -108,7 +108,7 @@ output "engine_version_actual" {
 }
 
 output "auth_token_enabled" {
-  description = "Whether ElastiCache is ENFORCING the auth token stored in secret_name. False means the token exists but is not required — which is the only workable setting while the chart sends REDIS_USER."
+  description = "Whether ElastiCache is ENFORCING the auth token stored in secret_name. False means the token exists but is not required. THIS ESTATE SETS TRUE — see the tfvars: tenant-manager reads REDIS_PASSWORD and REDIS_CA_CERT (base64 PEM, not a path), and leaves REDIS_USERNAME unset, which is exactly what the legacy password-only AUTH of ElastiCache expects. The looser default elsewhere in this repository exists for charts that cannot carry a password; this service can."
   value       = module.valkey.auth_token_enabled
 }
 

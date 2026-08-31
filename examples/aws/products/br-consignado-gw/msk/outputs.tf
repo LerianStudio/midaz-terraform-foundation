@@ -126,10 +126,14 @@ output "consumer_group" {
 # Helm handoff — POPULATED, unlike the br-sfn root this was derived from
 #
 # The donor left helm_values empty because the br-sfn chart names no streaming
-# variable and a guessed key would be silently ignored. Here there is no chart at
-# all — br-consignado-gw ships none — so the authority is the service's own
-# configuration surface (internal/bootstrap/config.go:740-749), which names every
-# variable exactly.
+# variable and a guessed key would be silently ignored.
+#
+# These keys come from the SERVICE's own configuration surface
+# (internal/bootstrap/config.go:740-749), which names every variable exactly. A
+# published chart does exist (br-consignado-gw-helm 1.0.1, ghcr helm-internal) but
+# its values.yaml was NOT read while authoring this root — so treat the names below
+# as the contract the chart has to satisfy, and reconcile them against the real
+# values.yaml in the helmfile phase rather than assuming either side.
 #
 # THE CREDENTIALS ARE FILE PATHS, NOT VALUES, AND THAT CHANGES THE DEPLOYMENT.
 # STREAMING_KAFKA_SASL_USERNAME_FILE and _PASSWORD_FILE are read from disk at boot.
@@ -146,13 +150,19 @@ output "consumer_group" {
 ################################################################################
 
 output "helm_values" {
-  description = "Chart env vars this cluster fills in. Verified against the gateway's configuration surface, not a chart — it has none. WARNING: the SASL credentials are FILE PATHS (STREAMING_KAFKA_SASL_USERNAME_FILE / _PASSWORD_FILE), so the projected secret must be MOUNTED AS A VOLUME, not injected as env vars. The paths are a chart decision and are deliberately not guessed here."
-  value = {
-    STREAMING_ENABLED               = "true"
-    STREAMING_BROKERS               = module.msk.endpoint
-    STREAMING_KAFKA_TLS_ENABLED     = "true"
-    STREAMING_KAFKA_ALLOW_PLAINTEXT = "false"
-    STREAMING_KAFKA_SASL_MECHANISM  = var.enable_sasl_scram ? "scram-sha-512" : ""
-    STREAMING_CLOUDEVENTS_SOURCE    = "consignado-gw"
-  }
+  description = "Chart env vars this cluster fills in. Verified against the gateway's CONFIGURATION SURFACE, not against the published chart (br-consignado-gw-helm 1.0.1, not read here) — reconcile in the helmfile phase. WARNING: the SASL credentials are FILE PATHS (STREAMING_KAFKA_SASL_USERNAME_FILE / _PASSWORD_FILE), so the projected secret must be MOUNTED AS A VOLUME, not injected as env vars. The paths are a chart decision and are deliberately not guessed here."
+  value = merge(
+    {
+      STREAMING_ENABLED               = "true"
+      STREAMING_BROKERS               = module.msk.endpoint
+      STREAMING_KAFKA_TLS_ENABLED     = "true"
+      STREAMING_KAFKA_ALLOW_PLAINTEXT = "false"
+      STREAMING_CLOUDEVENTS_SOURCE    = "consignado-gw"
+    },
+    # OMITTED, NOT EMPTIED, when SCRAM is off. A key present with an empty value is
+    # not the same as an absent key: it lands in the ConfigMap, the chart cannot
+    # tell it apart from a deliberate setting, and the failure surfaces as a broker
+    # auth error rather than as a configuration one.
+    var.enable_sasl_scram ? { STREAMING_KAFKA_SASL_MECHANISM = "scram-sha-512" } : {},
+  )
 }

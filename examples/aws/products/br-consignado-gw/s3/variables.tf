@@ -174,7 +174,7 @@ variable "oidc_provider_arn" {
 }
 
 variable "service_account" {
-  description = "Kubernetes service account allowed to assume the IRSA role, in \"namespace:name\" form (the notation examples/aws/infra-base/eks/iam.tf already uses). CONFIRM IT AGAINST THE CHART: br-consignado-gw ships no Helm chart, so the default below is the intended convention rather than a measured fact. A mismatch produces a role no pod can assume, and the failure surfaces at runtime as AccessDenied on the first custody write, not at apply time."
+  description = "Kubernetes service account allowed to assume the IRSA role, in \"namespace:name\" form (the notation examples/aws/infra-base/eks/iam.tf already uses). CONFIRM IT AGAINST THE CHART: the published chart (br-consignado-gw-helm 1.0.1) was not read while authoring this root, so the default below is the intended convention rather than a measured fact. A mismatch produces a role no pod can assume, and the failure surfaces at runtime as AccessDenied on the first custody write, not at apply time."
   type        = string
   default     = "consignado:br-consignado-gw"
 
