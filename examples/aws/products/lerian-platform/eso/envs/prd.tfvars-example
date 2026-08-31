@@ -1,0 +1,68 @@
+################################################################################
+# products/lerian-platform/eso — prd
+#
+# Costs nothing: one IAM role and one IAM policy.
+#
+# THIS IS THE STACK THAT MAKES EVERY OTHER CREDENTIAL USABLE. Every datastore root
+# in this repository generates a strong password and writes it to Secrets Manager,
+# and none of them delivers it to a pod. Apply the whole estate without this and
+# every workload boots without its database password.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "lerian-platform"
+environment = "prd"
+
+# eks_cluster_name is derived -> lerian-prd-eks
+
+# The external-secrets chart default. Change it here if the release overrides
+# serviceAccount.name — the :sub condition admits nothing else.
+service_account = "external-secrets:external-secrets"
+
+################################################################################
+# Scope
+#
+# Both vault roots, read only. ESO projects for every workload, so a per-product
+# scope defeats it — and the asymmetry that matters is the WRITE side: this role
+# has no CreateSecret, no PutSecretValue and no DeleteSecret, so a compromise of
+# the operator reads credentials but cannot destroy them.
+################################################################################
+
+secret_path_prefixes = [
+  "tenants/",
+  "clusters/",
+]
+
+read_actions = [
+  "secretsmanager:GetSecretValue",
+  "secretsmanager:DescribeSecret",
+]
+
+allow_list_secrets = true
+
+################################################################################
+# CMK — REQUIRED BEFORE THE MSK SASL PASSWORD CAN BE PROJECTED
+#
+# AWS refuses an AWS-managed key on a secret associated with an MSK cluster, so the
+# MSK module creates its own CMK. Without kms:Decrypt on it, the ExternalSecret
+# carrying STREAMING_KAFKA_SASL_PASSWORD sits in SecretSyncedError while every other
+# secret projects normally — and both br-consignado-gw and streaming-hub refuse to
+# talk to Kafka in a managed deployment without SASL.
+#
+# FILL THIS IN after products/shared-resources/msk has been applied:
+#
+#   terraform -chdir=examples/aws/products/shared-resources/msk output -raw scram_kms_key_arn
+#
+# The placeholder below is intentional and BREAKS THE PLAN: lerian-infra aborts on
+# any "<...>" token outside a comment. Replace it, or delete the entry entirely if
+# MSK has not been applied yet and the Kafka projection can wait.
+################################################################################
+
+kms_key_arns = ["<MSK-SCRAM-CMK-ARN>"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

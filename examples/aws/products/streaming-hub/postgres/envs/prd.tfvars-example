@@ -1,0 +1,100 @@
+################################################################################
+# products/streaming-hub/postgres — prd
+#
+# THE ONLY MANDATORY DATASTORE THE HUB HAS. Not Valkey (deliberately removed — the
+# hub uses pg_try_advisory_xact_lock for cron singleton-ing and a durable Postgres
+# idempotency store, precisely so a BYOC deployment need not run Redis), not Mongo,
+# not S3.
+#
+# TWO THINGS IN HERE ARE POSTURE DECISIONS RATHER THAN SIZING.
+#
+# 1. rds.force_ssl = 1. Until now this repository had ZERO occurrences of force_ssl
+#    and no root wrapper even exposed the module's `parameters` input, so the
+#    parameter group was born empty and RDS defaults force_ssl to 0 on the postgres
+#    families — every database accepted plaintext from anything inside its security
+#    group. This makes the SERVER refuse a non-TLS connection, which is the only
+#    half of the guarantee infrastructure can hold: the client still has to ask for
+#    TLS, and it does, in the DSN the ExternalSecret templates (sslmode=require).
+#
+# 2. Postgres 17 needs THREE variables changed together — engine_version, family
+#    and major_engine_version. Change one and the apply fails, having already
+#    decided some of the plan.
+#
+# MAX_CONNECTIONS IS A REAL CONSTRAINT ON THIS ONE. The hub runs several roles with
+# different pool sizes and the invariant is sum(replicas x max_open_conns) <=
+# max_connections. On db.m7g.large that ceiling is generous, but it is the number to
+# check before scaling the delivery plane out, and exceeding it shows up as
+# intermittent connection refusals under load rather than as a startup error.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. Selecting instance types
+# is the client's responsibility; see the Instance Types Disclaimer in the
+# repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "streaming-hub"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine — Postgres 17, all three variables together
+################################################################################
+
+engine_version       = "17"
+family               = "postgres17"
+major_engine_version = "17"
+
+database_name = "streaminghub"
+username      = "postgres"
+
+################################################################################
+# TLS — the server-side half, and the reason var.parameters exists on this root
+################################################################################
+
+parameters = [
+  {
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
+  },
+]
+
+################################################################################
+# Sizing
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "consignado"
+  CostCenter = "consignado-prd"
+}

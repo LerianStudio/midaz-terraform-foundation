@@ -68,6 +68,23 @@ locals {
     }] : []
   }
 
+  # WORM. The upstream module reads exactly rule.default_retention.{mode,days,years}
+  # and creates aws_s3_bucket_object_lock_configuration only when object_lock_enabled
+  # is true AND rule.default_retention is non-null — an empty map here therefore means
+  # "no lock", not "a lock with defaults".
+  object_lock_configuration = {
+    for logical_name, config in var.buckets :
+    logical_name => config.object_lock_enabled ? {
+      rule = {
+        default_retention = {
+          mode  = config.object_lock_mode
+          days  = config.object_lock_days
+          years = config.object_lock_years
+        }
+      }
+    } : {}
+  }
+
   server_side_encryption = {
     for logical_name, config in var.buckets :
     logical_name => {
@@ -96,6 +113,12 @@ module "buckets" {
   versioning = {
     enabled = each.value.versioning_enabled
   }
+
+  # Object Lock is a CREATE-TIME property of the bucket. It cannot be enabled on an
+  # existing bucket, and it cannot be disabled once enabled: turning it on later
+  # means replacing the bucket and re-uploading everything in it.
+  object_lock_enabled       = each.value.object_lock_enabled
+  object_lock_configuration = local.object_lock_configuration[each.key]
 
   server_side_encryption_configuration = local.server_side_encryption[each.key]
 

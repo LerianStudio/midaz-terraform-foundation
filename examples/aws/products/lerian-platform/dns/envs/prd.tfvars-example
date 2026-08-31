@@ -1,0 +1,53 @@
+################################################################################
+# products/lerian-platform/dns — prd
+#
+# Roughly USD 0.50/month for the zone plus query charges; ACM certificates are free.
+#
+# THIS IS THE ONE STACK WITH A MANUAL STEP IN THE MIDDLE OF IT. The apply blocks on
+# ACM validation, which cannot succeed until somebody creates an NS record in the
+# PARENT account. Read main.tf before running it, and expect a two-pass apply:
+#
+#   1. lerian-infra ... --target lerian-platform/dns   -> stalls on validation
+#   2. read `terraform output name_servers`, create the NS record in the parent
+#   3. re-run                                          -> validation completes
+#
+# Or set wait_for_validation = false, do the delegation, and validate out of band.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "lerian-platform"
+environment = "prd"
+
+################################################################################
+# The names
+#
+# BOTH PLACEHOLDERS BREAK THE PLAN UNTIL FILLED IN — lerian-infra aborts on any
+# "<...>" token outside a comment, which is the repository's convention for a value
+# that must not be guessed.
+#
+# zone_name differs per ACCOUNT, not per environment: the two accounts of this
+# estate hold two different delegated subdomains of one parent, which is what keeps
+# them independent at the DNS layer. Both accounts run environment = "prd" here —
+# the distinction lives in the account and in this name, not in the Terraform
+# environment enum.
+#
+# parent_zone_name is the zone in the third, management account. It is never
+# managed from here; it only asserts that zone_name really is a child of it.
+################################################################################
+
+zone_name        = "<CHILD-ZONE-FQDN>"
+parent_zone_name = "<PARENT-ZONE-FQDN>"
+
+################################################################################
+# Validation
+################################################################################
+
+wait_for_validation = true
+validation_timeout  = "45m"
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

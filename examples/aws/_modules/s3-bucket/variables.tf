@@ -33,6 +33,11 @@ variable "buckets" {
       versioning_enabled                     enable object versioning (default true)
       kms_key_arn                            SSE-KMS with this CMK instead of SSE-S3/AES256
       force_destroy                          allow terraform destroy on a non-empty bucket
+      object_lock_enabled                    WORM. Immutable retention, set ONCE AT CREATION
+                                             and never afterwards (default false)
+      object_lock_mode                       GOVERNANCE or COMPLIANCE, required when
+                                             object_lock_enabled is true
+      object_lock_days / object_lock_years   default retention period, exactly one of the two
       lifecycle_enabled                      emit a lifecycle configuration at all (default true)
       transition_ia_days                     days before transitioning to the IA class
       transition_glacier_days                days before transitioning to the Glacier class
@@ -46,6 +51,10 @@ variable "buckets" {
     versioning_enabled                     = optional(bool, true)
     kms_key_arn                            = optional(string, null)
     force_destroy                          = optional(bool, false)
+    object_lock_enabled                    = optional(bool, false)
+    object_lock_mode                       = optional(string, null)
+    object_lock_days                       = optional(number, null)
+    object_lock_years                      = optional(number, null)
     lifecycle_enabled                      = optional(bool, true)
     transition_ia_days                     = optional(number, null)
     transition_glacier_days                = optional(number, null)
@@ -116,6 +125,41 @@ variable "buckets" {
       v.abort_incomplete_multipart_upload_days == null || v.abort_incomplete_multipart_upload_days >= 1
     ])
     error_message = "The abort_incomplete_multipart_upload_days must be at least 1 when set."
+  }
+
+  # Object Lock is only settable AT BUCKET CREATION and can never be turned on
+  # afterwards, so every way of getting it half-configured has to fail the plan
+  # rather than produce a bucket that has to be recreated to fix.
+  validation {
+    condition = alltrue([
+      for k, v in var.buckets :
+      !v.object_lock_enabled || v.versioning_enabled
+    ])
+    error_message = "Object Lock requires versioning: S3 rejects a locked bucket without versioning, and a retained object is a retained VERSION."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.buckets :
+      !v.object_lock_enabled || contains(["GOVERNANCE", "COMPLIANCE"], coalesce(v.object_lock_mode, "unset"))
+    ])
+    error_message = "When object_lock_enabled is true, object_lock_mode must be GOVERNANCE or COMPLIANCE. GOVERNANCE lets a principal holding s3:BypassGovernanceRetention delete early; COMPLIANCE cannot be bypassed by anyone, including the account root, for the whole retention period."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.buckets :
+      !v.object_lock_enabled || ((v.object_lock_days == null) != (v.object_lock_years == null))
+    ])
+    error_message = "When object_lock_enabled is true, set exactly one of object_lock_days or object_lock_years. Setting neither creates a locked bucket with NO default retention, which silently retains nothing."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, v in var.buckets :
+      v.object_lock_enabled || (v.object_lock_mode == null && v.object_lock_days == null && v.object_lock_years == null)
+    ])
+    error_message = "object_lock_mode, object_lock_days and object_lock_years only apply when object_lock_enabled is true. Setting them alone would be read as WORM protection that does not exist."
   }
 }
 

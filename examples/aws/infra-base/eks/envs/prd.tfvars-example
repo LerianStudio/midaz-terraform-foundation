@@ -77,8 +77,21 @@ create_cert_manager_role             = true
 #
 # Narrow the wildcard to that zone's ID before prd, e.g.
 # ["arn:aws:route53:::hostedzone/Z0123456789ABCDEFGHIJ"].
-external_dns_hosted_zone_arns = ["arn:aws:route53:::hostedzone/*"]
-cert_manager_hosted_zone_arns = ["arn:aws:route53:::hostedzone/*"]
+# NARROW THESE. They used to ship as ["arn:aws:route53:::hostedzone/*"] — a
+# wildcard over every hosted zone in the account, in the ONE environment where both
+# controllers are enabled. Everywhere else in this repository a value that must be
+# supplied is a "<...>" placeholder that fails the plan; that convention was not
+# applied here, so the widest possible grant was also the default.
+#
+# The value is the zone this account owns:
+#
+#   terraform -chdir=examples/aws/products/lerian-platform/dns output -raw zone_arn
+#
+# Delete the cert_manager line entirely on an estate that terminates TLS at the ALB
+# with an ACM certificate — there is no cert-manager there and it needs no zone
+# access. Set create_cert_manager_role = false alongside it.
+external_dns_hosted_zone_arns = ["<ROUTE53-ZONE-ARN>"]
+cert_manager_hosted_zone_arns = ["<ROUTE53-ZONE-ARN>"]
 
 extra_tags = {
   Owner      = "devops"

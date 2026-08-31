@@ -1,0 +1,83 @@
+################################################################################
+# products/tenant-manager/documentdb — prd
+#
+# The control plane's own datastore. It holds tenants, services and — crucially —
+# only the REFERENCES to secrets, never the secrets themselves.
+#
+# documentdb_tls = "enabled" HERE, WHICH IS A DEPARTURE FROM EVERY OTHER
+# DOCUMENTDB TFVARS IN THIS REPOSITORY, AND IT IS DELIBERATE.
+#
+# The foundation ships "disabled" in every environment including prd, labelled a
+# KNOWN GAP, because the blocker is the RDS CA bundle that Terraform does not
+# distribute: a consumer that turns TLS on cannot verify the certificate.
+#
+# tenant-manager is not blocked by that. MONGODB_TLS=true makes it append
+# tls=true&tlsInsecure=true (internal/bootstrap/config_pure.go:181) — verification
+# is skipped ON PURPOSE, with the reason written down at config_pure.go:166-169,
+# because DocumentDB presents Amazon's own CA and the service has no env var for a
+# bundle. So encryption in transit is reachable here today with no chart change and
+# no CA distribution.
+#
+# Be precise about what that buys and what it does not: the traffic is ENCRYPTED,
+# and the server is NOT AUTHENTICATED. Inside a private subnet whose only clients
+# are the cluster's own nodes that is a real improvement over plaintext, and it is
+# not the same thing as verified TLS. Recording it here rather than inheriting a
+# "disabled" nobody argued with.
+#
+# retryWrites=false IS NOT SET BY THIS FILE AND NOT SET BY THE SERVICE. It has to
+# be in the MONGODB_URI string itself: DocumentDB does not implement retryable
+# writes, the driver enables them by default, and tenant-manager appends the option
+# only to the tenant URIs it provisions, never to its own. The URI is composed in
+# the ExternalSecret template — see the mongodb_uri_template_hint output.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "tenant-manager"
+environment = "prd"
+
+mode = "dedicated"
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# TLS — see the header. Encrypted, not verified.
+################################################################################
+
+documentdb_tls = "enabled"
+
+master_username = "docdbadmin"
+port            = 27017
+
+################################################################################
+# Sizing
+#
+# Three instances for failover. The control plane is not on the transaction path,
+# but a tenant onboarding that fails halfway leaves a Casdoor application and a
+# database with no reference recorded against them.
+################################################################################
+
+instance_class         = "db.r6g.large"
+instances_count        = 3
+parameter_group_family = "docdb5.0"
+
+backup_retention_period = 14
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+
+extra_tags = {
+  Owner      = "consignado"
+  CostCenter = "consignado-prd"
+}

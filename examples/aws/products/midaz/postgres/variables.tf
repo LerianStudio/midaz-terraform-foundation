@@ -270,3 +270,13 @@ variable "enabled_cloudwatch_logs_exports" {
   type        = list(string)
   default     = ["postgresql", "upgrade"]
 }
+
+variable "parameters" {
+  description = "DB parameters applied to the parameter group, as a list of {name, value} (and optionally apply_method for a static parameter that needs a reboot). THIS IS WHERE TLS IS ENFORCED: rds.force_ssl = \"1\" makes the server REFUSE any non-TLS connection, and it is the only place in this repository that can state it — the module ships an empty parameter list and RDS defaults force_ssl to 0 on the postgres families, so a database with no entry here accepts plaintext from anything inside the security group. Encryption in transit is a client policy decision everywhere else in this repo; on a money path it is not."
+  type = list(object({
+    name         = string
+    value        = string
+    apply_method = optional(string)
+  }))
+  default = []
+}
