@@ -135,6 +135,21 @@ locals {
 # State bucket
 ################################################################################
 
+# S3 server access logging is deliberately off, and the exception is scoped to this
+# one bucket rather than turned off for the repository.
+#
+# Access logging needs a SECOND bucket to receive the logs, and that bucket is
+# created by the very root that bootstraps an environment — it would have to be
+# protected, lifecycled and destroyed alongside the state it describes, and would
+# raise the same finding about itself. What it would buy is a delayed, best-effort
+# copy of a record CloudTrail already keeps: every call against this bucket is made
+# with named credentials the account guard verified, and management events are
+# recorded account-wide with no bucket here.
+#
+# Enable S3 data events on this bucket in CloudTrail if you need object-level reads
+# and writes; that is the supported path, and it does not put an unprotected bucket
+# next to the state.
+#tfsec:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "tfstate" {
   bucket = local.bucket_name
 
