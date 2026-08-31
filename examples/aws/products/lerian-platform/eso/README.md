@@ -19,6 +19,11 @@ repository generates** do not:
 | `{product}-{env}-docdb/password` | `_modules/mongodb-documentdb/main.tf:177` |
 | `AmazonMSK_{name}` | `_modules/streaming-msk/main.tf:88-92` |
 
+And a fourth, written by hand: `installation/{env}/...`, whose only inhabitant today
+is the streaming-hub KEK. Grant it before the secret exists — an empty namespace
+costs nothing, and deferring the grant is how the KEK ends up unreadable with the hub
+reporting healthy and refusing to sign.
+
 A list covering only the first family produces an operator that syncs every
 application secret and **not one database password**. The symptom is
 `SecretSyncedError` on exactly the ExternalSecrets the estate cannot boot without —

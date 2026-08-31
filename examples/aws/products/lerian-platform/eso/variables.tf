@@ -60,13 +60,16 @@ variable "secret_path_prefixes" {
 
       application secrets   tenants/{env}/...    written by tenant-manager and by
                             clusters/{env}/...   the gateway, at runtime
+      installation secrets  installation/{env}/...  written BY HAND by the operator;
+                                                    the streaming-hub KEK is the only
+                                                    one today
       datastore secrets     {product}-{env}-postgres/password
                             {product}-{env}-valkey/auth-token
                             {product}-{env}-docdb/password
                             AmazonMSK_{name}      written by THIS repository's
                                                   datastore modules, at apply time
 
-    The second family is every credential Terraform itself generates
+    The third family is every credential Terraform itself generates
     (_modules/postgres-rds/main.tf:255, valkey-elasticache/main.tf:226,
     mongodb-documentdb/main.tf:177, streaming-msk/main.tf:88-92). None of them
     starts with tenants/ or clusters/.

@@ -146,6 +146,15 @@ variable "deny_secret_path_patterns" {
     tenants/{env}/{org}/{app}/external/... and NOT
     tenants/{env}/{tenantId}/{module}/kafka — including the case where a module is
     itself named "external", which a shorter pattern would catch by accident.
+
+    ONE SHAPE IT DOES NOT COVER, IF YOU COPY THIS ELSEWHERE. lib-commons omits the
+    environment segment entirely when the environment string is blank
+    (commons/secretsmanager/external.go:92-95), producing
+    tenants/{org}/{app}/external/... — three segments, which this pattern misses.
+    On the consignado estate that path is unreachable, because ENV_NAME is a hard
+    boot requirement for the gateway and the gateway's own Allow is scoped to
+    tenants/production/ anyway, so the two are consistent. An estate where the
+    environment is optional needs a second pattern.
   EOT
 
   type    = list(string)
