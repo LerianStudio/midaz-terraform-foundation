@@ -1,0 +1,65 @@
+################################################################################
+# products/reporter/s3 — prd
+#
+# Generated regulatory reports. The lifecycle below is the reason this bucket
+# is not just a default bucket: reports are read often for a month, rarely
+# after a quarter, and have to survive seven years.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "reporter"
+environment = "prd"
+
+# eks_cluster_name is derived -> lerian-prd-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# service_account must match the ServiceAccount the reporter release actually
+# uses. The chart creates one per component (manager and worker) from
+# plugin-manager.fullname / the worker equivalent, so "reporter:reporter" is the
+# common case and NOT a guarantee — check the rendered ServiceAccount name before
+# the first apply. A mismatch fails at runtime with AccessDenied, not at apply.
+#
+# Set oidc_provider_arn explicitly to skip both lookups (useful when the plan
+# runs without eks:DescribeCluster).
+################################################################################
+
+irsa_enabled    = true
+service_account = "reporter:reporter"
+
+################################################################################
+# Buckets
+#
+# expiration_days = 2555 is seven years, the regulatory retention this bucket
+# exists to satisfy. The module validates the ordering (glacier after IA,
+# expiration after both) at plan time, so an out-of-order edit fails before it
+# reaches AWS.
+#
+# force_destroy stays false: `terraform destroy` must fail on a bucket holding
+# reports rather than empty it.
+################################################################################
+
+buckets = {
+  "reporter-storage" = {
+    versioning_enabled = true
+    force_destroy      = false
+
+    transition_ia_days         = 30
+    transition_glacier_days    = 90
+    expiration_days            = 2555
+    noncurrent_expiration_days = 30
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

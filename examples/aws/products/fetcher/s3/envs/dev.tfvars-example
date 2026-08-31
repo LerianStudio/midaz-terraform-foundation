@@ -1,0 +1,57 @@
+################################################################################
+# products/fetcher/s3 — dev
+#
+# One bucket, fetcher-dev-external-data-{account_id}. Extraction output ages
+# out fast, so dev keeps almost nothing; force_destroy is on so a destroy does
+# not leave an orphan bucket behind an ephemeral environment.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is
+# not).
+################################################################################
+
+region      = "us-east-1"
+product     = "fetcher"
+environment = "dev"
+
+# eks_cluster_name is derived -> lerian-dev-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# The object storage keys are on the WORKER in this chart, so it is the worker's
+# ServiceAccount that needs the eks.amazonaws.com/role-arn annotation. Check the
+# rendered name before the first apply — a mismatch fails at runtime with
+# AccessDenied, not at apply time.
+#
+# Set oidc_provider_arn explicitly to skip both lookups.
+################################################################################
+
+irsa_enabled    = true
+service_account = "fetcher:fetcher-worker"
+
+################################################################################
+# Buckets
+#
+# force_destroy = true only here.
+################################################################################
+
+buckets = {
+  "external-data" = {
+    versioning_enabled = true
+    force_destroy      = true
+
+    transition_ia_days         = 15
+    expiration_days            = 30
+    noncurrent_expiration_days = 7
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

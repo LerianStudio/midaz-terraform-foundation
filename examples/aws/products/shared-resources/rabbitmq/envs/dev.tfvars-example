@@ -1,0 +1,75 @@
+################################################################################
+# products/shared-resources/rabbitmq — dev
+#
+# THERE IS NO CHEAP AMAZONMQ BROKER. The RabbitMQ engine only accepts the
+# mq.m5.* and mq.m7g.* families; mq.m7g.medium is the smallest of them, at
+# roughly USD 100/month. The burstable mq.t2.* / mq.t3.* types are ActiveMQ-ONLY
+# and AWS rejects them for RabbitMQ in EVERY deployment mode, SINGLE_INSTANCE
+# included — the module asserts this at plan time rather than letting
+# CreateBroker fail. dev's only lever is the node count.
+#
+# OPT-IN: applying this directory is what enables the shared RabbitMQ tier.
+# There is no rabbitmq_enabled toggle. At USD 100/month for a dev broker, not
+# applying it is a defensible default.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "dev"
+
+# There is no `mode` here on purpose: this stack always CREATES (the module is
+# pinned to mode = "dedicated"). "shared" is what a PRODUCT sets to consume it.
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists. A product consuming with mode = "shared" gets
+# security_group_id = null and cannot authorise itself.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Topology — SINGLE_INSTANCE  ->  broker named shared-dev-rabbitmq-single
+#
+# THIS IS THE CROSS-STACK CONTRACT. With append_deployment_suffix = true the
+# broker name carries the topology, and a product consuming it with
+# mode = "shared" must DECLARE that name in its own shared_broker_name:
+#
+#   SINGLE_INSTANCE here -> the consumer's derived default already matches, so
+#                           it leaves shared_broker_name = ""
+#
+# Switching to CLUSTER_MULTI_AZ renames the broker to shared-dev-rabbitmq-cluster
+# and every shared consumer's plan fails until it sets shared_broker_name.
+################################################################################
+
+broker_deployment_mode   = "SINGLE_INSTANCE"
+append_deployment_suffix = true
+
+host_instance_type = "mq.m7g.medium"
+engine_version     = "3.13"
+mq_admin_user      = "rabbitmqadmin"
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+auto_minor_version_upgrade = true
+apply_immediately          = true
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

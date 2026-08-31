@@ -1,0 +1,55 @@
+################################################################################
+# products/plugin-bc-correios/s3 — stg
+#
+# Same shape as prd at a shorter retention, and without the CMK: staging
+# rehearses the lifecycle, not the key management.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-bc-correios"
+environment = "stg"
+
+# eks_cluster_name is derived -> lerian-stg-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# The NAME half of service_account is confirmed from the chart:
+# bc-correios.serviceAccountName falls back to bc-correios.fullname, which is
+# nameOverride "bc-correios". The NAMESPACE half is whatever namespace the
+# release is installed into — check it before the first apply, because a mismatch
+# fails at runtime with AccessDenied rather than at apply time.
+#
+# Set oidc_provider_arn explicitly to skip both lookups.
+################################################################################
+
+irsa_enabled    = true
+service_account = "bc-correios:bc-correios"
+
+################################################################################
+# Buckets
+################################################################################
+
+buckets = {
+  "bc-correios-attachments" = {
+    versioning_enabled = true
+    force_destroy      = false
+
+    transition_ia_days         = 30
+    transition_glacier_days    = 90
+    expiration_days            = 365
+    noncurrent_expiration_days = 30
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

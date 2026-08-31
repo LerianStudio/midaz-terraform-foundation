@@ -1,0 +1,59 @@
+################################################################################
+# products/plugin-bc-correios/s3 — dev
+#
+# One bucket, plugin-bc-correios-dev-bc-correios-attachments-{account_id}.
+# force_destroy is on so a destroy does not leave an orphan bucket behind an
+# ephemeral environment.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is
+# not).
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-bc-correios"
+environment = "dev"
+
+# eks_cluster_name is derived -> lerian-dev-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# The NAME half of service_account is confirmed from the chart:
+# bc-correios.serviceAccountName falls back to bc-correios.fullname, which is
+# nameOverride "bc-correios". The NAMESPACE half is whatever namespace the
+# release is installed into — check it before the first apply, because a mismatch
+# fails at runtime with AccessDenied rather than at apply time.
+#
+# Set oidc_provider_arn explicitly to skip both lookups.
+################################################################################
+
+irsa_enabled    = true
+service_account = "bc-correios:bc-correios"
+
+################################################################################
+# Buckets
+#
+# force_destroy = true only here. No CMK in dev: SSE-S3 (AES256) is the module
+# default and costs nothing.
+################################################################################
+
+buckets = {
+  "bc-correios-attachments" = {
+    versioning_enabled = true
+    force_destroy      = true
+
+    transition_ia_days         = 30
+    expiration_days            = 90
+    noncurrent_expiration_days = 7
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

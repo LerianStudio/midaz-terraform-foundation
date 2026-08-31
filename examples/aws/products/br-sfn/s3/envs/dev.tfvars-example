@@ -1,0 +1,69 @@
+################################################################################
+# products/br-sfn/s3 — dev
+#
+# One bucket, br-sfn-dev-correios-attachments-{account_id}.
+# force_destroy is on so a destroy does not leave an orphan bucket behind an
+# ephemeral environment.
+#
+# APPLY ONLY IF THE CORREIOS RAIL IS ENABLED. correios.enabled defaults to false
+# (br-sfn/values.yaml:604); with the rail off this bucket has no writer.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is
+# not).
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sfn"
+environment = "dev"
+
+# eks_cluster_name is derived -> lerian-dev-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# The NAME half of service_account is confirmed from the chart:
+# br-sfn.serviceAccountName falls back to br-sfn.fullname, which is nameOverride
+# "br-sfn" (templates/_helpers.tpl:4-14, 33-38), with serviceAccount.create
+# defaulting to true (values.yaml:31-34). The NAMESPACE half is whatever
+# namespace the release is installed into — check it before the first apply,
+# because a mismatch fails at runtime with AccessDenied rather than at apply
+# time.
+#
+# ONE SERVICE ACCOUNT FOR THE WHOLE CHART. br-sfn shares a single ServiceAccount
+# across spb, spi, siloc, scr, slc-edge, desk, cockpit and correios, so this role
+# is assumable by all of them. The chart offers no per-rail alternative. See
+# variables.tf.
+#
+# Set oidc_provider_arn explicitly to skip both lookups.
+################################################################################
+
+irsa_enabled    = true
+service_account = "br-sfn:br-sfn"
+
+################################################################################
+# Buckets
+#
+# force_destroy = true only here. No CMK in dev: SSE-S3 (AES256) is the module
+# default and costs nothing.
+################################################################################
+
+buckets = {
+  "correios-attachments" = {
+    versioning_enabled = true
+    force_destroy      = true
+
+    transition_ia_days         = 30
+    expiration_days            = 90
+    noncurrent_expiration_days = 7
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

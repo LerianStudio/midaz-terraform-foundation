@@ -1,0 +1,63 @@
+################################################################################
+# infra-base/eks — dev
+#
+# Cheapest cluster that still exercises the whole contract: one small node group,
+# short log retention, no autoscaler. Cluster name: lerian-dev-eks.
+################################################################################
+
+region      = "us-east-1"
+product     = "lerian"
+environment = "dev"
+
+# Control plane
+cluster_version = "1.36"
+
+# Public endpoint is on in dev so laptops and CI reach the API, but only from the
+# listed CIDRs.
+#
+# MUST BE EDITED BEFORE APPLYING. The placeholder below is not a valid CIDR on
+# purpose, so `terraform plan` stops with an actionable error instead of either
+# (a) failing in AWS mid-apply, which is what the RFC 5737 documentation ranges
+# that used to sit here did, or (b) quietly applying and leaving the Kubernetes
+# API open. Find your public egress address with:
+#
+#   curl -s https://checkip.amazonaws.com
+#
+# then replace the placeholder with "<that address>/32". Add one entry per office
+# or VPN egress address; private ranges do not belong here (the public endpoint
+# only ever sees public source addresses - use the private endpoint for in-VPC
+# access, already enabled below).
+cluster_endpoint_public_access  = true
+cluster_endpoint_private_access = true
+allowed_api_access_cidrs = [
+  "<PUT-YOUR-EGRESS-IP-HERE>/32"
+]
+
+enable_cluster_creator_admin_permissions = true
+
+# Cheap logging in dev.
+cloudwatch_log_group_retention_in_days = 7
+
+# Single small x86 pool. t3.medium is burstable and non-production only.
+node_groups = {
+  default = {
+    instance_types = ["t3.medium"]
+    ami_type       = "AL2023_x86_64_STANDARD"
+    capacity_type  = "ON_DEMAND"
+    min_size       = 5
+    max_size       = 15
+    desired_size   = 5
+    disk_size      = 20
+  }
+}
+
+# IRSA roles. Autoscaler and load balancer controller stay off in dev.
+create_autoscaler_role               = false
+create_load_balancer_controller_role = false
+create_external_dns_role             = false
+create_cert_manager_role             = false
+
+extra_tags = {
+  Owner     = "devops"
+  CostCenter = "platform-dev"
+}

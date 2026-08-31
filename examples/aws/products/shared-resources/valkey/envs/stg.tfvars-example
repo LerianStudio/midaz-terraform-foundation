@@ -1,0 +1,58 @@
+################################################################################
+# products/shared-resources/valkey — stg
+#
+# Two cache clusters: the minimum that allows automatic failover and Multi-AZ,
+# and therefore the minimum that proves a primary loss is survivable.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "stg"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress
+#
+# Same posture as dev. Once infra-base/eks exists in stg and the node security
+# group is resolving (check `terraform output ingress_security_group_ids`), flip
+# allow_private_subnet_cidr_ingress to false — that is the posture prd ships.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.t4g.medium x 2, Multi-AZ
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.t4g.medium"
+num_cache_clusters         = 2
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 3
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

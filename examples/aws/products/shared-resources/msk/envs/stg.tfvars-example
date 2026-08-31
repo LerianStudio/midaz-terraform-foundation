@@ -1,0 +1,79 @@
+################################################################################
+# products/shared-resources/msk — stg
+#
+# Three brokers, one per Type=database subnet. The broker count must be a
+# multiple of the number of client subnets, which the module asserts at plan
+# time.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "stg"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress
+#
+# Same posture as dev. Once infra-base/eks exists in stg and the node security
+# group is resolving, flip allow_private_subnet_cidr_ingress to false.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Cluster — kafka.m7g.large x 3
+#
+# LOCAL storage with autoscaling headroom. TIERED is available on this family
+# (it is the kafka.t3.* dev sizing that rejects it) and is the lever to pull in
+# prd when retention grows.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.m7g.large"
+broker_ebs_volume_size = 100
+storage_mode           = "LOCAL"
+
+enable_storage_autoscaling       = true
+storage_autoscaling_max_capacity = 250
+
+################################################################################
+# Security
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Kafka configuration
+################################################################################
+
+auto_create_topics_enable = false
+
+################################################################################
+# Observability
+#
+# PER_BROKER is the first level that shows per-node skew, which is what a
+# rebalance problem looks like before it becomes an outage.
+################################################################################
+
+enhanced_monitoring                    = "PER_BROKER"
+cloudwatch_logs_enabled                = true
+cloudwatch_log_group_retention_in_days = 14
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

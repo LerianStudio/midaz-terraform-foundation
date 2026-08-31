@@ -1,0 +1,130 @@
+################################################################################
+# products/br-sfn/msk — dev
+#
+# READ THE COST NOTE BEFORE APPLYING THIS WITH mode = "dedicated".
+#
+# MSK has no cheap corner, and the broker COUNT is why. kafka.t3.small is the
+# smallest broker AWS offers, the minimum is two, and the count must be a
+# MULTIPLE of the number of client subnets. infra-base/vpc tags three subnets
+# Type=database, so the valid values are 3, 6, 9 — the real floor is THREE
+# brokers, roughly USD 105/month. The rest of br-sfn dev (db.t4g.micro
+# Postgres + cache.t4g.micro Valkey) is about USD 27/month combined.
+#
+# For a dev environment the answer is almost always:
+#
+#     mode = "shared"
+#
+# which resolves shared-{env}-msk from products/shared-resources/msk, creates
+# nothing and costs nothing. A dedicated cluster in dev buys isolation nobody is
+# auditing yet. Switch it below only when you specifically need it.
+#
+# AND CONFIRM YOU NEED A BROKER AT ALL. The br-sfn chart names no streaming
+# variable anywhere — no STREAMING_BROKERS, no STREAMING_ENABLED — so the chart
+# cannot tell you which rails publish or whether this deployment enables any of
+# them. Ask the br-sfn service owners before provisioning either mode.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sfn"
+environment = "dev"
+
+# "dedicated" creates br-sfn-dev-msk (~USD 105/month minimum). "shared"
+# consumes the cluster owned by products/shared-resources/msk instead; this stack
+# then creates nothing and every sizing value below is ignored.
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+# Both carry the "lerian" prefix on purpose: they belong to the infra-base
+# FOUNDATION, not to br-sfn and not to the shared datastore tier.
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists. It matters more on MSK than anywhere else: the
+# module used to ship no VPC-CIDR fallback at all, so empty allow lists produced
+# a cluster with zero ingress that looked healthy and accepted no connections.
+#
+# Rules are opened only on the listener ports the enabled auth modes use — with
+# the settings below that is 9096 (SASL/SCRAM over TLS) and nothing else.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+# subnet_ids = []  -> the three Type=database subnets are used, so
+#                     number_of_broker_nodes must be 3, 6 or 9. Narrow this to
+#                     exactly two subnet ids to run a 2-broker cluster; the ids
+#                     are generated, so they cannot be written here.
+
+################################################################################
+# Cluster — kafka.t3.small x 3 (~USD 105/month)
+#
+# storage_mode stays empty: TIERED is REJECTED by the kafka.t3.* family.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.t3.small"
+broker_ebs_volume_size = 20
+storage_mode           = ""
+
+enable_storage_autoscaling = false
+
+################################################################################
+# Security
+#
+# SASL/SCRAM on, credentials in AmazonMSK_br-sfn-dev-msk under a customer
+# managed CMK. Both the AmazonMSK_ prefix and the CMK are AWS requirements for
+# any secret associated with an MSK cluster — this is the one Lerian datastore
+# whose secret is not named {name}/password.
+#
+# TLS in transit is mandatory once SCRAM is on, and MSK's SASL/SCRAM is
+# SCRAM-SHA-512 ONLY — not the SCRAM-SHA-256 most examples show. helm_values here
+# is empty (the chart names no streaming key), so the mechanism has to be set by
+# hand wherever the br-sfn rails read it from.
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Kafka configuration
+#
+# auto.create.topics.enable stays false — but note the gap it leaves on br-sfn.
+# Unlike br-sisbajud, this chart provisions NO topics: it states that RedPanda
+# topics for spb/spi are an environment concern and that the compose
+# redpanda-topics one-shot is dev-only (README.md:78-79). So something outside
+# both the chart and this Terraform has to create them before the rails publish.
+# Keeping auto-create false makes that gap fail loudly instead of silently
+# producing topics with broker defaults and the wrong replication factor.
+#
+# default_replication_factor is left null, deriving min(brokers, 3) = 3. Because
+# nothing here creates topics with an explicit factor, whatever eventually does
+# will very likely inherit this value — which is the right one for 3 brokers.
+################################################################################
+
+auto_create_topics_enable = false
+
+################################################################################
+# Observability
+################################################################################
+
+enhanced_monitoring                    = "DEFAULT"
+cloudwatch_logs_enabled                = false
+cloudwatch_log_group_retention_in_days = 7
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

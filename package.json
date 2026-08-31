@@ -2,7 +2,7 @@
   "name": "lerian-terraform-foundation",
   "version": "0.0.0-development",
   "private": true,
-  "description": "Terraform templates for deploying Midaz infrastructure",
+  "description": "Terraform templates for the infrastructure the Lerian products run on",
   "scripts": {
     "commit": "git-cz",
     "semantic-release": "semantic-release"

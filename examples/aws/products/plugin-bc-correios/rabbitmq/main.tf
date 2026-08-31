@@ -1,0 +1,106 @@
+################################################################################
+# products/plugin-bc-correios/rabbitmq — the message broker of plugin-bc-correios
+#
+# ONE ROOT STACK PER SERVICE. This directory owns exactly one datastore and one
+# state file (aws/products/plugin-bc-correios/rabbitmq/terraform.tfstate). That matters most
+# here: an AmazonMQ broker replacement is the slowest apply of the set, and
+# per-service state means it never blocks a database parameter change.
+#
+#   mode = "dedicated"  -> creates plugin-bc-correios-{env}-rabbitmq[-single|-cluster], its
+#                          security group and its Secrets Manager entry.
+#   mode = "shared"     -> creates NOTHING. Resolves the broker owned by
+#                          products/shared-resources/rabbitmq by name (see
+#                          var.shared_broker_name for the topology suffix), plus
+#                          the secret shared-{env}-rabbitmq/password.
+#
+# TWO DIFFERENT "MODE" AXES live in this stack and they are unrelated:
+#   var.mode                    dedicated | shared                  Lerian sharing
+#   var.broker_deployment_mode  SINGLE_INSTANCE | CLUSTER_MULTI_AZ  AWS topology
+# The broker NAME carries the topology suffix; the secret and the security group
+# never do.
+#
+# Deploy order: infra-base/vpc -> this stack. infra-base/eks can come before or
+# after; see check "eks_node_security_group_resolved" in the network module.
+#
+# This stack does NOT call the naming module. It creates no AWS resource of its
+# own, and the two cross-stack names it derives (VPC, EKS cluster) belong to
+# infra-base and carry the "lerian" product label.
+################################################################################
+
+################################################################################
+# Network resolution — _modules/product-network
+#
+# Pure lookup module, no AWS resource. It owns the derived cross-stack names
+# (VPC, EKS cluster), the private subnet CIDR lookup, the PLURAL EKS node
+# security group lookup and check "eks_node_security_group_resolved". All of
+# that would otherwise be ~90 lines duplicated verbatim in this stack and in
+# its siblings; it is written once there and consumed here.
+#
+# enabled = (mode == "dedicated") is what keeps shared mode free of lookups: in
+# shared mode this stack resolves nothing, plans to zero resources, and does not
+# even require the VPC to exist. Note that `enabled` tracks var.mode, the Lerian sharing axis — NOT var.broker_deployment_mode, the AWS topology axis.
+#
+# subnet_tag_type is deliberately NOT passed. The module's own default is
+# "private" — the subnets whose CIDRs become INGRESS. var.subnet_tag_type here
+# is "database" and selects the subnets the broker is PLACED in; it
+# goes to the rabbitmq-amazonmq module only.
+#
+# The "nothing can reach this broker at all" case is not asserted
+# anywhere in this stack: the rabbitmq-amazonmq module already carries check
+# "ingress_is_reachable" for it.
+################################################################################
+
+module "network" {
+  source = "../../../_modules/product-network"
+
+  enabled     = var.mode == "dedicated"
+  environment = var.environment
+
+  vpc_name         = var.vpc_name
+  eks_cluster_name = var.eks_cluster_name
+
+  allow_private_subnet_cidr_ingress      = var.allow_private_subnet_cidr_ingress
+  eks_node_security_group_lookup_enabled = var.eks_node_security_group_lookup_enabled
+
+  allowed_security_group_ids = var.allowed_security_group_ids
+  allowed_cidr_blocks        = var.allowed_cidr_blocks
+}
+
+################################################################################
+# RabbitMQ — plugin-bc-correios-{environment}-rabbitmq[-single|-cluster]
+# Secret: plugin-bc-correios-{env}-rabbitmq/password   Host: the raw AmazonMQ broker host
+################################################################################
+
+module "rabbitmq" {
+  source = "../../../_modules/rabbitmq-amazonmq"
+
+  product     = var.product
+  environment = var.environment
+  mode        = var.mode
+  extra_tags  = var.extra_tags
+
+  # Only read when mode = "shared". It carries the -single / -cluster suffix of
+  # the shared broker, which the lookup cannot discover — see the variable.
+  shared_broker_name = var.shared_broker_name
+
+  vpc_name        = module.network.vpc_name
+  subnet_tag_type = var.subnet_tag_type
+
+  allowed_security_group_ids = module.network.ingress_security_group_ids
+  allowed_cidr_blocks        = module.network.ingress_cidr_blocks
+  allow_vpc_cidr_ingress     = var.allow_vpc_cidr_ingress
+
+  port                   = var.port
+  console_port           = var.console_port
+  enable_console_ingress = var.enable_console_ingress
+
+  broker_deployment_mode   = var.broker_deployment_mode
+  append_deployment_suffix = var.append_deployment_suffix
+  engine_version           = var.engine_version
+  host_instance_type       = var.host_instance_type
+  mq_admin_user            = var.mq_admin_user
+
+  auto_minor_version_upgrade = var.auto_minor_version_upgrade
+  apply_immediately          = var.apply_immediately
+  enable_general_logs        = var.enable_general_logs
+}

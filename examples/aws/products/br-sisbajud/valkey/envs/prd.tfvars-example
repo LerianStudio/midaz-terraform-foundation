@@ -1,0 +1,75 @@
+################################################################################
+# products/br-sisbajud/valkey — prd
+#
+# Three cache clusters across three AZs with automatic failover, daily snapshots
+# retained for a week.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sisbajud"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+################################################################################
+# Security — the KNOWN GAP, same as products/shared-resources/valkey
+#
+# transit_encryption_mode stays "preferred" and auth_token_enabled stays false,
+# not because production should run a plaintext unauthenticated cache, but
+# because the br-sisbajud chart exposes no way to configure a TLS client:
+#
+#   - The chart defines exactly TWO Redis variables, REDIS_HOST and
+#     REDIS_PASSWORD. There is no REDIS_TLS and no REDIS_CA_CERT, so "required"
+#     would lock the application out with nothing in the values to explain it.
+#   - REDIS_PASSWORD is optional on both sides ("set if the external Redis
+#     requires auth", values-template.yaml:29), and sending an AUTH token over a
+#     plaintext connection hands the credential to anything on the path.
+#
+# The auth token IS generated and stored at br-sisbajud-prd-valkey/auth-token
+# regardless, so flipping both switches later is a tfvars change plus a chart
+# change, not a rebuild. Until then the cache is protected by the security group
+# and the private subnets alone. Documented, not forgotten.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

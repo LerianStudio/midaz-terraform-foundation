@@ -1,0 +1,84 @@
+################################################################################
+# products/plugin-br-pix-switch/rabbitmq — prd
+#
+# CLUSTER_MULTI_AZ on mq.m5.large. AmazonMQ spreads a RabbitMQ cluster across
+# three AZs from the subnets the module selects; there is no separate node count
+# to set.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-switch"
+environment = "prd"
+
+mode = "dedicated"
+
+# If you switch to mode = "shared", shared_broker_name is MANDATORY here. The
+# products/shared-resources/rabbitmq prd tfvars deploy the shared broker as
+# CLUSTER_MULTI_AZ, and
+# the derived default assumes -single:
+#   shared_broker_name = "shared-prd-rabbitmq-cluster"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Ports
+#
+# enable_console_ingress opens 443 to the same sources as AMQPS. Narrowing it to
+# false hides the management console. Unlike midaz it does NOT break a
+# RABBITMQ_HEALTH_CHECK_URL, which targets the management HTTP API — so it stays
+# true, and the exposure is bounded by the ingress allow list above, not by the
+# port list.
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — CLUSTER_MULTI_AZ on mq.m5.large
+#
+# apply_immediately is false in production: a broker modification applied outside
+# the maintenance window is a reboot in the middle of the trading day.
+################################################################################
+
+broker_deployment_mode   = "CLUSTER_MULTI_AZ"
+append_deployment_suffix = true
+host_instance_type       = "mq.m5.large"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = false
+enable_general_logs        = true
+
+################################################################################
+# Helm handoff
+#
+# RABBITMQ_HOST is the raw AWS broker host. There is no alternative: the only
+# other candidate would be a private alias, and an AMQPS client that validates
+# the hostname — which is what production must do — rejects it, because the
+# broker certificate covers *.mq.{region}.on.aws.
+#
+# The consequence to plan around is that replacing the broker changes
+# RABBITMQ_HOST, so it is a Helm values change. Values are generated from
+# `terraform output` on every deploy, so this is a re-run, not a hand edit.
+################################################################################
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

@@ -1,0 +1,71 @@
+################################################################################
+# products/midaz/valkey — dev
+#
+# Absolute minimum sizing. cache.t4g.micro with one cache cluster is roughly
+# USD 12/month.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "midaz"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.t4g.micro, one cache cluster (~USD 12/month)
+#
+# One cache cluster means no failover and no Multi-AZ: both require at least two.
+# It also means reader_endpoint comes back null.
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.t4g.micro"
+num_cache_clusters         = 1
+automatic_failover_enabled = false
+multi_az_enabled           = false
+snapshot_retention_limit   = 0
+
+################################################################################
+# Security
+#
+# Transit encryption stays ON in "preferred" mode, which accepts TLS and
+# plaintext clients alike — the midaz chart still connects in plaintext, and
+# helm_values therefore reports REDIS_TLS = "false". Flipping the mode to
+# "required" without a chart change locks the ledger out.
+#
+# auth_token_enabled = false: the token is generated and written to
+# midaz-dev-valkey/auth-token either way, ElastiCache just does not demand it yet.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+
+# Logical Valkey database index, emitted as REDIS_DB.
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

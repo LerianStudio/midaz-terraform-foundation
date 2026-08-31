@@ -1,0 +1,55 @@
+################################################################################
+# products/flowker/documentdb — stg
+#
+# INFERRED COMPOSITION — see dev.tfvars-example and ../../README.md.
+#
+# Two instances on the smallest class: enough to exercise a real failover and the
+# reader endpoint, which a single-instance dev cluster cannot.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "flowker"
+environment = "stg"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium, two instances
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 2
+parameter_group_family = "docdb5.0"
+
+documentdb_tls = "disabled"
+
+backup_retention_period = 7
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = false
+
+enabled_cloudwatch_logs_exports = ["audit"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

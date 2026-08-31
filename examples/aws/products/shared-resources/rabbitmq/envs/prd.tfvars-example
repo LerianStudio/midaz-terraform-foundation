@@ -1,0 +1,78 @@
+################################################################################
+# products/shared-resources/rabbitmq — prd
+#
+# CLUSTER_MULTI_AZ on mq.m5.large: three nodes, one per AZ, managed by AmazonMQ.
+# Roughly USD 660/month. mq.m5.large is a sizing decision, not a topology
+# requirement — the smaller mq.m7g.medium clusters just as well.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. A SHARED broker
+# carries the traffic of every product pointed at it. Selecting instance types
+# is the client's responsibility; see the Instance Types Disclaimer in the
+# repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "prd"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — the tight posture
+#
+# allow_private_subnet_cidr_ingress = false: security-group-only ingress, which
+# requires infra-base/eks to exist first. Before the first prd apply, confirm
+# eks_node_security_group_resolved does NOT warn.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+# Add the VPN or bastion security group here if operators need console access.
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Topology — CLUSTER_MULTI_AZ  ->  broker named shared-prd-rabbitmq-cluster
+#
+# EVERY SHARED CONSUMER IN prd MUST SET, on its own rabbitmq root:
+#
+#   shared_broker_name = "shared-prd-rabbitmq-cluster"
+#
+# The consumer's derived default is "shared-prd-rabbitmq-single", which does not
+# exist here. Confirm the exact string with: terraform output -raw broker_name
+#
+# The -single / -cluster suffix is also what makes a topology migration safe on
+# a shared broker: the two brokers coexist while consumers are repointed one at
+# a time. See _modules/rabbitmq-amazonmq/docs/UPGRADE-GUIDE.md.
+################################################################################
+
+broker_deployment_mode   = "CLUSTER_MULTI_AZ"
+append_deployment_suffix = true
+
+host_instance_type = "mq.m5.large"
+engine_version     = "3.13"
+mq_admin_user      = "rabbitmqadmin"
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Auto minor version upgrades are OFF in prd: an unattended broker restart is a
+# message-loss window for every consuming product that is not using publisher
+# confirms. Upgrade in a planned change instead.
+################################################################################
+
+auto_minor_version_upgrade = false
+apply_immediately          = false
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

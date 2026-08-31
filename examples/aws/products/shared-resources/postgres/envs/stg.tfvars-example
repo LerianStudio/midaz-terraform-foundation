@@ -1,0 +1,76 @@
+################################################################################
+# products/shared-resources/postgres — stg
+#
+# Staging rehearses the production TOPOLOGY at a smaller size: Multi-AZ so the
+# failover is proven, on the smallest class that still supports Performance
+# Insights (the t2/t3/t4g micro and small range is excluded by AWS).
+#
+# Deletion protection is ON here. A shared staging instance that anyone can
+# destroy with a stray `terraform destroy` takes every product rehearsing
+# against it down at once.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "stg"
+
+# vpc_name         is derived -> lerian-stg-vpc
+# eks_cluster_name is derived -> lerian-stg-eks
+
+################################################################################
+# Ingress
+#
+# Same posture as dev. Once infra-base/eks exists in stg and the node security
+# group is resolving (check `terraform output ingress_security_group_ids`), flip
+# allow_private_subnet_cidr_ingress to false to move to security-group-only
+# ingress — that is the posture prd ships with.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "lerian"
+username             = "postgres"
+
+################################################################################
+# Sizing — db.t4g.medium, Multi-AZ
+#
+# The first burstable class above the Performance Insights exclusion list, so
+# the query plans staging produces are the ones prd will produce.
+################################################################################
+
+instance_class        = "db.t4g.medium"
+allocated_storage     = 50
+max_allocated_storage = 200
+multi_az              = true
+
+backup_retention_period = 7
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

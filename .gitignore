@@ -5,9 +5,31 @@
 *.tfstate
 *.tfstate.*
 
-# tfplan files
+# Local workspace state. examples/aws/bootstrap creates its own backend, so it
+# runs on LOCAL state with one workspace per environment:
+# terraform.tfstate.d/<env>/terraform.tfstate. Already matched by *.tfstate
+# above; kept explicit so the directory is never staged by mistake.
+terraform.tfstate.d/
+
+# Generated backend configuration written by examples/aws/bootstrap. Contains the
+# client's AWS account id in the bucket name, so it stays out of this repository.
+# examples/aws/backend/README.md and .gitkeep remain tracked.
+examples/aws/backend/*.hcl
+
+# Environment -> AWS account mapping, written by lerian-infra init. Carries the client's
+# account ids and profile names, for the same reason the backend config above is
+# excluded. examples/aws/environments.conf.example remains tracked and is the
+# template operators copy.
+examples/aws/environments.conf
+
+# tfplan files. Terraform saved plans are ZIP archives that embed the full state
+# and config, including account ids and any value marked sensitive - they must
+# never be committed. The bare `tfplan` and `*.tfplan` patterns below missed
+# `tfplan.dev` / `tfplan.stg`, which is exactly how two of them got committed, so
+# `tfplan*` catches every suffix.
 *.tfplan
 tfplan
+tfplan*
 
 # Crash log files
 crash.log
@@ -52,7 +74,9 @@ node_modules
 package-lock.json
 
 # Plans and documentation (local only - root level)
-/docs/
 
 # Beads issue tracker (local only)
 .beads/
+
+# Working documents: plans and notes, local only.
+/docs/

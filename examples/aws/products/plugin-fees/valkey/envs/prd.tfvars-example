@@ -1,0 +1,99 @@
+################################################################################
+# products/plugin-fees/valkey — prd
+#
+# Three cache clusters across three AZs with automatic failover, daily
+# snapshots retained for a week.
+#
+# Copy to prd.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-fees"
+environment = "prd"
+
+# OPT-IN. plugin-fees does not need Valkey on its main path — the only consumer
+# is the multi-tenant connection-pool registry, which the chart renders
+# exclusively when MULTI_TENANT_ENABLED is "true"
+# (templates/fees/configmap.yaml:96-110; the flag itself defaults to "false" at
+# values.yaml:196). If that feature is off, do not apply this directory at all:
+# not applying it is what "disabled" means here, and it saves the whole
+# ElastiCache bill.
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+# Both carry the "lerian" prefix on purpose: they belong to the infra-base
+# FOUNDATION, not to plugin-fees — and not to the shared datastore tier either,
+# which carries "shared".
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists: it authorises the Type=private subnet CIDRs,
+# which only depend on infra-base/vpc. The EKS node security group is looked up
+# on top of that and simply resolves to nothing until the cluster is created —
+# check "eks_node_security_group_resolved" warns while that is the case.
+#
+# allow_vpc_cidr_ingress is the module's VPC CIDR FALLBACK, applied only when
+# both allow lists resolve empty. False here so an empty allow list trips the
+# module's check "ingress_is_reachable" instead of quietly widening to a CIDR
+# that includes the public subnets.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+################################################################################
+# Security
+#
+# plugin-fees ships BOTH client-side knobs, so the auth-token gap here is a
+# configuration change rather than a chart change:
+#   MULTI_TENANT_REDIS_TLS       values.yaml:215 — note it defaults to "false",
+#                                where the tracer chart defaults to "true"
+#   MULTI_TENANT_REDIS_PASSWORD  a NAMED optional key in the chart Secret
+#                                (templates/fees/secrets.yaml:28-30), declared
+#                                at values.yaml:246
+#
+# Left at the safe default anyway, because flipping transit_encryption_mode to
+# "required" and auth_token_enabled to true in one step, in production, on a
+# client whose TLS trust store has not been verified, is how a registry goes
+# dark. Rehearse in stg, then flip. The token IS generated and stored at
+# plugin-fees-prd-valkey/auth-token regardless.
+#
+# Worth flagging for a production review: the chart's "false" default on
+# MULTI_TENANT_REDIS_TLS means the tenant cache connection is plaintext unless
+# something overrides it. The helm_values output of this stack is that
+# override — it reports what the server actually enforces.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

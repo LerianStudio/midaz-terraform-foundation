@@ -57,8 +57,7 @@ resource "azurerm_private_endpoint" "redis_2" {
 
 resource "azurerm_private_dns_a_record" "redis" {
   name                = var.redis_name
-  zone_name           = data.azurerm_private_dns_zone.redis.name
-  resource_group_name = data.azurerm_private_dns_zone.redis.resource_group_name
+  private_dns_zone_id = data.azurerm_private_dns_zone.redis.id
   ttl                 = var.redis_dns_ttl
   records             = [azurerm_private_endpoint.redis.private_service_connection[0].private_ip_address]
 

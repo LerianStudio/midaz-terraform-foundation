@@ -68,49 +68,33 @@ jobs:
     - name: Terraform Format Check
       run: terraform fmt -check -recursive
 
-    # Initialize Terraform working directories
-    - name: Terraform Init
+    # Initialize and validate every Terraform directory.
+    #
+    # Directories are DISCOVERED, not listed. The previous hand-maintained list
+    # had already drifted: examples/aws/amazonmq, the three documentdb stacks,
+    # examples/azure/cosmosdb and examples/azure/base-resources were deployable
+    # but never checked, and any new directory silently escaped CI until someone
+    # remembered to edit this file.
+    #
+    # A versions.tf is the marker every root module and child module in this
+    # repository carries. terraform -chdir replaces the old cd chain, where one
+    # wrong ../ silently validated the wrong directory.
+    - name: Terraform Init and Validate
       run: |
-        # AWS components
-        cd examples/aws/vpc && terraform init -backend=false
-        cd ../route53 && terraform init -backend=false
-        cd ../rds && terraform init -backend=false
-        cd ../valkey && terraform init -backend=false
-        cd ../eks && terraform init -backend=false
-        # GCP components
-        cd ../../../examples/gcp/vpc && terraform init -backend=false
-        cd ../cloud-dns && terraform init -backend=false
-        cd ../cloud-sql && terraform init -backend=false
-        cd ../valkey && terraform init -backend=false
-        cd ../gke && terraform init -backend=false
-        # Azure components
-        cd ../../../examples/azure/network && terraform init -backend=false
-        cd ../dns && terraform init -backend=false
-        cd ../database && terraform init -backend=false
-        cd ../redis && terraform init -backend=false
-        cd ../aks && terraform init -backend=false
-
-    # Validate Terraform configurations
-    - name: Terraform Validate
-      run: |
-        # AWS components
-        cd examples/aws/vpc && terraform validate
-        cd ../route53 && terraform validate
-        cd ../rds && terraform validate
-        cd ../valkey && terraform validate
-        cd ../eks && terraform validate
-        # GCP components
-        cd ../../../examples/gcp/vpc && terraform validate
-        cd ../cloud-dns && terraform validate
-        cd ../cloud-sql && terraform validate
-        cd ../valkey && terraform validate
-        cd ../gke && terraform validate
-        # Azure components
-        cd ../../../examples/azure/network && terraform validate
-        cd ../dns && terraform validate
-        cd ../database && terraform validate
-        cd ../redis && terraform validate
-        cd ../aks && terraform validate
+        set -euo pipefail
+        dirs=$(find examples -name versions.tf -not -path '*/.terraform/*' -exec dirname {} \; | sort -u)
+        if [ -z "$dirs" ]; then
+          echo "No Terraform directories found - the discovery glob is wrong." >&2
+          exit 1
+        fi
+        echo "Discovered Terraform directories:"
+        echo "$dirs"
+        for dir in $dirs; do
+          echo "::group::$dir"
+          terraform -chdir="$dir" init -backend=false -input=false
+          terraform -chdir="$dir" validate
+          echo "::endgroup::"
+        done
 
     # Run TFLint on all Terraform files
     - name: Init TFLint
@@ -136,7 +120,7 @@ jobs:
         additional_args: "--exclude aws-ssm-secret-use-customer-key,aws-ssm-secret-use-customer-key,aws-ec2-no-public-egress-sgr,aws-ec2-require-vpc-flow-logs-for-all-vpcs,google-sql-encrypt-in-transit-data,google-gke-enable-private-cluster,google-gke-enable-network-policy,google-gke-enforce-pod-security-policy,aws-mq-enable-audit-logging,aws-documentdb-encryption-customer-key"
 
   release:
-    needs: validate  # Only run after validation succeeds
+    needs: [validate]  # Only run after validation succeeds
     runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'push'
     steps:

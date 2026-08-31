@@ -1,0 +1,72 @@
+################################################################################
+# products/shared-resources/documentdb — dev
+#
+# DocumentDB has NO CHEAP CORNER. db.t3.medium is the smallest class the service
+# offers — the RDS micro/small range does not exist for it — so one instance is
+# roughly USD 60/month, more than the shared PostgreSQL and Valkey put together.
+#
+# OPT-IN: applying this directory is what enables the shared DocumentDB tier.
+# There is no documentdb_enabled toggle. In a cost-sensitive dev environment the
+# right answer is usually NOT to apply this directory at all and to let the
+# products that need Mongo run mode = "dedicated" only where they must.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "dev"
+
+# There is no `mode` here on purpose: this stack always CREATES (the module is
+# pinned to mode = "dedicated"). "shared" is what a PRODUCT sets to consume it.
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists. A product consuming with mode = "shared" gets
+# security_group_id = null and cannot authorise itself, so an unreachable shared
+# cluster is unreachable for every consumer at once.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium x 1 (~USD 60/month)
+#
+# One instance: no reader, so reader_endpoint points back at the writer.
+#
+# documentdb_tls stays "disabled". Not because of the host — consumers receive
+# the raw *.docdb.amazonaws.com endpoint, exactly what the certificate covers —
+# but because the consuming charts must first mount the global RDS CA bundle
+# into MONGO_*_TLS_CA_CERT, which Terraform does not distribute. On a SHARED
+# cluster that switch is all-or-nothing for every consumer. Known gap.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 1
+parameter_group_family = "docdb5.0"
+documentdb_tls         = "disabled"
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+apply_immediately       = true
+
+enabled_cloudwatch_logs_exports = []
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

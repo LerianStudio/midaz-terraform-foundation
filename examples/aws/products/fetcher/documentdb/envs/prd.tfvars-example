@@ -1,0 +1,65 @@
+################################################################################
+# products/fetcher/documentdb — prd
+#
+# Three instances across three AZs, deletion protection on, audit logs
+# exported. fetcher stores extraction job state and metadata here — the raw
+# extracted payloads go to S3, not to Mongo.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "fetcher"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc   (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks   (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# TLS — a KNOWN GAP, not an oversight
+#
+# documentdb_tls stays "disabled". The fetcher chart has a MONGO_TLS_CA_CERT key
+# but nothing distributes the global RDS CA bundle into the pod, and Terraform
+# cannot. The host side is already correct: helm_values always emits the raw
+# *.docdb.amazonaws.com writer endpoint, the exact name the certificate covers,
+# so hostname validation passes the moment the CA is mounted.
+################################################################################
+
+documentdb_tls = "disabled"
+
+################################################################################
+# Engine and sizing — db.r6g.large, three instances
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.r6g.large"
+instances_count        = 3
+parameter_group_family = "docdb5.0"
+
+backup_retention_period = 14
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

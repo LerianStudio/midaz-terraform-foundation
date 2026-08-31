@@ -1,0 +1,96 @@
+################################################################################
+# products/plugin-br-pix-indirect-btg/postgres — prd
+#
+# Production: Multi-AZ, deletion protection on, and both observability paths
+# enabled.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-indirect-btg"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+#
+# database_name is the ONE database RDS creates, emitted as DB_NAME for all four
+# data-plane components. The chart disagrees with itself about the name — pix,
+# inbound and outbound default to "pix", reconciliation defaults to "pix_btg",
+# and the bundled subchart provisions "pix_btg". Pointing all four at this one
+# value is what keeps reconciliation from dialling a database that RDS never
+# created. See the product README.
+#
+# username becomes DB_USER. The chart default is "plugin" (application side);
+# the bundled subchart uses "pix_btg". Following the application side is what
+# matters at runtime.
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "pix"
+username             = "plugin"
+
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Created as plugin-br-pix-indirect-btg-prd-postgres-replica and emitted by
+# helm_values as DB_REPLICA_HOST / _PORT / _USER / _NAME on all four data-plane
+# components.
+#
+# Those keys are emitted whether or not a replica exists — with none, they point
+# at the primary. That is the chart's own default shape, and it is what the
+# external path needs: the chart's host helper returns EMPTY when the bundled
+# subchart is disabled and only DB_HOST has a required() guard, so an unset
+# DB_REPLICA_HOST would render as "".
+################################################################################
+
+create_read_replica         = true
+read_replica_instance_class = "db.m7g.large"
+read_replica_multi_az       = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

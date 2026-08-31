@@ -1,0 +1,74 @@
+################################################################################
+# products/notifications/valkey — stg
+#
+# Two cache clusters with automatic failover: the smallest topology that actually
+# exercises a promotion and produces a reader endpoint, which a single-node dev
+# group cannot.
+#
+# Copy to stg.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "notifications"
+environment = "stg"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-stg-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-stg-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.t4g.small, two cache clusters, Multi-AZ
+#
+# multi_az_enabled requires BOTH num_cache_clusters >= 2 AND
+# automatic_failover_enabled = true. Setting one without the others fails the
+# apply, not the plan.
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.t4g.small"
+num_cache_clusters         = 2
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 1
+
+################################################################################
+# Security
+#
+# Transit encryption stays ON in "preferred" mode, which accepts TLS and
+# plaintext clients alike — the chart still connects in plaintext, and
+# helm_secret_values therefore reports REDIS_TLS = "false". Flipping the mode to
+# "required" without a chart change locks every component out.
+#
+# auth_token_enabled = false: the token is generated and written to
+# notifications-stg-valkey/auth-token either way, ElastiCache just does not
+# demand it yet.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+
+# Logical Valkey database index, emitted as REDIS_DB. The chart default is 0.
+redis_db_index = 0
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

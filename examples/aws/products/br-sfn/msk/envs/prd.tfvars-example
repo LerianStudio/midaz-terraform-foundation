@@ -1,0 +1,114 @@
+################################################################################
+# products/br-sfn/msk — prd
+#
+# Three brokers, one per Type=database subnet, replication factor 3 so a single
+# broker loss costs no partitions. Roughly USD 630/month at 500 GB per broker.
+#
+# THIS IS THE ENVIRONMENT WHERE mode = "dedicated" CAN ACTUALLY BE JUSTIFIED, and
+# the justification is regulatory isolation rather than cost or throughput. A
+# shared Kafka cluster is ONE topic namespace, ONE set of ACLs and ONE retention
+# budget for every product pointed at it. br-sfn talks directly to BACEN and
+# Nuclea over RSFN — SPB/STR settlement, SPI/Pix, SILOC, SCR. If the deployment
+# has to be able to state that no other workload can read or replay that
+# traffic, that is the argument, and this directory is how it is met.
+#
+# BUT THE CHART GIVES YOU NOTHING TO STAND ON. br-sfn names no streaming
+# variable anywhere: no STREAMING_BROKERS, no STREAMING_ENABLED. It says only
+# that RedPanda is external and that its topics are "an environment concern".
+# Which rails publish, and whether this deployment enables any of them, is an
+# application fact. Confirm it with the br-sfn service owners and record the
+# isolation decision explicitly rather than inheriting it from this file.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. Selecting instance
+# types is the client's responsibility; see the Instance Types Disclaimer in the
+# repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sfn"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — the tight posture
+#
+# allow_private_subnet_cidr_ingress = false: security-group-only ingress, which
+# requires infra-base/eks to exist first. Before the first prd apply, confirm
+# check "eks_node_security_group_resolved" does NOT warn — with both this and
+# the allow lists empty, the module's check "ingress_is_reachable" fires and the
+# cluster accepts no connections.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+# Add the VPN or bastion security group here if operators need direct access.
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Cluster — kafka.m7g.large x 3, TIERED storage
+#
+# TIERED moves cold segments off the broker EBS volume and is the lever to pull
+# when retention grows. It is rejected by the kafka.t3.* family, which is why
+# dev cannot use it.
+#
+# Retention matters more than usual here: RSFN rail events are the settlement
+# audit trail. br-sfn ships no topic provisioning, so nothing sets a per-topic
+# retention for you — set it deliberately wherever the topics are created,
+# rather than inheriting the broker default.
+################################################################################
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.m7g.large"
+broker_ebs_volume_size = 500
+storage_mode           = "TIERED"
+
+enable_storage_autoscaling       = true
+storage_autoscaling_max_capacity = 2000
+
+################################################################################
+# Security
+################################################################################
+
+encryption_in_transit_client_broker = "TLS"
+
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+################################################################################
+# Kafka configuration
+#
+# Replication factor 3 across three brokers: a single broker loss costs no
+# partitions.
+#
+# THIS IS THE BROKER DEFAULT ONLY. It applies to topics created without an
+# explicit factor. br-sfn ships no topic provisioning, so this default is what
+# an auto-created or hand-created topic inherits unless the creator overrides
+# it. Verify the actual per-topic factor after the rails have run once.
+################################################################################
+
+auto_create_topics_enable  = false
+default_replication_factor = 3
+
+################################################################################
+# Observability
+################################################################################
+
+enhanced_monitoring                    = "PER_BROKER"
+cloudwatch_logs_enabled                = true
+cloudwatch_log_group_retention_in_days = 90
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

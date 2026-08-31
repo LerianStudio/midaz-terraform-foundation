@@ -1,0 +1,65 @@
+################################################################################
+# products/product-console/documentdb — dev
+#
+# DocumentDB has no cheap corner: db.t3.medium is the SMALLEST class the service
+# offers (there is no micro and no small), so one instance is roughly USD
+# 60/month. For product-console specifically that is a hard number to justify in
+# an ephemeral environment — the console stores UI state, not ledger data — so
+# mode = "shared" against products/shared-resources/documentdb is the better dev
+# answer whenever that tier exists.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "product-console"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.t3.medium, one instance (~USD 60/month)
+#
+# instance_class MUST be db.t3.medium or larger. db.t4g.micro, db.t3.small and
+# the rest of the RDS burstable range simply do not exist for DocumentDB, and the
+# module rejects them with a plan-time precondition rather than five minutes into
+# the apply.
+#
+# One instance means no failover: an AZ loss takes the cluster down. That is the
+# correct trade in dev and the wrong one anywhere else.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.t3.medium"
+instances_count        = 1
+parameter_group_family = "docdb5.0"
+
+# TLS off in dev, matching every other product. See prd for the gap this leaves.
+documentdb_tls = "disabled"
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+enabled_cloudwatch_logs_exports = []
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

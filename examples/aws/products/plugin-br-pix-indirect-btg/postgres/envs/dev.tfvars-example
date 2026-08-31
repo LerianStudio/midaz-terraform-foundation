@@ -1,0 +1,87 @@
+################################################################################
+# products/plugin-br-pix-indirect-btg/postgres — dev
+#
+# Absolute minimum sizing. db.t4g.micro with 20 GB is roughly USD 15/month
+# (us-east-1 on-demand, ESTIMATE — price it against the AWS Pricing Calculator).
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-indirect-btg"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine
+#
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
+#
+# database_name is the ONE database RDS creates, emitted as DB_NAME for all four
+# data-plane components. The chart disagrees with itself about the name — pix,
+# inbound and outbound default to "pix", reconciliation defaults to "pix_btg",
+# and the bundled subchart provisions "pix_btg". Pointing all four at this one
+# value is what keeps reconciliation from dialling a database that RDS never
+# created. See the product README.
+#
+# username becomes DB_USER. The chart default is "plugin" (application side);
+# the bundled subchart uses "pix_btg". Following the application side is what
+# matters at runtime.
+################################################################################
+
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "pix"
+username             = "plugin"
+
+################################################################################
+# Sizing — db.t4g.micro (~USD 15/month)
+#
+# Performance Insights MUST stay false: AWS does not offer it on db.t4g.micro,
+# and the module rejects the combination with a plan-time precondition rather
+# than letting the apply fail five minutes in. Enhanced Monitoring is off for the
+# same cost reason, and the monitoring IAM role goes with it.
+################################################################################
+
+instance_class        = "db.t4g.micro"
+allocated_storage     = 20
+max_allocated_storage = 50
+multi_az              = false
+
+backup_retention_period = 1
+skip_final_snapshot     = true
+deletion_protection     = false
+
+performance_insights_enabled = false
+monitoring_interval          = 0
+create_monitoring_role       = false
+
+enabled_cloudwatch_logs_exports = ["postgresql"]
+
+# No replica in dev. helm_values still emits the DB_REPLICA_* keys, pointed at
+# the primary — that is the chart's own default shape (DB_REPLICA_HOST defaults
+# to the same host helper as DB_HOST), not an invention of this stack.
+create_read_replica = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

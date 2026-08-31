@@ -1,0 +1,83 @@
+################################################################################
+# products/underwriter/valkey — dev
+#
+# Absolute minimum sizing, roughly USD 12/month.
+#
+# COMPOSITION INFERRED: the underwriter chart is not in this repository. The
+# Valkey dependency is evidenced by the vendored charts/valkey-2.4.7.tgz
+# tarball, not by a values.yaml this repo can read.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "underwriter"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+# Both carry the "lerian" prefix on purpose: they belong to the infra-base
+# FOUNDATION, not to underwriter — and not to the shared datastore tier either,
+# which carries "shared".
+
+################################################################################
+# Ingress
+#
+# allow_private_subnet_cidr_ingress = true is what makes this stack appliable
+# BEFORE infra-base/eks exists: it authorises the Type=private subnet CIDRs,
+# which only depend on infra-base/vpc. The EKS node security group is looked up
+# on top of that and simply resolves to nothing until the cluster is created —
+# check "eks_node_security_group_resolved" warns while that is the case.
+#
+# allow_vpc_cidr_ingress is the module's VPC CIDR FALLBACK, applied only when
+# both allow lists resolve empty. False here so an empty allow list trips the
+# module's check "ingress_is_reachable" instead of quietly widening to a CIDR
+# that includes the public subnets.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.t4g.micro, one cache cluster (~USD 12/month)
+#
+# One cache cluster means no failover and no Multi-AZ: both require at least
+# two. It also means reader_endpoint comes back null.
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.t4g.micro"
+num_cache_clusters         = 1
+automatic_failover_enabled = false
+multi_az_enabled           = false
+snapshot_retention_limit   = 0
+
+################################################################################
+# Security
+#
+# Transit encryption stays ON in "preferred" mode, which accepts TLS and
+# plaintext clients alike. auth_token_enabled = false: the token is generated
+# and written to the Secrets Manager entry either way, ElastiCache just does not
+# demand it yet. See the module README and this stack's README for why.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

@@ -1,0 +1,70 @@
+################################################################################
+# products/flowker/valkey — dev
+#
+# INFERRED COMPOSITION. flowker has no readable Helm chart in this monorepo; the
+# evidence for this datastore is a vendored valkey-0.7.4.tgz with no Chart.yaml
+# above it. See ../../README.md.
+#
+# Absolute minimum sizing. cache.t4g.micro with one cache cluster is roughly
+# USD 12/month.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "flowker"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — cache.t4g.micro, one cache cluster (~USD 12/month)
+#
+# One cache cluster means no failover and no Multi-AZ: both require at least two.
+# It also means reader_endpoint comes back null.
+################################################################################
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+node_type                  = "cache.t4g.micro"
+num_cache_clusters         = 1
+automatic_failover_enabled = false
+multi_az_enabled           = false
+snapshot_retention_limit   = 0
+
+################################################################################
+# Security
+#
+# Transit encryption ON in "preferred" mode, which accepts TLS and plaintext
+# clients alike, and auth_token_enabled = false. Both are the conservative choice
+# forced by the missing chart: "required" or an enforced token against a client
+# nobody can inspect produces a lockout that looks like a network fault. The
+# token IS generated and written to flowker-dev-valkey/auth-token either way.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "preferred"
+auth_token_enabled         = false
+
+maintenance_window = "mon:00:00-mon:03:00"
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

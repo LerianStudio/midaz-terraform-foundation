@@ -1,0 +1,72 @@
+################################################################################
+# products/shared-resources/documentdb — prd
+#
+# Three instances across three AZs: one writer, two readers behind the reader
+# endpoint published as reader_endpoint. Roughly USD 650/month on db.r6g.large.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION. A SHARED cluster
+# carries the load of every product pointed at it, so it needs headroom a
+# per-product cluster does not. Selecting instance types is the client's
+# responsibility; see the Instance Types Disclaimer in the repository README.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "shared"
+environment = "prd"
+
+# vpc_name         is derived -> lerian-prd-vpc
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# Ingress — the tight posture
+#
+# allow_private_subnet_cidr_ingress = false: security-group-only ingress, which
+# requires infra-base/eks to exist first. Before the first prd apply, confirm
+# eks_node_security_group_resolved does NOT warn. If it does, either eks is not
+# applied yet or the cluster name does not match — do not work around it by
+# re-enabling the CIDR path.
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+# Add the VPN or bastion security group here if operators need direct access.
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Engine and sizing — db.r6g.large x 3
+#
+# KNOWN GAP: documentdb_tls stays "disabled" in production.
+#
+# The host side is no longer the blocker — consumers receive the raw
+# *.docdb.amazonaws.com endpoint, which is exactly what the DocumentDB
+# certificate covers, so hostname validation passes. What is missing is that the
+# consuming charts must mount the global RDS CA bundle into MONGO_*_TLS_CA_CERT,
+# which Terraform does not distribute. On a SHARED cluster flipping this is
+# all-or-nothing: every consuming product needs the CA bundle wired on the same
+# day. Turn it on once they all do.
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.r6g.large"
+instances_count        = 3
+parameter_group_family = "docdb5.0"
+documentdb_tls         = "disabled"
+
+backup_retention_period = 30
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

@@ -1,0 +1,88 @@
+################################################################################
+# products/matcher/rabbitmq — dev
+#
+# INFERRED DEPENDENCY, AND THE MOST EXPENSIVE OF THE THREE.
+#
+# The Matcher chart is not in this repository. The broker is inferred from a
+# vendored rabbitmq-2.1.11.tgz in charts/matcher/charts/ — which proves the
+# dependency is DECLARED, not that it is enabled: plugin-br-bank-transfer vendors
+# the identical tarball and ships the subchart disabled.
+#
+# And there is no cheap AmazonMQ RabbitMQ broker. The engine only accepts the
+# mq.m5.* and mq.m7g.* families, so the floor is a SINGLE_INSTANCE mq.m7g.medium
+# at roughly USD 100/month (us-east-1 on-demand, ESTIMATE) — several times this
+# product's PostgreSQL and Valkey combined. mq.t3.micro is an ActiveMQ-ONLY type:
+# cheap, and refused outright for RabbitMQ in every deployment mode.
+#
+# CONFIRM WITH THE MATCHER TEAM BEFORE APPLYING THIS DIRECTORY. If the broker is
+# needed but the cost is not, set mode = "shared" and consume
+# products/shared-resources/rabbitmq.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "matcher"
+environment = "dev"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+
+# If you switch to mode = "shared", also set shared_broker_name: the shared
+# broker's name carries a -single / -cluster suffix that the lookup cannot
+# discover. For dev the derived default already matches
+# ("shared-dev-rabbitmq-single"), so nothing extra is needed here.
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Ports
+#
+# 5671 (AMQPS) and 443 (management HTTPS) are what AmazonMQ actually serves.
+#
+# Neither is emitted into a helm_values map: there is no readable Matcher chart,
+# so the env var names are unknown. Use the port, console_port, amqp_endpoint and
+# console_url outputs to wire the release by hand.
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — SINGLE_INSTANCE on mq.m7g.medium
+#
+# mq.m7g.medium is the smallest type the RabbitMQ engine offers, and it supports
+# CLUSTER_MULTI_AZ exactly as well as SINGLE_INSTANCE: for RabbitMQ the deployment
+# mode does not constrain the instance type at all. What dev saves by staying
+# SINGLE_INSTANCE is the node count — one broker instead of three.
+#
+# The module rejects any type outside mq.m5.* / mq.m7g.* at plan time, so an
+# ActiveMQ-only type such as mq.t3.micro fails before the apply starts.
+################################################################################
+
+broker_deployment_mode   = "SINGLE_INSTANCE"
+append_deployment_suffix = true
+host_instance_type       = "mq.m7g.medium"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = true
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

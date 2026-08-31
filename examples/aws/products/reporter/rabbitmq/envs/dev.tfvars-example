@@ -1,0 +1,84 @@
+################################################################################
+# products/reporter/rabbitmq — dev
+#
+# There is no cheap AmazonMQ RabbitMQ broker. The engine only accepts the
+# mq.m5.* and mq.m7g.* families, so the floor is a SINGLE_INSTANCE
+# mq.m7g.medium at roughly USD 100/month (us-east-1 on-demand, ESTIMATE —
+# price it against the AWS Pricing Calculator before committing). mq.t3.micro
+# is an ActiveMQ-ONLY type: cheap, and refused for RabbitMQ in every
+# deployment mode.
+#
+# reporter's worker is KEDA-driven off this broker's queue depth, so the
+# broker is not optional even in dev: with no broker the ScaledJob never
+# scales above zero and no report is ever generated.
+#
+# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+################################################################################
+
+region      = "us-east-1"
+product     = "reporter"
+environment = "dev"
+
+mode = "dedicated"
+
+# If you switch to mode = "shared", also set shared_broker_name: the shared
+# broker's name carries a -single / -cluster suffix the lookup cannot discover.
+# For dev the derived default already matches ("shared-dev-rabbitmq-single").
+
+# vpc_name         is derived -> lerian-dev-vpc   (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-dev-eks   (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Ports
+#
+# 5671 (AMQPS) and 443 (management HTTPS) are what AmazonMQ actually serves.
+#
+# Mind the mapping on the way out: this chart emits the AMQPS port as
+# RABBITMQ_PORT_AMQP and the management port as RABBITMQ_PORT_HOST — the reverse
+# of the midaz chart. See the header of outputs.tf.
+#
+# enable_console_ingress stays true: RABBITMQ_HEALTH_CHECK_URL targets the
+# management API on 443, and the chart's bootstrap Job declares the exchange,
+# queue and binding over that same API.
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — SINGLE_INSTANCE on mq.m7g.medium
+#
+# mq.m7g.medium is the smallest type the RabbitMQ engine offers, and it supports
+# CLUSTER_MULTI_AZ exactly as well as SINGLE_INSTANCE: for RabbitMQ the deployment
+# mode does not constrain the instance type at all. What dev saves by staying
+# SINGLE_INSTANCE is the node count — one broker instead of three.
+#
+# The module rejects any type outside mq.m5.* / mq.m7g.* at plan time.
+################################################################################
+
+broker_deployment_mode   = "SINGLE_INSTANCE"
+append_deployment_suffix = true
+host_instance_type       = "mq.m7g.medium"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = true
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-dev"
+}

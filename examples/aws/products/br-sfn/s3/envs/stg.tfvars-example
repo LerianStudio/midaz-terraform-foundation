@@ -1,0 +1,70 @@
+################################################################################
+# products/br-sfn/s3 — stg
+#
+# One bucket, br-sfn-stg-correios-attachments-{account_id}. Same shape as prd
+# minus the retention: this is where the lifecycle transitions get observed
+# before they are trusted with five years of BACEN correspondence.
+#
+# force_destroy is OFF from stg upwards — a destroy that silently emptied a
+# bucket is not a behaviour worth having outside dev.
+#
+# APPLY ONLY IF THE CORREIOS RAIL IS ENABLED. correios.enabled defaults to false
+# (br-sfn/values.yaml:604); with the rail off this bucket has no writer.
+#
+# Copy to stg.tfvars before use (*.tfvars is gitignored, *.tfvars-example is
+# not).
+################################################################################
+
+region      = "us-east-1"
+product     = "br-sfn"
+environment = "stg"
+
+# eks_cluster_name is derived -> lerian-stg-eks   (infra-base/eks)
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = true resolves the cluster OIDC provider from the derived cluster
+# name and creates the role. Unlike the datastore roots, this one CANNOT be
+# applied before infra-base/eks exists: the OIDC lookup is a singular data source
+# and fails the plan.
+#
+# The NAME half of service_account is confirmed from the chart:
+# br-sfn.serviceAccountName falls back to br-sfn.fullname, which is nameOverride
+# "br-sfn" (templates/_helpers.tpl:4-14, 33-38). The NAMESPACE half is whatever
+# namespace the release is installed into — check it before the first apply.
+#
+# ONE SERVICE ACCOUNT FOR THE WHOLE CHART: this role is assumable by every rail,
+# not only correios. See variables.tf.
+#
+# Set oidc_provider_arn explicitly to skip both lookups.
+################################################################################
+
+irsa_enabled    = true
+service_account = "br-sfn:br-sfn"
+
+################################################################################
+# Buckets
+#
+# Retention is deliberately short here. stg exists to prove the lifecycle rules
+# fire in the right order (IA -> Glacier -> expiration), which the module already
+# validates at plan time, and to prove the rail can read back what it wrote after
+# a transition. It is not an archive.
+################################################################################
+
+buckets = {
+  "correios-attachments" = {
+    versioning_enabled = true
+    force_destroy      = false
+
+    transition_ia_days         = 30
+    transition_glacier_days    = 90
+    expiration_days            = 365
+    noncurrent_expiration_days = 30
+  }
+}
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-stg"
+}

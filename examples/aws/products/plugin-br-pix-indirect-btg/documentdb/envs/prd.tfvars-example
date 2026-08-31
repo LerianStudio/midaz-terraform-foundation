@@ -1,0 +1,75 @@
+################################################################################
+# products/plugin-br-pix-indirect-btg/documentdb — prd
+#
+# Three instances across three AZs, deletion protection on, audit logs exported.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "plugin-br-pix-indirect-btg"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# TLS — a KNOWN GAP, not an oversight
+#
+# documentdb_tls stays "disabled", matching products/shared-resources/documentdb.
+# Two things have to land before it can be flipped:
+#
+#   1. The chart has to mount the global RDS CA bundle for the components that
+#      will validate the certificate. Terraform does not distribute that bundle
+#      and cannot.
+#   2. MONGO_TLS has to exist on inbound and outbound. Today only
+#      templates/pix/configmap.yaml carries it, so enabling TLS on the cluster
+#      would leave two of the three Mongo-speaking components with no way to be
+#      told about it.
+#
+# The host side is already correct: helm_values always emits the raw
+# *.docdb.amazonaws.com writer endpoint, which is exactly the name the DocumentDB
+# certificate covers, so hostname validation passes.
+#
+# Flip it once both land. Leaving it disabled with no note would be the
+# oversight; this is the note.
+################################################################################
+
+documentdb_tls = "disabled"
+
+################################################################################
+# Engine and sizing — db.r6g.large, three instances
+################################################################################
+
+master_username = "docdbadmin"
+port            = 27017
+
+instance_class         = "db.r6g.large"
+instances_count        = 3
+parameter_group_family = "docdb5.0"
+
+backup_retention_period = 14
+preferred_backup_window = "07:00-09:00"
+skip_final_snapshot     = false
+deletion_protection     = true
+apply_immediately       = false
+
+enabled_cloudwatch_logs_exports = ["audit", "profiler"]
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}

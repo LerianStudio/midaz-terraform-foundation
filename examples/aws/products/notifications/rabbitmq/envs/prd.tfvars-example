@@ -1,0 +1,77 @@
+################################################################################
+# products/notifications/rabbitmq — prd
+#
+# CLUSTER_MULTI_AZ on mq.m5.large. AmazonMQ spreads a RabbitMQ cluster across
+# three AZs from the subnets the module selects; there is no separate node count
+# to set.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "us-east-1"
+product     = "notifications"
+environment = "prd"
+
+mode = "dedicated"
+
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
+
+# If you switch to mode = "shared", shared_broker_name is MANDATORY here. The
+# products/shared-resources/rabbitmq prd tfvars deploy the shared broker as
+# CLUSTER_MULTI_AZ, and the derived default assumes -single:
+#   shared_broker_name = "shared-prd-rabbitmq-cluster"
+
+################################################################################
+# Ingress
+################################################################################
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+################################################################################
+# Ports
+#
+# 5671 (AMQPS) and 443 (management HTTPS) are what AmazonMQ actually serves;
+# there is no reason to change either.
+#
+# WATCH THE CHART NAMES. helm_values maps port -> RABBITMQ_PORT_AMQP and
+# console_port -> RABBITMQ_PORT_HOST. That is the OPPOSITE of the midaz chart,
+# where the same two names are swapped. The notifications chart defaults are
+# RABBITMQ_PORT_AMQP: "5672" and RABBITMQ_PORT_HOST: "15672", so each name means
+# what it says here.
+################################################################################
+
+port                   = 5671
+console_port           = 443
+enable_console_ingress = true
+
+################################################################################
+# Broker — CLUSTER_MULTI_AZ on mq.m5.large
+#
+# append_deployment_suffix stays true: it is what makes the SINGLE_INSTANCE ->
+# CLUSTER_MULTI_AZ migration a side-by-side procedure (the -single and -cluster
+# brokers coexist) rather than a destroy-and-recreate.
+#
+# apply_immediately is false from staging on: a broker modification applied
+# outside the maintenance window is a reboot in the middle of the day.
+################################################################################
+
+broker_deployment_mode   = "CLUSTER_MULTI_AZ"
+append_deployment_suffix = true
+host_instance_type       = "mq.m5.large"
+engine_version           = "3.13"
+mq_admin_user            = "rabbitmqadmin"
+
+auto_minor_version_upgrade = true
+apply_immediately          = false
+enable_general_logs        = true
+
+extra_tags = {
+  Owner      = "devops"
+  CostCenter = "platform-prd"
+}
