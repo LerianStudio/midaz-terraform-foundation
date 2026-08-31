@@ -57,14 +57,6 @@ buckets = {
 # CONFIRM service_account AGAINST THE CHART. A published chart exists
 # (br-consignado-gw-helm 1.0.1, ghcr helm-internal) and was not read here, so this
 # is the intended convention, not a measured fact.
-#
-# AND DECIDE THE TWO-ROLES QUESTION BEFORE THE HELMFILE PHASE: this root creates a
-# role for the bucket, and products/br-consignado-gw/secrets creates another for
-# the vault. A ServiceAccount carries exactly ONE role-arn annotation. Either
-# attach this root's policy (see the iam_policy_arns output) to the vault role and
-# set irsa_enabled = false here, or give the chart two service accounts. Applying
-# both roles and annotating with one of them produces a gateway that can read the
-# vault and cannot write custody artefacts — discovered on the first averbação.
 ################################################################################
 
 # irsa_enabled = false: THIS ROOT CREATES NO ROLE, only the attachable policy.
