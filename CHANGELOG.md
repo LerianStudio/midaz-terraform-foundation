@@ -1,5 +1,30 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.6.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.6.0)
+
+- **Features:**
+  - Added `lerian-infra`, the Go orchestrator for Terraform roots.
+  - Introduced `lerian-infra` with managed templates, secret references, and a release pipeline.
+  - Rewrote `deploy.sh` for the v2 AWS layout.
+  - Added AWS product stacks for various plugins and services, including `plugin-br-pix-switch`, `br-sfn`, `br-sisbajud`, `matcher`, and more.
+  - Introduced AWS modules for naming, network contracts, and datastore configurations.
+
+- **Fixes:**
+  - Addressed the private DNS record by zone ID for Azure.
+  - Removed committed Terraform plan files and widened the ignore pattern.
+  - Generated URL-safe credentials in every AWS datastore module.
+
+- **Improvements:**
+  - Scoped the `tfsec` logging exception to the AWS state bucket.
+  - Allowed AWS, GCP, and Azure as commit scopes in CI.
+  - Migrated CI workflows to Blacksmith runners.
+
+Contributors: @ferr3ira-gabriel, @ferr3ira.gabriel, @fred, @lerian-studio-midaz-push-bot[bot], @primo.ruiz.v
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.5.0...v1.6.0)
+
+---
+
 ## [1.5.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.5.0)
 
 Features:
