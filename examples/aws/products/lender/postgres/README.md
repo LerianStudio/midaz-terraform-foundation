@@ -1,20 +1,20 @@
-# products/underwriter/postgres
+# products/lender/postgres
 
-PostgreSQL for the underwriter (lender) product. Root stack over
+PostgreSQL for the lender product. Root stack over
 [`_modules/postgres-rds`](../../../_modules/postgres-rds).
 
 One root, one datastore, one state file.
 
-> **⚠ The underwriter chart is not in this repository.** `helm_values` is
+> **⚠ The lender chart is not in this repository.** `helm_values` is
 > deliberately **empty**. Read [`../README.md`](../README.md) before using this
 > stack for anything beyond a dev sandbox.
 
 | | |
 |---|---|
 | Module | `../../../_modules/postgres-rds` |
-| State key | `aws/products/underwriter/postgres/terraform.tfstate` |
-| Creates | `underwriter-{env}-postgres` (RDS instance) |
-| Secret | `underwriter-{env}-postgres/password` |
+| State key | `aws/products/lender/postgres/terraform.tfstate` |
+| Creates | `lender-{env}-postgres` (RDS instance) |
+| Secret | `lender-{env}-postgres/password` |
 | Chart target | **unknown** — see below |
 
 ## Why `helm_values` is empty
@@ -43,7 +43,7 @@ Helm render, and does not fail the pod start. It produces a service quietly
 talking to the chart's in-cluster default while this RDS instance sits idle,
 surfacing in production as data written to the wrong place.
 
-`database_name` (default `"underwriter"`) is likewise an **infrastructure
+`database_name` (default `"lender"`) is likewise an **infrastructure
 choice**, not a fact read from anywhere. Confirm it with the owning team.
 
 ## Map it by hand
@@ -51,7 +51,7 @@ choice**, not a fact read from anywhere. Confirm it with the owning team.
 Everything a consumer needs is published as a first-class output:
 
 ```bash
-cd examples/aws/products/underwriter/postgres
+cd examples/aws/products/lender/postgres
 terraform output -raw endpoint
 terraform output -raw port
 terraform output -raw database_name
@@ -65,11 +65,11 @@ Operator `ExternalSecret` references.
 ## Run it
 
 ```bash
-cd examples/aws/products/underwriter/postgres
+cd examples/aws/products/lender/postgres
 
 terraform init \
   -backend-config=../../../backend/dev.hcl \
-  -backend-config="key=aws/products/underwriter/postgres/terraform.tfstate"
+  -backend-config="key=aws/products/lender/postgres/terraform.tfstate"
 
 cp envs/dev.tfvars-example envs/dev.tfvars   # then edit
 terraform plan  -var-file=envs/dev.tfvars -out=tfplan
@@ -130,7 +130,7 @@ resolves `shared-{env}-postgres` with `data "aws_db_instance"` and
 instance. `security_group_id` comes back `null`.
 
 Worth noting: in shared mode `database_name` becomes the **shared** instance's
-initial database, not `"underwriter"` — one more reason to confirm what the
+initial database, not `"lender"` — one more reason to confirm what the
 application actually expects before running this anywhere real.
 
 Every sizing variable in the tfvars is ignored in that mode.

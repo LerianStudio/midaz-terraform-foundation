@@ -24,7 +24,7 @@
 # quietly talking to the chart's in-cluster default while the RDS instance sits
 # idle. The failure surfaces in production, as data written to the wrong place.
 #
-# TO CLOSE THIS: read the underwriter chart's values.yaml and the template that
+# TO CLOSE THIS: read the lender chart's values.yaml and the template that
 # renders its ConfigMap, then fill helm_values with the names found there. Three
 # distinct shapes already exist across Lerian charts, so do not copy another
 # product's block:
@@ -48,7 +48,7 @@ output "vpc_name" {
 }
 
 output "eks_cluster_name" {
-  description = "EKS cluster whose node security group was looked up. Note the \"lerian\" prefix: the cluster belongs to infra-base, not to underwriter."
+  description = "EKS cluster whose node security group was looked up. Note the \"lerian\" prefix: the cluster belongs to infra-base, not to lender."
   value       = module.network.eks_cluster_name
 }
 
@@ -87,7 +87,7 @@ output "security_group_id" {
 }
 
 output "secret_arn" {
-  description = "ARN of the Secrets Manager secret holding the master credentials: underwriter-{env}-postgres/password in dedicated mode, shared-{env}-postgres/password in shared mode."
+  description = "ARN of the Secrets Manager secret holding the master credentials: lender-{env}-postgres/password in dedicated mode, shared-{env}-postgres/password in shared mode."
   value       = module.postgres.secret_arn
 }
 
@@ -97,7 +97,7 @@ output "secret_name" {
 }
 
 output "identifier" {
-  description = "RDS DB instance identifier: underwriter-{environment}-postgres in dedicated mode, the resolved shared-{env}-postgres in shared mode."
+  description = "RDS DB instance identifier: lender-{environment}-postgres in dedicated mode, the resolved shared-{env}-postgres in shared mode."
   value       = module.postgres.identifier
 }
 
@@ -146,6 +146,6 @@ output "subnet_group_name" {
 ################################################################################
 
 output "helm_values" {
-  description = "EMPTY BY DESIGN. The underwriter chart is not in this repository (only vendored dependency tarballs), so the env var names it reads are unknown and are not guessed here. Read endpoint / port / database_name / username / secret_name individually and map them by hand once the chart is available. See the comment block at the top of outputs.tf."
+  description = "EMPTY BY DESIGN. The lender chart is not in this repository (only vendored dependency tarballs), so the env var names it reads are unknown and are not guessed here. Read endpoint / port / database_name / username / secret_name individually and map them by hand once the chart is available. See the comment block at the top of outputs.tf."
   value       = {}
 }

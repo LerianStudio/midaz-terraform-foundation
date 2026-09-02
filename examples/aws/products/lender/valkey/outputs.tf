@@ -32,7 +32,7 @@
 # There is no majority to fall back on and no Lerian-wide convention. A wrong
 # guess fails at connect time in production, not at plan time.
 #
-# TO CLOSE THIS: read the underwriter chart's values.yaml and the template that
+# TO CLOSE THIS: read the lender chart's values.yaml and the template that
 # renders its ConfigMap. Check specifically whether the port is a separate key,
 # embedded in the host, or appended by the template.
 ################################################################################
@@ -55,7 +55,7 @@ output "vpc_name" {
 }
 
 output "eks_cluster_name" {
-  description = "EKS cluster whose node security group was looked up. Note the \"lerian\" prefix: the cluster belongs to infra-base, not to underwriter."
+  description = "EKS cluster whose node security group was looked up. Note the \"lerian\" prefix: the cluster belongs to infra-base, not to lender."
   value       = module.network.eks_cluster_name
 }
 
@@ -94,7 +94,7 @@ output "security_group_id" {
 }
 
 output "secret_arn" {
-  description = "ARN of the Secrets Manager secret holding the auth token: underwriter-{env}-valkey/auth-token in dedicated mode, shared-{env}-valkey/auth-token in shared mode."
+  description = "ARN of the Secrets Manager secret holding the auth token: lender-{env}-valkey/auth-token in dedicated mode, shared-{env}-valkey/auth-token in shared mode."
   value       = module.valkey.secret_arn
 }
 
@@ -104,7 +104,7 @@ output "secret_name" {
 }
 
 output "identifier" {
-  description = "ElastiCache replication group id: underwriter-{environment}-valkey in dedicated mode, the resolved shared-{env}-valkey in shared mode."
+  description = "ElastiCache replication group id: lender-{environment}-valkey in dedicated mode, the resolved shared-{env}-valkey in shared mode."
   value       = module.valkey.identifier
 }
 
@@ -147,7 +147,7 @@ output "subnet_group_name" {
 ################################################################################
 
 output "redis_host_port" {
-  description = "\"endpoint:port\" in one string. Published as a convenience for the case where the underwriter chart turns out to follow the midaz / br-consignado-gw shape, in which the port lives inside the host variable. Do NOT use it for a chart that appends the port itself, as plugin-access-manager does — that yields host:port:port."
+  description = "\"endpoint:port\" in one string. Published as a convenience for the case where the lender chart turns out to follow the midaz / br-consignado-gw shape, in which the port lives inside the host variable. Do NOT use it for a chart that appends the port itself, as plugin-access-manager does — that yields host:port:port."
   value       = local.redis_host_port
 }
 
@@ -158,6 +158,6 @@ output "redis_host_port" {
 ################################################################################
 
 output "helm_values" {
-  description = "EMPTY BY DESIGN. The underwriter chart is not in this repository (only vendored dependency tarballs), so the env var names it reads are unknown and are not guessed here — and Redis naming in particular varies in three incompatible ways across the Lerian charts that ARE readable. Read endpoint / port / redis_host_port / secret_name individually and map them by hand once the chart is available. See the comment block at the top of outputs.tf."
+  description = "EMPTY BY DESIGN. The lender chart is not in this repository (only vendored dependency tarballs), so the env var names it reads are unknown and are not guessed here — and Redis naming in particular varies in three incompatible ways across the Lerian charts that ARE readable. Read endpoint / port / redis_host_port / secret_name individually and map them by hand once the chart is available. See the comment block at the top of outputs.tf."
   value       = {}
 }

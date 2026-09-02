@@ -14,13 +14,13 @@ variable "region" {
 }
 
 variable "product" {
-  description = "Product this datastore belongs to. Pinned to \"underwriter\" by validation: the derived name (underwriter-{env}-valkey) and the derived secret path (underwriter-{env}-valkey/auth-token) ARE the cross-stack discovery contract. A different value here silently produces resources the underwriter Helm release cannot find. A second product gets its own directory under examples/aws/products, not a different value here."
+  description = "Product this datastore belongs to. Pinned to \"lender\" by validation: the derived name (lender-{env}-valkey) and the derived secret path (lender-{env}-valkey/auth-token) ARE the cross-stack discovery contract. A different value here silently produces resources the lender Helm release cannot find. A second product gets its own directory under examples/aws/products, not a different value here."
   type        = string
-  default     = "underwriter"
+  default     = "lender"
 
   validation {
-    condition     = var.product == "underwriter"
-    error_message = "The product must be \"underwriter\". This root stack is the underwriter Valkey datastore; every name and secret path it produces is derived from it. To provision Valkey for another product, copy this directory to examples/aws/products/<product>/valkey instead."
+    condition     = var.product == "lender"
+    error_message = "The product must be \"lender\". This root stack is the lender Valkey datastore; every name and secret path it produces is derived from it. To provision Valkey for another product, copy this directory to examples/aws/products/<product>/valkey instead."
   }
 }
 
@@ -35,7 +35,7 @@ variable "environment" {
 }
 
 variable "mode" {
-  description = "\"dedicated\" creates a Valkey replication group owned by underwriter (underwriter-{env}-valkey). \"shared\" creates nothing and resolves the replication group owned by products/shared-resources/valkey, looked up by name: shared-{env}-valkey plus the secret shared-{env}-valkey/auth-token. In shared mode this stack resolves no VPC, no subnets and no EKS security group, and plans to zero resources."
+  description = "\"dedicated\" creates a Valkey replication group owned by lender (lender-{env}-valkey). \"shared\" creates nothing and resolves the replication group owned by products/shared-resources/valkey, looked up by name: shared-{env}-valkey plus the secret shared-{env}-valkey/auth-token. In shared mode this stack resolves no VPC, no subnets and no EKS security group, and plans to zero resources."
   type        = string
   default     = "dedicated"
 
@@ -55,10 +55,10 @@ variable "extra_tags" {
 # Network context
 #
 # Both names are OWNED BY the infra-base FOUNDATION and therefore carry the
-# "lerian" product label — not "underwriter", and not "shared" either (that one
+# "lerian" product label — not "lender", and not "shared" either (that one
 # labels the shared DATASTORE tier in products/shared-resources). Deriving them
-# from module.naming here would produce underwriter-{env}-vpc /
-# underwriter-{env}-eks, which do not exist — which is why this root stack does
+# from module.naming here would produce lender-{env}-vpc /
+# lender-{env}-eks, which do not exist — which is why this root stack does
 # not call the naming module at all.
 ################################################################################
 
@@ -78,7 +78,7 @@ variable "subnet_tag_type" {
 # Ingress
 #
 # Same two-source model as products/shared-resources/valkey, for the same
-# reason: the underwriter workloads run on the EKS nodes, and the replication group has to be
+# reason: the lender workloads run on the EKS nodes, and the replication group has to be
 # reachable from them on the first apply, before anyone has wired a security
 # group by hand.
 #
@@ -117,7 +117,7 @@ variable "eks_node_security_group_lookup_enabled" {
 }
 
 variable "eks_cluster_name" {
-  description = "Name of the EKS cluster whose node security group is resolved. Leave empty (the default) to DERIVE \"lerian-{environment}-eks\" — the cluster belongs to infra-base and carries the \"lerian\" product label, NOT \"underwriter\". The lookup matches the node security group by tag:Name = \"{cluster}-node\", which is what terraform-aws-modules/eks sets."
+  description = "Name of the EKS cluster whose node security group is resolved. Leave empty (the default) to DERIVE \"lerian-{environment}-eks\" — the cluster belongs to infra-base and carries the \"lerian\" product label, NOT \"lender\". The lookup matches the node security group by tag:Name = \"{cluster}-node\", which is what terraform-aws-modules/eks sets."
   type        = string
   default     = ""
 }
@@ -145,7 +145,7 @@ variable "parameter_group_family" {
 }
 
 variable "port" {
-  description = "Port the cache nodes accept connections on. Whether the underwriter application expects host and port SPLIT or concatenated as \"host:port\" is UNKNOWN — the chart is not in this repository. Both shapes exist across Lerian charts (midaz concatenates, tracer splits), so this cannot be guessed. That unknown is exactly why the helm_values output of this root is empty."
+  description = "Port the cache nodes accept connections on. Whether the lender application expects host and port SPLIT or concatenated as \"host:port\" is UNKNOWN — the chart is not in this repository. Both shapes exist across Lerian charts (midaz concatenates, tracer splits), so this cannot be guessed. That unknown is exactly why the helm_values output of this root is empty."
   type        = number
   default     = 6379
 }
@@ -195,7 +195,7 @@ variable "transit_encryption_enabled" {
 }
 
 variable "transit_encryption_mode" {
-  description = "Transit encryption mode: \"preferred\" accepts both TLS and plaintext clients, \"required\" accepts TLS only. Kept \"preferred\" because the underwriter chart is not available and its client TLS configuration cannot be verified; \"required\" in front of a client with no TLS support locks it out."
+  description = "Transit encryption mode: \"preferred\" accepts both TLS and plaintext clients, \"required\" accepts TLS only. Kept \"preferred\" because the lender chart is not available and its client TLS configuration cannot be verified; \"required\" in front of a client with no TLS support locks it out."
   type        = string
   default     = "preferred"
 
@@ -206,7 +206,7 @@ variable "transit_encryption_mode" {
 }
 
 variable "auth_token_enabled" {
-  description = "Make ElastiCache ENFORCE the auth token. The token is generated and stored in Secrets Manager either way; this only decides whether the server requires it. Kept false because the underwriter chart is not available and its AUTH support cannot be verified."
+  description = "Make ElastiCache ENFORCE the auth token. The token is generated and stored in Secrets Manager either way; this only decides whether the server requires it. Kept false because the lender chart is not available and its AUTH support cannot be verified."
   type        = bool
   default     = false
 }

@@ -1,20 +1,20 @@
-# products/underwriter/valkey
+# products/lender/valkey
 
-Cache for the underwriter (lender) product. Root stack over
+Cache for the lender product. Root stack over
 [`_modules/valkey-elasticache`](../../../_modules/valkey-elasticache).
 
 One root, one datastore, one state file.
 
-> **⚠ The underwriter chart is not in this repository.** `helm_values` is
+> **⚠ The lender chart is not in this repository.** `helm_values` is
 > deliberately **empty**. Read [`../README.md`](../README.md) before using this
 > stack for anything beyond a dev sandbox.
 
 | | |
 |---|---|
 | Module | `../../../_modules/valkey-elasticache` |
-| State key | `aws/products/underwriter/valkey/terraform.tfstate` |
-| Creates | `underwriter-{env}-valkey` (ElastiCache replication group) |
-| Secret | `underwriter-{env}-valkey/auth-token` |
+| State key | `aws/products/lender/valkey/terraform.tfstate` |
+| Creates | `lender-{env}-valkey` (ElastiCache replication group) |
+| Secret | `lender-{env}-valkey/auth-token` |
 | Chart target | **unknown** — see below |
 
 ## Why `helm_values` is empty, and why Redis is the worst case
@@ -45,7 +45,7 @@ at connect time in production, not at plan time.
 So that whoever reads the chart can wire the release without coming back here:
 
 ```bash
-cd examples/aws/products/underwriter/valkey
+cd examples/aws/products/lender/valkey
 terraform output -raw endpoint          # bare host          — for a split-key chart
 terraform output -raw port              #                      (tracer / plugin-access-manager shape)
 terraform output -raw redis_host_port   # "host:port"        — for a joined chart
@@ -62,11 +62,11 @@ Operator `ExternalSecret` references.
 ## Run it
 
 ```bash
-cd examples/aws/products/underwriter/valkey
+cd examples/aws/products/lender/valkey
 
 terraform init \
   -backend-config=../../../backend/dev.hcl \
-  -backend-config="key=aws/products/underwriter/valkey/terraform.tfstate"
+  -backend-config="key=aws/products/lender/valkey/terraform.tfstate"
 
 cp envs/dev.tfvars-example envs/dev.tfvars   # then edit
 terraform plan  -var-file=envs/dev.tfvars -out=tfplan
@@ -105,7 +105,7 @@ three environments, **including production**, because the chart is not available
 and neither the application's AUTH support nor its TLS trust store can be
 verified. Flipping either switch blind is how a production cache goes dark.
 
-The token **is** generated and written to `underwriter-{env}-valkey/auth-token`
+The token **is** generated and written to `lender-{env}-valkey/auth-token`
 regardless, so enabling it later is a tfvars change, not a rebuild.
 
 ## Availability

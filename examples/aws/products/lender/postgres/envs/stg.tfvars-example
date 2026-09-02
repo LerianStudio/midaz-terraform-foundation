@@ -1,25 +1,23 @@
 ################################################################################
-# products/underwriter/postgres — dev
+# products/lender/postgres — stg
 #
-# Absolute minimum sizing. db.t4g.micro with 20 GB is roughly USD 15/month.
+# Staging is production's shape at a smaller size.
 #
-# COMPOSITION INFERRED: the underwriter chart is not in this repository. The
-# PostgreSQL dependency is evidenced by the vendored
-# charts/postgresql-16.3.5.tgz tarball, not by a values.yaml this repo can read.
+# COMPOSITION INFERRED — see dev.tfvars-example and the product README.
 #
-# Copy to dev.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+# Copy to stg.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
 ################################################################################
 
 region      = "us-east-1"
-product     = "underwriter"
-environment = "dev"
+product     = "lender"
+environment = "stg"
 
 mode = "dedicated"
 
-# vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
-# eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
+# vpc_name         is derived -> lerian-stg-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-stg-eks        (infra-base/eks)
 # Both carry the "lerian" prefix on purpose: they belong to the infra-base
-# FOUNDATION, not to underwriter — and not to the shared datastore tier either,
+# FOUNDATION, not to lender — and not to the shared datastore tier either,
 # which carries "shared".
 
 ################################################################################
@@ -55,36 +53,36 @@ allowed_cidr_blocks        = []
 engine_version       = "16"
 family               = "postgres16"
 major_engine_version = "16"
-database_name        = "underwriter"
+database_name        = "lender"
 username             = "postgres"
 
 ################################################################################
-# Sizing — db.t4g.micro (~USD 15/month)
+# Sizing — db.t4g.medium
 #
-# Performance Insights MUST stay false: AWS does not offer it on db.t4g.micro,
-# and the module rejects the combination with a plan-time precondition rather
-# than letting the apply fail five minutes in. Enhanced Monitoring is off for
-# the same cost reason, and the monitoring IAM role goes with it.
+# The first burstable class above the Performance Insights exclusion list (which
+# covers t2/t3/t4g micro and small only), so query-level observability is on
+# here and the dev/prd gap in behaviour is closed before production sees it.
 ################################################################################
 
-instance_class        = "db.t4g.micro"
-allocated_storage     = 20
-max_allocated_storage = 50
+instance_class        = "db.t4g.medium"
+allocated_storage     = 50
+max_allocated_storage = 200
 multi_az              = false
 
-backup_retention_period = 1
-skip_final_snapshot     = true
+backup_retention_period = 7
+skip_final_snapshot     = false
 deletion_protection     = false
 
-performance_insights_enabled = false
-monitoring_interval          = 0
-create_monitoring_role       = false
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
 
-enabled_cloudwatch_logs_exports = ["postgresql"]
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 
 create_read_replica = false
 
 extra_tags = {
   Owner      = "devops"
-  CostCenter = "platform-dev"
+  CostCenter = "platform-stg"
 }

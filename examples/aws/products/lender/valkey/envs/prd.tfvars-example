@@ -1,23 +1,23 @@
 ################################################################################
-# products/underwriter/valkey — stg
+# products/lender/valkey — prd
 #
-# Two cache clusters with automatic failover.
+# Three cache clusters across three AZs with automatic failover.
 #
-# COMPOSITION INFERRED — see dev.tfvars-example and the product README.
+# COMPOSITION INFERRED — see the product README.
 #
-# Copy to stg.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
+# Copy to prd.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
 ################################################################################
 
 region      = "us-east-1"
-product     = "underwriter"
-environment = "stg"
+product     = "lender"
+environment = "prd"
 
 mode = "dedicated"
 
-# vpc_name         is derived -> lerian-stg-vpc        (infra-base/vpc)
-# eks_cluster_name is derived -> lerian-stg-eks        (infra-base/eks)
+# vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
+# eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
 # Both carry the "lerian" prefix on purpose: they belong to the infra-base
-# FOUNDATION, not to underwriter — and not to the shared datastore tier either,
+# FOUNDATION, not to lender — and not to the shared datastore tier either,
 # which carries "shared".
 
 ################################################################################
@@ -43,30 +43,29 @@ allowed_security_group_ids = []
 allowed_cidr_blocks        = []
 
 ################################################################################
-# Engine and sizing — cache.t4g.small, two cache clusters, Multi-AZ
-#
-# multi_az_enabled requires BOTH num_cache_clusters >= 2 AND
-# automatic_failover_enabled = true. Setting one without the others fails the
-# apply, not the plan.
+# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
 ################################################################################
 
 engine_version         = "7.2"
 parameter_group_family = "valkey7"
 port                   = 6379
 
-node_type                  = "cache.t4g.small"
-num_cache_clusters         = 2
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
 automatic_failover_enabled = true
 multi_az_enabled           = true
-snapshot_retention_limit   = 1
+snapshot_retention_limit   = 7
 
 ################################################################################
 # Security
 #
-# Transit encryption stays ON in "preferred" mode, which accepts TLS and
-# plaintext clients alike. auth_token_enabled = false: the token is generated
-# and written to the Secrets Manager entry either way, ElastiCache just does not
-# demand it yet. See the module README and this stack's README for why.
+# Both switches stay at the permissive default because the lender chart
+# is NOT in this repository: there is no way to verify that the application
+# can present an auth token or negotiate TLS. Flipping either one blind is how
+# a production cache goes dark.
+#
+# The token IS generated and stored at lender-prd-valkey/auth-token
+# regardless, so enabling it later is a tfvars change, not a rebuild.
 ################################################################################
 
 transit_encryption_enabled = true
@@ -78,5 +77,5 @@ apply_immediately  = false
 
 extra_tags = {
   Owner      = "devops"
-  CostCenter = "platform-stg"
+  CostCenter = "platform-prd"
 }

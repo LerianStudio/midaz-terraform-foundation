@@ -1,9 +1,9 @@
 ################################################################################
-# products/underwriter/valkey — dev
+# products/lender/valkey — dev
 #
 # Absolute minimum sizing, roughly USD 12/month.
 #
-# COMPOSITION INFERRED: the underwriter chart is not in this repository. The
+# COMPOSITION INFERRED: the lender chart is not in this repository. The
 # Valkey dependency is evidenced by the vendored charts/valkey-2.4.7.tgz
 # tarball, not by a values.yaml this repo can read.
 #
@@ -11,7 +11,7 @@
 ################################################################################
 
 region      = "us-east-1"
-product     = "underwriter"
+product     = "lender"
 environment = "dev"
 
 mode = "dedicated"
@@ -19,7 +19,7 @@ mode = "dedicated"
 # vpc_name         is derived -> lerian-dev-vpc        (infra-base/vpc)
 # eks_cluster_name is derived -> lerian-dev-eks        (infra-base/eks)
 # Both carry the "lerian" prefix on purpose: they belong to the infra-base
-# FOUNDATION, not to underwriter — and not to the shared datastore tier either,
+# FOUNDATION, not to lender — and not to the shared datastore tier either,
 # which carries "shared".
 
 ################################################################################

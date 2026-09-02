@@ -37,7 +37,7 @@ information](#important-information) before deploying anything to production.
 | `product-console` | true | false | false | DocumentDB |
 | `reporter` | true | false | false | DocumentDB, Valkey, RabbitMQ, S3 |
 | `tracer` | true | false | false | PostgreSQL, Valkey |
-| `underwriter` | true | false | false | PostgreSQL, Valkey |
+| `lender` | true | false | false | PostgreSQL, Valkey |
 
 On AWS: PostgreSQL is RDS, DocumentDB is Amazon DocumentDB, Valkey is ElastiCache,
 RabbitMQ is AmazonMQ, Kafka is MSK. Each product datastore can be **dedicated** or

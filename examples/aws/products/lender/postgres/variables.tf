@@ -14,13 +14,13 @@ variable "region" {
 }
 
 variable "product" {
-  description = "Product this datastore belongs to. Pinned to \"underwriter\" by validation: the derived name (underwriter-{env}-postgres) and the derived secret path (underwriter-{env}-postgres/password) ARE the cross-stack discovery contract. A different value here silently produces resources the underwriter Helm release cannot find. A second product gets its own directory under examples/aws/products, not a different value here."
+  description = "Product this datastore belongs to. Pinned to \"lender\" by validation: the derived name (lender-{env}-postgres) and the derived secret path (lender-{env}-postgres/password) ARE the cross-stack discovery contract. A different value here silently produces resources the lender Helm release cannot find. A second product gets its own directory under examples/aws/products, not a different value here."
   type        = string
-  default     = "underwriter"
+  default     = "lender"
 
   validation {
-    condition     = var.product == "underwriter"
-    error_message = "The product must be \"underwriter\". This root stack is the underwriter PostgreSQL datastore; every name and secret path it produces is derived from it. To provision PostgreSQL for another product, copy this directory to examples/aws/products/<product>/postgres instead."
+    condition     = var.product == "lender"
+    error_message = "The product must be \"lender\". This root stack is the lender PostgreSQL datastore; every name and secret path it produces is derived from it. To provision PostgreSQL for another product, copy this directory to examples/aws/products/<product>/postgres instead."
   }
 }
 
@@ -35,7 +35,7 @@ variable "environment" {
 }
 
 variable "mode" {
-  description = "\"dedicated\" creates a PostgreSQL instance owned by underwriter (underwriter-{env}-postgres). \"shared\" creates nothing and resolves the instance owned by products/shared-resources/postgres, looked up by name: shared-{env}-postgres plus the secret shared-{env}-postgres/password. In shared mode this stack resolves no VPC, no subnets and no EKS security group, and plans to zero resources."
+  description = "\"dedicated\" creates a PostgreSQL instance owned by lender (lender-{env}-postgres). \"shared\" creates nothing and resolves the instance owned by products/shared-resources/postgres, looked up by name: shared-{env}-postgres plus the secret shared-{env}-postgres/password. In shared mode this stack resolves no VPC, no subnets and no EKS security group, and plans to zero resources."
   type        = string
   default     = "dedicated"
 
@@ -55,10 +55,10 @@ variable "extra_tags" {
 # Network context
 #
 # Both names are OWNED BY the infra-base FOUNDATION and therefore carry the
-# "lerian" product label — not "underwriter", and not "shared" either (that one
+# "lerian" product label — not "lender", and not "shared" either (that one
 # labels the shared DATASTORE tier in products/shared-resources). Deriving them
-# from module.naming here would produce underwriter-{env}-vpc /
-# underwriter-{env}-eks, which do not exist — which is why this root stack does
+# from module.naming here would produce lender-{env}-vpc /
+# lender-{env}-eks, which do not exist — which is why this root stack does
 # not call the naming module at all.
 ################################################################################
 
@@ -78,7 +78,7 @@ variable "subnet_tag_type" {
 # Ingress
 #
 # Same two-source model as products/shared-resources/postgres, for the same
-# reason: the underwriter workloads run on the EKS nodes, and the instance has to be
+# reason: the lender workloads run on the EKS nodes, and the instance has to be
 # reachable from them on the first apply, before anyone has wired a security
 # group by hand.
 #
@@ -117,7 +117,7 @@ variable "eks_node_security_group_lookup_enabled" {
 }
 
 variable "eks_cluster_name" {
-  description = "Name of the EKS cluster whose node security group is resolved. Leave empty (the default) to DERIVE \"lerian-{environment}-eks\" — the cluster belongs to infra-base and carries the \"lerian\" product label, NOT \"underwriter\". The lookup matches the node security group by tag:Name = \"{cluster}-node\", which is what terraform-aws-modules/eks sets."
+  description = "Name of the EKS cluster whose node security group is resolved. Leave empty (the default) to DERIVE \"lerian-{environment}-eks\" — the cluster belongs to infra-base and carries the \"lerian\" product label, NOT \"lender\". The lookup matches the node security group by tag:Name = \"{cluster}-node\", which is what terraform-aws-modules/eks sets."
   type        = string
   default     = ""
 }
@@ -153,7 +153,7 @@ variable "major_engine_version" {
 variable "database_name" {
   description = "Name of the initial database created on the instance. INFERRED, not read from a chart: infrastructure/K8S/helm/charts/underwriter holds no Chart.yaml, no values.yaml and no templates — only two vendored dependency tarballs (postgresql-16.3.5.tgz, valkey-2.4.7.tgz). Nothing in the repository states the database name the application expects, so this default is an infrastructure choice the owning team has to confirm."
   type        = string
-  default     = "underwriter"
+  default     = "lender"
 }
 
 variable "username" {
@@ -195,7 +195,7 @@ variable "multi_az" {
 ################################################################################
 
 variable "create_read_replica" {
-  description = "Create a read replica, underwriter-{env}-postgres-replica, published as the replica_endpoint output."
+  description = "Create a read replica, lender-{env}-postgres-replica, published as the replica_endpoint output."
   type        = bool
   default     = false
 }

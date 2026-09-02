@@ -1,15 +1,16 @@
 ################################################################################
-# products/underwriter/valkey — prd
+# products/lender/postgres — prd
 #
-# Three cache clusters across three AZs with automatic failover.
+# Production: Multi-AZ, deletion protection on.
 #
-# COMPOSITION INFERRED — see the product README.
+# COMPOSITION INFERRED — see the product README. Do not run this in production
+# before the owning team has confirmed the datastore composition.
 #
 # Copy to prd.tfvars before use (*.tfvars is gitignored, *.tfvars-example is not).
 ################################################################################
 
 region      = "us-east-1"
-product     = "underwriter"
+product     = "lender"
 environment = "prd"
 
 mode = "dedicated"
@@ -17,7 +18,7 @@ mode = "dedicated"
 # vpc_name         is derived -> lerian-prd-vpc        (infra-base/vpc)
 # eks_cluster_name is derived -> lerian-prd-eks        (infra-base/eks)
 # Both carry the "lerian" prefix on purpose: they belong to the infra-base
-# FOUNDATION, not to underwriter — and not to the shared datastore tier either,
+# FOUNDATION, not to lender — and not to the shared datastore tier either,
 # which carries "shared".
 
 ################################################################################
@@ -43,37 +44,48 @@ allowed_security_group_ids = []
 allowed_cidr_blocks        = []
 
 ################################################################################
-# Engine and sizing — cache.m7g.large, three cache clusters, Multi-AZ
-################################################################################
-
-engine_version         = "7.2"
-parameter_group_family = "valkey7"
-port                   = 6379
-
-node_type                  = "cache.m7g.large"
-num_cache_clusters         = 3
-automatic_failover_enabled = true
-multi_az_enabled           = true
-snapshot_retention_limit   = 7
-
-################################################################################
-# Security
+# Engine
 #
-# Both switches stay at the permissive default because the underwriter chart
-# is NOT in this repository: there is no way to verify that the application
-# can present an auth token or negotiate TLS. Flipping either one blind is how
-# a production cache goes dark.
-#
-# The token IS generated and stored at underwriter-prd-valkey/auth-token
-# regardless, so enabling it later is a tfvars change, not a rebuild.
+# engine_version stays MAJOR-only. Pinning "16.3" is what broke a real apply:
+# AWS retired that minor and every plan afterwards failed with
+# "Cannot find version 16.3 for postgres".
 ################################################################################
 
-transit_encryption_enabled = true
-transit_encryption_mode    = "preferred"
-auth_token_enabled         = false
+engine_version       = "16"
+family               = "postgres16"
+major_engine_version = "16"
+database_name        = "lender"
+username             = "postgres"
 
-maintenance_window = "mon:00:00-mon:03:00"
-apply_immediately  = false
+################################################################################
+# Sizing — db.m7g.large, Multi-AZ
+################################################################################
+
+instance_class        = "db.m7g.large"
+allocated_storage     = 100
+max_allocated_storage = 1000
+multi_az              = true
+
+backup_retention_period = 14
+skip_final_snapshot     = false
+deletion_protection     = true
+
+performance_insights_enabled          = true
+performance_insights_retention_period = 7
+monitoring_interval                   = 60
+create_monitoring_role                = true
+
+enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
+################################################################################
+# Read replica
+#
+# Off by default even in production: the lender chart is not available in this
+# repository, so there is no way to confirm the application can address a reader
+# endpoint. Turn it on only after the chart is published and read.
+################################################################################
+
+create_read_replica = false
 
 extra_tags = {
   Owner      = "devops"

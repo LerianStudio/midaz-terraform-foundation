@@ -6,10 +6,10 @@
 #
 #   terraform init \
 #     -backend-config=../../../backend/dev.hcl \
-#     -backend-config="key=aws/products/underwriter/postgres/terraform.tfstate"
+#     -backend-config="key=aws/products/lender/postgres/terraform.tfstate"
 #
 # The relative path is three levels up, not four: this directory is
-# examples/aws/products/underwriter/postgres, so ../../../ lands on examples/aws,
+# examples/aws/products/lender/postgres, so ../../../ lands on examples/aws,
 # where both backend/ and _modules/ live.
 #
 # Do NOT add placeholder values (<PUT-YOUR-BUCKET-NAME-HERE> and friends). The

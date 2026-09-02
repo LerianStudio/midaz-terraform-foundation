@@ -1,12 +1,12 @@
-# products/underwriter
+# products/lender
 
-AWS datastores for **underwriter** (the lending product, also referred to as
-*lender*): products, origination, servicing, accounting, portfolio, audit.
+AWS datastores for **lender** (ex-underwriter; the lending product): products,
+origination, servicing, accounting, portfolio, audit.
 
 ```
-examples/aws/products/underwriter/
-├── postgres/     -> _modules/postgres-rds         underwriter-{env}-postgres
-└── valkey/       -> _modules/valkey-elasticache   underwriter-{env}-valkey
+examples/aws/products/lender/
+├── postgres/     -> _modules/postgres-rds         lender-{env}-postgres
+└── valkey/       -> _modules/valkey-elasticache   lender-{env}-valkey
 ```
 
 See [`../midaz/README.md`](../midaz/README.md) for everything identical across
@@ -24,7 +24,7 @@ of private DNS, and why `endpoint` is always the raw AWS host.
 vendored dependency tarballs and an empty `tmpcharts-*` leftover:
 
 ```
-underwriter/
+lender/
 ├── charts/
 │   ├── postgresql-16.3.5.tgz     Bitnami postgresql, appVersion 17.2.0
 │   └── valkey-2.4.7.tgz          Bitnami valkey,     appVersion 8.0.2
@@ -32,7 +32,7 @@ underwriter/
 ```
 
 Both tarballs were unpacked and their `Chart.yaml` read: they are **upstream
-Bitnami charts**, not the product's own packaged chart. `underwriter` has no
+Bitnami charts**, not the product's own packaged chart. `lender` has no
 `lerian-common-helm` tarball either, so unlike `plugin-br-pix-jd` there is not
 even a library chart to inspect.
 
@@ -43,7 +43,7 @@ even a library chart to inspect.
 | **Established** | The product depends on **PostgreSQL** and **Valkey**. Nobody vendors a dependency chart by accident, and the pair matches what `product-infra-dependencies.yaml` recorded. |
 | **Established** | It depends on **nothing else in this repo's catalogue**. No mongodb, rabbitmq, kafka or S3 tarball is vendored — the same evidence, read the other way. |
 | **NOT established** | Every env var name the application reads. The tarballs are the charts that *stand a database pod up*; they say nothing about how the product *connects to one*. |
-| **NOT established** | The database name. `database_name` defaults to `"underwriter"` here as an infrastructure choice, not because anything states it. |
+| **NOT established** | The database name. `database_name` defaults to `"lender"` here as an infrastructure choice, not because anything states it. |
 
 ### Consequence: `helm_values` is empty in both roots
 
@@ -74,14 +74,14 @@ There is no majority and no Lerian-wide convention. The postgres side is no
 better: `DB_ONBOARDING_*`, `DB_HOST`, and `POSTGRES_HOST` are all in production
 use across the four.
 
-`products/underwriter/valkey` therefore publishes **both** candidate shapes as
+`products/lender/valkey` therefore publishes **both** candidate shapes as
 first-class outputs — `endpoint` and `port` split, plus `redis_host_port`
 joined — so that whoever reads the chart can wire the release without coming
 back to Terraform.
 
 ### To close this
 
-1. Obtain the underwriter chart (its own repository, or a rendered release).
+1. Obtain the lender chart (its own repository, or a rendered release).
 2. Read `values.yaml` and the template that renders its ConfigMap.
 3. For Redis, check specifically whether the port is a separate key, embedded in
    the host, or appended by the template.
@@ -97,8 +97,8 @@ correct; the handoff is not verifiable.
 
 Everything that does not depend on the chart:
 
-- naming, tagging and the anti-collision contract (`underwriter-{env}-postgres`,
-  `underwriter-{env}-valkey`, and the matching Secrets Manager paths);
+- naming, tagging and the anti-collision contract (`lender-{env}-postgres`,
+  `lender-{env}-valkey`, and the matching Secrets Manager paths);
 - VPC / subnet / EKS-node-security-group resolution through `module.network`;
 - the ingress model, the `dedicated` / `shared` switch, the seven uniform
   outputs;
@@ -110,7 +110,7 @@ Everything that does not depend on the chart:
 Both roots publish everything a consumer needs as individual outputs:
 
 ```bash
-cd examples/aws/products/underwriter/postgres
+cd examples/aws/products/lender/postgres
 terraform output -raw endpoint
 terraform output -raw port
 terraform output -raw database_name
@@ -134,7 +134,7 @@ three environments, **including production**, because the chart is not available
 and neither the application's AUTH support nor its TLS trust store can be
 verified. Flipping either switch blind is how a production cache goes dark.
 
-The token *is* generated and stored at `underwriter-{env}-valkey/auth-token`
+The token *is* generated and stored at `lender-{env}-valkey/auth-token`
 regardless, so enabling it later is a tfvars change, not a rebuild.
 
 ## Deploy order
@@ -144,18 +144,18 @@ regardless, so enabling it later is a tfvars change, not a rebuild.
 2. examples/aws/infra-base/vpc            -> lerian-{env}-vpc
 3. examples/aws/infra-base/eks            -> lerian-{env}-eks
 4. examples/aws/products/shared-resources/*   (OPTIONAL, only for mode = "shared")
-5. products/underwriter/{postgres,valkey}     <- in any order, in parallel
-6. helm upgrade --install underwriter ...     <- blocked on the chart being available
+5. products/lender/{postgres,valkey}     <- in any order, in parallel
+6. helm upgrade --install lender ...     <- blocked on the chart being available
 ```
 
 ## Running a stack
 
 ```bash
-cd examples/aws/products/underwriter/postgres
+cd examples/aws/products/lender/postgres
 
 terraform init \
   -backend-config=../../../backend/dev.hcl \
-  -backend-config="key=aws/products/underwriter/postgres/terraform.tfstate"
+  -backend-config="key=aws/products/lender/postgres/terraform.tfstate"
 
 cp envs/dev.tfvars-example envs/dev.tfvars   # then edit
 terraform plan  -var-file=envs/dev.tfvars -out=tfplan
@@ -164,8 +164,8 @@ terraform apply tfplan
 
 | Stack | State key |
 |---|---|
-| postgres | `aws/products/underwriter/postgres/terraform.tfstate` |
-| valkey | `aws/products/underwriter/valkey/terraform.tfstate` |
+| postgres | `aws/products/lender/postgres/terraform.tfstate` |
+| valkey | `aws/products/lender/valkey/terraform.tfstate` |
 
 ## What gets created
 
@@ -173,8 +173,8 @@ terraform apply tfplan
 
 | Stack | AWS resource | Secrets Manager | ~USD/month |
 |---|---|---|---|
-| postgres | `underwriter-dev-postgres` (RDS `db.t4g.micro`, 20 GB) | `underwriter-dev-postgres/password` | 15 |
-| valkey | `underwriter-dev-valkey` (ElastiCache `cache.t4g.micro`, 1 node) | `underwriter-dev-valkey/auth-token` | 12 |
+| postgres | `lender-dev-postgres` (RDS `db.t4g.micro`, 20 GB) | `lender-dev-postgres/password` | 15 |
+| valkey | `lender-dev-valkey` (ElastiCache `cache.t4g.micro`, 1 node) | `lender-dev-valkey/auth-token` | 12 |
 | **total** | | | **~27** |
 
 Estimates; price them against your own AWS Pricing Calculator.
