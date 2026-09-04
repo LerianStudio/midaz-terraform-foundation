@@ -81,22 +81,26 @@ Field orientation, since it reads backwards once: from either side, `owner_id` /
 `vpc_id` / `cidr_block` describe the **requester** (the control plane), and
 `peer_*` describe the **accepter** (this stack).
 
-Like the overlap guard, this evaluates against a data source: a plan without
-credentials defers it to apply, and it still runs before anything is accepted.
+This evaluates against a data source: a plan without credentials defers it to
+apply, and it still runs before anything is accepted.
 
-## The overlap guard
+`tests/provenance.tftest.hcl` proves all three with `mock_provider "aws" {}` — no
+credential, no AWS call. Coherent values plan clean; each of the three facts
+diverging on its own is refused. `terraform test` with `mock_provider` needs
+Terraform **>= 1.7** locally; the root's `required_version` floor stays `>= 1.5.0`,
+and the foundation's CI does not run `terraform test` today.
 
-The plan fails when `peer_cidr` overlaps the **local** VPC CIDR. The three blocks
-are one character apart — control plane `10.59.0.0/16`, production `10.60.0.0/16`,
-staging `10.61.0.0/16`. AWS **refuses** that route: a destination identical to the
-local route is rejected as a duplicate, and one nested inside the VPC CIDR is
-allowed only for middlebox targets, which a peering connection is not. The apply
-therefore aborts with an opaque API error *after* the cross-account acceptance
-has already happened. The guard buys the same refusal at plan time, with the bad
-value and both CIDRs in the message.
+## No CIDR-overlap guard, and why
 
-The guard is attached to the route, because the route is what carries the bad
-value. `route_table_ids` is validated non-empty, so it is always reached.
+The digit slip this estate is exposed to — control plane `10.59.0.0/16`,
+production `10.60.0.0/16`, staging `10.61.0.0/16`, one character apart — is
+already caught, one guard earlier. The `cidr_block` provenance check requires
+`peer_cidr` to *equal* the CIDR the API reports for this connection's requester,
+and AWS refuses to create a peering between overlapping CIDRs at all, so a
+connection whose real requester block overlaps this VPC does not exist to be
+accepted. Any other `peer_cidr` fails provenance on the accepter, before a route
+is planned. An overlap guard on the route could only run after that check had
+passed, on a value already proven equal to the real one.
 
 ## Routing is per direction
 

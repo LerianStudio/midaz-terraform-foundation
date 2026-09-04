@@ -66,10 +66,8 @@ module "naming" {
 #
 # Neither the accepter resource nor the routes address the local VPC: one is
 # addressed by peering id, the others by route table id. The module is here for
-# the two guards, and they are what makes it load-bearing — the CIDR feeds the
-# overlap test below, and the VPC id is what the provenance precondition compares
-# the request's target against. Without the module there is nothing to compare
-# either value with and neither guard could exist.
+# ONE value — the VPC id, which the third provenance precondition compares the
+# request's target against. Without it that guard has nothing to compare with.
 #
 # Resolution is by tag:Name = "lerian-{environment}-vpc", so there is no new
 # input to keep in sync with infra-base/vpc.
@@ -113,34 +111,6 @@ module "network" {
 
 data "aws_vpc_peering_connection" "requested" {
   id = var.pcx_id
-}
-
-locals {
-  ##############################################################################
-  # CIDR overlap test — same arithmetic as the requester root
-  #
-  # Two CIDR blocks are either disjoint or nested — there is no partial overlap —
-  # so they intersect exactly when their network addresses agree at the SHORTER
-  # of the two prefix lengths. cidrhost("{network}/{shorter}", 0) is that
-  # comparison: the inner call normalises each block to its own network address,
-  # the outer one re-masks it to the shorter prefix.
-  #
-  # Terraform 1.15 has no cidrcontains/cidroverlap function, and comparing first
-  # and last addresses as strings would compare them lexicographically, where
-  # "10.9.0.0" sorts after "10.10.0.0". This form needs no numeric conversion of
-  # addresses at all.
-  ##############################################################################
-  local_cidr   = module.network.vpc_cidr_block
-  local_prefix = tonumber(split("/", local.local_cidr)[1])
-  peer_prefix  = tonumber(split("/", var.peer_cidr)[1])
-
-  shared_prefix = min(local.local_prefix, local.peer_prefix)
-
-  peer_overlaps_local_vpc = (
-    cidrhost("${cidrhost(local.local_cidr, 0)}/${local.shared_prefix}", 0)
-    ==
-    cidrhost("${cidrhost(var.peer_cidr, 0)}/${local.shared_prefix}", 0)
-  )
 }
 
 ################################################################################
@@ -207,6 +177,16 @@ resource "aws_vpc_peering_connection_accepter" "this" {
 # point — the dependency edge is: routing a pending-acceptance connection fails,
 # so the graph has to order every route after the acceptance, and it only knows
 # to do that if the route refers to the resource.
+#
+# AND THERE IS NO CIDR-OVERLAP GUARD HERE, DELIBERATELY. The obvious one — refuse
+# a peer_cidr that overlaps the local VPC — cannot be reached. The second
+# provenance precondition above already requires peer_cidr to EQUAL the CIDR the
+# API reports for this connection's requester, and AWS refuses to create a
+# peering between overlapping CIDRs in the first place, so a connection whose real
+# requester block overlaps this VPC does not exist to be accepted. Any other
+# peer_cidr fails provenance, on the accepter, before a route is planned. A guard
+# on the route would only ever run after that one had passed, with a value that
+# had already been proven equal to the real one.
 ################################################################################
 
 resource "aws_route" "to_control_plane" {
@@ -215,32 +195,4 @@ resource "aws_route" "to_control_plane" {
   route_table_id            = each.value
   destination_cidr_block    = var.peer_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection_accepter.this.vpc_peering_connection_id
-
-  lifecycle {
-    # A peer_cidr overlapping the LOCAL VPC CIDR is the expensive digit slip on
-    # this estate: control plane 10.59.0.0/16, production 10.60.0.0/16, staging
-    # 10.61.0.0/16 — one character apart. AWS refuses that route. A destination
-    # identical to the local route is rejected as a duplicate of it, and one
-    # nested inside the VPC CIDR is accepted only for middlebox targets (Gateway
-    # Load Balancer endpoint, NAT gateway, Network Firewall endpoint, network
-    # interface) — a peering connection is not one of them.
-    #
-    # So the slip does not silently hijack traffic. It aborts the apply AFTER
-    # the cross-account acceptance has already happened, with an API error that
-    # names neither peer_cidr nor the tfvars it came from. This guard buys the
-    # same refusal at plan time, with the value and both CIDRs in the message.
-    #
-    # The guard lives on the route and not on the accepter because the route is
-    # what carries the bad value. It is reached on every apply: route_table_ids
-    # is validated non-empty, so at least one instance of this resource always
-    # exists to evaluate it.
-    #
-    # Evaluated against a data source, so on a plan without credentials the local
-    # CIDR is unknown and Terraform defers the check to apply. It still runs
-    # before anything is created.
-    precondition {
-      condition     = !local.peer_overlaps_local_vpc
-      error_message = "peer_cidr is ${var.peer_cidr}, which overlaps the local VPC CIDR of environment ${var.environment}. AWS refuses a route whose destination duplicates or sits inside the local VPC CIDR, so the apply would abort with an opaque API error right after the cross-account acceptance had already happened. peer_cidr must be the CONTROL PLANE block (10.59.0.0/16), not this stack's own (staging 10.61.0.0/16, production 10.60.0.0/16); fix the tfvars rather than this guard."
-    }
-  }
 }

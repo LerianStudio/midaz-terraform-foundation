@@ -78,10 +78,12 @@ variable "peer_cidr" {
   description = <<-EOT
     CIDR block of the REMOTE VPC — the control plane, 10.59.0.0/16. It becomes
     the destination_cidr_block of a route in every local route table listed
-    below. A value that is merely wrong applies cleanly and feeds real traffic to
-    a peering that drops it; a value that overlaps this VPC is refused by AWS
-    only mid-apply, after the acceptance. The overlap guard in main.tf is what
-    makes the second case fail at plan time instead.
+    below.
+
+    It is not taken on trust. The provenance precondition in main.tf reads the
+    connection back from the API and refuses the plan unless this value equals
+    the CIDR the requester's VPC actually has, so a wrong block cannot reach a
+    route table at all.
   EOT
 
   type = string
@@ -111,6 +113,6 @@ variable "route_table_ids" {
 
   validation {
     condition     = length(var.route_table_ids) > 0
-    error_message = "At least one route_table_id is required. An accepted peering with no local route carries no return traffic; an empty list here would apply cleanly, accept the connection, and route nothing — and it would also skip the CIDR overlap guard, which is attached to the route."
+    error_message = "At least one route_table_id is required. An accepted peering with no local route carries no return traffic; an empty list here would apply cleanly, accept the connection, and route nothing."
   }
 }
