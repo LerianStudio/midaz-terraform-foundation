@@ -80,7 +80,11 @@ variable "peers" {
   }
 
   validation {
-    condition     = alltrue([for peer in var.peers : can(cidrhost(peer.cidr, 0))])
-    error_message = "Every peer cidr must be a valid CIDR block, e.g. 10.61.0.0/16. It becomes the destination_cidr_block of a route in this VPC, so a malformed or wrong value here routes real traffic into a black hole."
+    condition = alltrue([
+      for peer in var.peers :
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", peer.cidr)) &&
+      can(cidrhost(peer.cidr, 0))
+    ])
+    error_message = "Every peer cidr must be a valid IPv4 CIDR block, e.g. 10.61.0.0/16. It becomes the destination_cidr_block of a route in this VPC, so a malformed or wrong value here routes real traffic into a black hole. IPv6 is refused rather than passed through: aws_route writes destination_cidr_block, which is the IPv4 attribute, and an IPv6 block belongs in destination_ipv6_cidr_block — a resource argument this root does not set. cidrhost accepts fd00::/8 and every route built from it would fail at apply, or worse, be written as a v4 destination nobody meant."
   }
 }
