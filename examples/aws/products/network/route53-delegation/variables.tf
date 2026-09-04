@@ -82,8 +82,9 @@ variable "delegations" {
   validation {
     condition = alltrue([
       for servers in values(var.delegations) :
-      length(servers) >= 2 && length(servers) <= 6
+      length(servers) <= 6 &&
+      length(distinct([for s in servers : lower(trimsuffix(s, "."))])) >= 2
     ])
-    error_message = "Every delegation must list between 2 and 6 name servers. Route53 hands out exactly 4 per zone, and a list of 1 is almost always a truncated copy-and-paste: the delegation would apply cleanly, resolve while that single server answers, and take the child zone off the internet the moment it does not."
+    error_message = "Every delegation must list between 2 and 6 name servers, and at least 2 of them must be DISTINCT. Route53 hands out exactly 4 per zone, and a list of 1 is almost always a truncated copy-and-paste: the delegation would apply cleanly, resolve while that single server answers, and take the child zone off the internet the moment it does not. A list that repeats one server has exactly that failure mode while looking like a list of 4 — DNS treats an NS set as a set, so duplicates collapse to one effective server, and the count is compared on names lowercased and stripped of their trailing dot because ns-1.example. and NS-1.EXAMPLE are the same host written twice."
   }
 }
