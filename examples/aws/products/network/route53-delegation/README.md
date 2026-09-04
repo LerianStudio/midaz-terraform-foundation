@@ -31,14 +31,24 @@ The children served from here are `devops.consignado.lerian.dev` (control plane
 account) and `stg.consignado.lerian.dev` (this account). **`hml.` is not one of
 them, now or later.**
 
-The NS record for `hml.consignado.lerian.dev` does not live in this zone. It lives
-in `lerian.dev`, in the management account (`Z08918942Z5HSMYZ002F`,
-`infra/README.md` §"The manual step"; both `dns` tfvars carry
-`parent_zone_name = "lerian.dev"`), which no root in this account reaches. Adding
-`hml.` to `delegations` would create a delegation that always loses to the more
-specific one upstream: it would apply cleanly, resolve for nobody, and read like a
-working configuration. Removing the upstream record is a dated step of the
-`cutover-trinus-staging` lane, when the hml zone dies.
+The delegation that actually serves `hml.consignado.lerian.dev` does not live in
+this zone. It lives one level up, in `lerian.dev` in the management account
+(`Z08918942Z5HSMYZ002F`, `infra/README.md` §"The manual step"; both `dns` tfvars
+carry `parent_zone_name = "lerian.dev"`), which no root in this account reaches.
+Measured 04/09 against `ns-620.awsdns-13.net`, authoritative for `lerian.dev`:
+`x.stg.` and `x.devops.` are referred to the name servers of
+`consignado.lerian.dev`, while `x.hml.` is referred **directly** to the hml zone.
+
+This parent zone does already carry an `hml.` NS record, pointing at those same
+name servers, and it is never consulted — the more specific delegation upstream
+wins before a resolver ever gets here. That stale record is also why
+`allow_overwrite` stays `false`: an apply that met an existing NS record for a
+child fails rather than adopting a record some other process owns.
+
+Adding `hml.` to `delegations` would therefore write a record that applies
+cleanly, resolves for nobody, and reads like working configuration. Deleting the
+upstream NS is a dated step of the `cutover-trinus-staging` lane, when the hml
+zone dies.
 
 ## 3. No TLS window
 

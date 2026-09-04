@@ -48,10 +48,19 @@ the create call returns an id, the request goes `initiating-request` → `failed
 and the apply aborts with `unexpected state 'failed'` once that dead `pcx-` id
 is already in state.
 
-The guard buys exactly one thing: the same refusal at plan time, before any API
-call, in a message that names the peer, both CIDRs and the blocks this estate
-uses — instead of a state-machine string that names neither the tfvars nor the
-value that was wrong.
+The guard buys exactly one thing: the same refusal at plan time, before any
+resource is created, in a message that names the peer, both CIDRs and the blocks
+this estate uses — instead of a state-machine string that names neither the tfvars
+nor the value that was wrong. (Not before any API call: resolving the local VPC is
+one, and it is where the local CIDR comes from.)
+
+It compares against the CIDR **declared** for each peer in `peers`, not the one
+its VPC really has — the real one lives in the other account and no data source
+here can read it. So the guard catches a declared block that overlaps this VPC;
+a declared block that is simply wrong about a VPC it does not overlap is caught on
+the other side instead, by the `cidr_block` provenance check in
+[`vpc-peering-accepter`](../vpc-peering-accepter), which reads the connection back
+from the API.
 
 Blocks on this estate: control plane `10.59.0.0/16`, staging `10.61.0.0/16`,
 production `10.60.0.0/16`.
