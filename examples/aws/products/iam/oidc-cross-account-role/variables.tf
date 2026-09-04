@@ -124,23 +124,28 @@ variable "additional_policy_names" {
     policy_json. They are resolved to
     arn:{partition}:iam::{this account}:policy/{name}.
 
-    Measured, and not optional for the control plane: products/tenant-manager/s3
-    runs with irsa_enabled = false and emits
-    `tenant-manager-prd-migrations-s3-access` and
-    `tenant-manager-prd-casdoor-templates-s3-access` for a role to borrow. Without
-    them the Casdoor templates are unreachable and tenant onboarding fails at the
-    template fetch. A ServiceAccount carries exactly one role-arn annotation, so
-    borrowing is how one role holds both concerns.
+    EXACTLY TWO, and which two is not a preference. products/tenant-manager/s3
+    runs with irsa_enabled = false and emits no role of its own: it emits
+    `tenant-manager-{env}-migrations-s3-access` and
+    `tenant-manager-{env}-casdoor-templates-s3-access` for a role to borrow.
+    Without the second one the Casdoor templates are unreachable and tenant
+    onboarding fails at the template fetch — a working control plane needs both,
+    so the validation below requires one of each rather than accepting whatever
+    list somebody wrote. A ServiceAccount carries exactly one role-arn
+    annotation, which is why borrowing is how one role holds both concerns.
+
+    The ENVIRONMENT SEGMENT is free. That sibling root derives the name from its
+    own environment, and freezing "prd" here would make this root refuse a
+    correct list in any other one. What is pinned is the pair of suffixes, which
+    is that root's contract inside THIS repository — coupling to a sibling, not
+    to a consumer.
 
     APPLY products/tenant-manager/s3 FIRST. Attaching a policy that does not exist
     fails with NoSuchEntity — loud, not silent.
 
-    NO DEFAULT, deliberately. An empty list is a legal answer and stays legal —
-    written out. What is not legal is omitting the input: a default of [] made
-    "the control plane needs both S3 policies" and "somebody forgot to say" the
-    same tfvars, and the second one applies cleanly and loses the Casdoor
-    templates. The names themselves are not checked against a list here — this is
-    a foundation example, and which policies a role borrows belongs in the tfvars.
+    NO DEFAULT, deliberately, and now nothing to default TO: a default of []
+    made "the control plane needs both S3 policies" and "somebody forgot to say"
+    the same tfvars, and the second one applies cleanly and loses the templates.
   EOT
 
   type = list(string)
@@ -150,6 +155,21 @@ variable "additional_policy_names" {
       for name in var.additional_policy_names :
       can(regex("^[A-Za-z0-9+=,.@_-]{1,128}$", name))
     ])
-    error_message = "Every entry must be a managed policy NAME of 1-128 characters from the IAM name charset [A-Za-z0-9+=,.@_-] — not an ARN and not a path. main.tf builds arn:{partition}:iam::{this account}:policy/{name} from each entry, so an ARN pasted here becomes an ARN inside an ARN and fails at apply with NoSuchEntity, naming a policy nobody can find. For the control plane the expected content is the two policies products/tenant-manager/s3 emits: tenant-manager-prd-migrations-s3-access and tenant-manager-prd-casdoor-templates-s3-access."
+    error_message = "Every entry must be a managed policy NAME of 1-128 characters from the IAM name charset [A-Za-z0-9+=,.@_-] — not an ARN and not a path. main.tf builds arn:{partition}:iam::{this account}:policy/{name} from each entry, so an ARN pasted here becomes an ARN inside an ARN and fails at apply with NoSuchEntity, naming a policy nobody can find."
+  }
+
+  validation {
+    condition = (
+      length(var.additional_policy_names) == 2 &&
+      length([
+        for name in var.additional_policy_names : name
+        if can(regex("^tenant-manager-[a-z0-9-]+-migrations-s3-access$", name))
+      ]) == 1 &&
+      length([
+        for name in var.additional_policy_names : name
+        if can(regex("^tenant-manager-[a-z0-9-]+-casdoor-templates-s3-access$", name))
+      ]) == 1
+    )
+    error_message = "additional_policy_names must hold EXACTLY the two policies products/tenant-manager/s3 emits — one name ending in -migrations-s3-access and one ending in -casdoor-templates-s3-access, both prefixed tenant-manager- (e.g. tenant-manager-prd-migrations-s3-access and tenant-manager-prd-casdoor-templates-s3-access). BOTH are mandatory for the control plane: without the casdoor-templates policy the templates are unreachable and tenant onboarding fails at the template fetch, and the migrations policy is what lets the tenant manager run a new tenant's schema. The environment segment is free on purpose — that root names its policies after its own environment — but the two suffixes are its contract, one of each, nothing else in the list."
   }
 }

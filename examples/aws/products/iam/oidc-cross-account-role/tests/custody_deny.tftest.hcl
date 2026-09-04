@@ -59,9 +59,13 @@ variables {
   sa_subject      = "platform:tenant-manager"
   role_name       = "consignado-tenant-manager-cross-account"
 
-  # No default any more: every caller says what the role borrows, out loud. This
-  # proof is about the Deny, so it borrows nothing.
-  additional_policy_names = []
+  # Not a choice: the variable requires one of each of the two policies
+  # products/tenant-manager/s3 emits. This proof is about the Deny, and the
+  # borrowed policies are along for the ride.
+  additional_policy_names = [
+    "tenant-manager-prd-migrations-s3-access",
+    "tenant-manager-prd-casdoor-templates-s3-access",
+  ]
 
   # The transcription's Allow half, with the Deny deliberately absent. This is
   # the realistic accident the old guard existed to catch: somebody rewrites the

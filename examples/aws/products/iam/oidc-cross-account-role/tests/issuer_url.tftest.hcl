@@ -38,12 +38,15 @@ override_data {
 }
 
 variables {
-  region                  = "sa-east-1"
-  environment             = "prd"
-  oidc_issuer_url         = "https://oidc.eks.sa-east-1.amazonaws.com/id/0123456789ABCDEF0123456789ABCDEF"
-  sa_subject              = "platform:tenant-manager"
-  role_name               = "consignado-tenant-manager-cross-account"
-  additional_policy_names = []
+  region          = "sa-east-1"
+  environment     = "prd"
+  oidc_issuer_url = "https://oidc.eks.sa-east-1.amazonaws.com/id/0123456789ABCDEF0123456789ABCDEF"
+  sa_subject      = "platform:tenant-manager"
+  role_name       = "consignado-tenant-manager-cross-account"
+  additional_policy_names = [
+    "tenant-manager-prd-migrations-s3-access",
+    "tenant-manager-prd-casdoor-templates-s3-access",
+  ]
 
   policy_json = <<-EOT
     {
