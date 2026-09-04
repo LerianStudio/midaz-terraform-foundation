@@ -41,11 +41,17 @@ no input of its own.
 
 ## The overlap guard
 
-The plan fails when a peer CIDR overlaps the local VPC CIDR. AWS **accepts** a
-peering between overlapping blocks and then never routes over it: the more
-specific local route wins, packets stay inside the local VPC, and the failure
-shows up in the other account as an unreachable service with nothing logged
-anywhere. Plan time is the only cheap place to catch it.
+The plan fails when a peer CIDR overlaps the local VPC CIDR. AWS **refuses**
+such a peering — "you cannot create a VPC peering connection between VPCs that
+have matching or overlapping IPv4 or IPv6 CIDR blocks" — but it refuses it late:
+the create call returns an id, the request goes `initiating-request` → `failed`,
+and the apply aborts with `unexpected state 'failed'` once that dead `pcx-` id
+is already in state.
+
+The guard buys exactly one thing: the same refusal at plan time, before any API
+call, in a message that names the peer, both CIDRs and the blocks this estate
+uses — instead of a state-machine string that names neither the tfvars nor the
+value that was wrong.
 
 Blocks on this estate: control plane `10.59.0.0/16`, staging `10.61.0.0/16`,
 production `10.60.0.0/16`.

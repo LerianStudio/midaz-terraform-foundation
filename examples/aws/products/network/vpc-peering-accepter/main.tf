@@ -217,14 +217,18 @@ resource "aws_route" "to_control_plane" {
   vpc_peering_connection_id = aws_vpc_peering_connection_accepter.this.vpc_peering_connection_id
 
   lifecycle {
-    # A route whose destination overlaps the LOCAL VPC CIDR is the expensive
-    # digit slip on this estate. The control plane is 10.59.0.0/16, production is
-    # 10.60.0.0/16 and staging is 10.61.0.0/16 — one character apart. Writing
-    # 10.60.0.0/16 into peer_cidr while applying `prd` does not fail: AWS accepts
-    # the route, and from then on the more specific local route wins for some
-    # destinations while this one hijacks the rest of the VPC's own address
-    # space. Nothing is logged; it surfaces as intermittently unreachable
-    # datastores inside the account.
+    # A peer_cidr overlapping the LOCAL VPC CIDR is the expensive digit slip on
+    # this estate: control plane 10.59.0.0/16, production 10.60.0.0/16, staging
+    # 10.61.0.0/16 — one character apart. AWS refuses that route. A destination
+    # identical to the local route is rejected as a duplicate of it, and one
+    # nested inside the VPC CIDR is accepted only for middlebox targets (Gateway
+    # Load Balancer endpoint, NAT gateway, Network Firewall endpoint, network
+    # interface) — a peering connection is not one of them.
+    #
+    # So the slip does not silently hijack traffic. It aborts the apply AFTER
+    # the cross-account acceptance has already happened, with an API error that
+    # names neither peer_cidr nor the tfvars it came from. This guard buys the
+    # same refusal at plan time, with the value and both CIDRs in the message.
     #
     # The guard lives on the route and not on the accepter because the route is
     # what carries the bad value. It is reached on every apply: route_table_ids
@@ -236,7 +240,7 @@ resource "aws_route" "to_control_plane" {
     # before anything is created.
     precondition {
       condition     = !local.peer_overlaps_local_vpc
-      error_message = "peer_cidr is ${var.peer_cidr}, which overlaps the local VPC CIDR of environment ${var.environment}. A route to a block that contains this VPC's own addresses is accepted by AWS and then hijacks local traffic — the failure surfaces as datastores in this account becoming intermittently unreachable, with nothing logged. peer_cidr must be the CONTROL PLANE block (10.59.0.0/16), not this stack's own (staging 10.61.0.0/16, production 10.60.0.0/16); fix the tfvars rather than this guard."
+      error_message = "peer_cidr is ${var.peer_cidr}, which overlaps the local VPC CIDR of environment ${var.environment}. AWS refuses a route whose destination duplicates or sits inside the local VPC CIDR, so the apply would abort with an opaque API error right after the cross-account acceptance had already happened. peer_cidr must be the CONTROL PLANE block (10.59.0.0/16), not this stack's own (staging 10.61.0.0/16, production 10.60.0.0/16); fix the tfvars rather than this guard."
     }
   }
 }

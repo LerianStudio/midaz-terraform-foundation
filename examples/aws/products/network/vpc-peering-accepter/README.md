@@ -88,10 +88,12 @@ credentials defers it to apply, and it still runs before anything is accepted.
 
 The plan fails when `peer_cidr` overlaps the **local** VPC CIDR. The three blocks
 are one character apart — control plane `10.59.0.0/16`, production `10.60.0.0/16`,
-staging `10.61.0.0/16` — and writing the local block into `peer_cidr` does not
-fail: AWS accepts the route, which then hijacks this VPC's own address space.
-Nothing is logged; it surfaces as datastores in this account becoming
-intermittently unreachable. Plan time is the only cheap place to catch it.
+staging `10.61.0.0/16`. AWS **refuses** that route: a destination identical to the
+local route is rejected as a duplicate, and one nested inside the VPC CIDR is
+allowed only for middlebox targets, which a peering connection is not. The apply
+therefore aborts with an opaque API error *after* the cross-account acceptance
+has already happened. The guard buys the same refusal at plan time, with the bad
+value and both CIDRs in the message.
 
 The guard is attached to the route, because the route is what carries the bad
 value. `route_table_ids` is validated non-empty, so it is always reached.

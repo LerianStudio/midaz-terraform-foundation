@@ -144,19 +144,30 @@ resource "aws_vpc_peering_connection" "this" {
   tags = merge(module.naming.tags, { Name = "${module.naming.name}-${each.key}" })
 
   lifecycle {
-    # A peering between overlapping CIDRs is ACCEPTED by the AWS API and then
-    # simply does not route: the more specific local route always wins, so the
-    # connection sits ACTIVE while every packet to the peer stays inside this
-    # VPC. There is no error message anywhere — it looks like a broken
-    # application, days later, in the other account. Plan time is the only cheap
-    # place to catch it.
+    # AWS REFUSES a peering between overlapping CIDRs: "you cannot create a VPC
+    # peering connection between VPCs that have matching or overlapping IPv4 or
+    # IPv6 CIDR blocks" (VPC Peering Guide, limitations). It refuses it LATE,
+    # though. CreateVpcPeeringConnection returns an id, the request goes
+    # initiating-request -> failed, and the provider only waits for
+    # pending-acceptance/active, so the apply aborts partway with
+    #
+    #   waiting for EC2 VPC Peering Connection (pcx-...) create:
+    #   unexpected state 'failed'
+    #
+    # after that dead id has already been written to state, and a failed
+    # connection can be neither accepted nor rejected while it lingers.
+    #
+    # That is all this guard buys, and it is enough: the same refusal at PLAN
+    # time, before any API call, naming the peer key, both CIDRs and the blocks
+    # this estate actually uses — instead of a state-machine string that names
+    # neither the tfvars nor the value that was wrong.
     #
     # The guard is evaluated against a data source, so on a plan without
     # credentials the local CIDR is unknown and Terraform defers the check to
     # apply. It still runs before anything is created.
     precondition {
       condition     = !local.peer_overlaps_local_vpc[each.key]
-      error_message = "Peer \"${each.key}\" has CIDR ${each.value.cidr}, which overlaps the local VPC CIDR of environment ${var.environment}. A peering with overlapping CIDRs is accepted by AWS and then never routes — traffic stays inside the local VPC and the failure surfaces in the other account as an unreachable service. The two estates must use disjoint blocks (control plane 10.59.0.0/16, staging 10.61.0.0/16, production 10.60.0.0/16); fix the CIDR in the tfvars rather than this guard."
+      error_message = "Peer \"${each.key}\" has CIDR ${each.value.cidr}, which overlaps the local VPC CIDR of environment ${var.environment}. AWS refuses a peering between overlapping CIDRs: the request would land in state \"failed\" and the apply would abort with \"unexpected state 'failed'\", after a dead connection id had already been written to state. The two estates must use disjoint blocks (control plane 10.59.0.0/16, staging 10.61.0.0/16, production 10.60.0.0/16); fix the CIDR in the tfvars rather than this guard."
     }
   }
 }

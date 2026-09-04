@@ -78,9 +78,10 @@ variable "peer_cidr" {
   description = <<-EOT
     CIDR block of the REMOTE VPC — the control plane, 10.59.0.0/16. It becomes
     the destination_cidr_block of a route in every local route table listed
-    below, so a wrong value here does not fail: it silently routes real traffic
-    into the peering, or worse, hijacks a block of this VPC. The overlap guard in
-    main.tf is what makes a digit slip fail at plan time instead.
+    below. A value that is merely wrong applies cleanly and feeds real traffic to
+    a peering that drops it; a value that overlaps this VPC is refused by AWS
+    only mid-apply, after the acceptance. The overlap guard in main.tf is what
+    makes the second case fail at plan time instead.
   EOT
 
   type = string
