@@ -21,6 +21,16 @@
 #
 # Both steps are IaC. Nothing here is clicked.
 #
+# AND THE ID THAT CROSSES IS CHECKED AGAINST WHERE IT CAME FROM. A peering id is
+# an opaque handle: `auto_accept = true` accepts whatever pcx- the tfvars names,
+# and any AWS account on earth can open a peering request to a VPC in this one.
+# Accepting the wrong request and then routing var.peer_cidr into it points a
+# 10.59.0.0/16 route at a stranger's VPC — from inside, indistinguishable from a
+# working control plane. The three preconditions on the accepter below read the
+# connection back from the API and refuse a request that is not the one this
+# tfvars describes: wrong requester account, wrong requester CIDR, or aimed at a
+# different local VPC.
+#
 # APPLIED TWICE, ONE ENVIRONMENT AT A TIME. Two stacks share this account, so
 # this one directory is applied as `stg` and as `prd`, into two separate states
 # (see backend.tf). Every input is singular for that reason: each apply accepts
@@ -54,10 +64,13 @@ module "naming" {
 ################################################################################
 # Local VPC resolution — _modules/product-network
 #
-# This root does not need the local VPC id: the accepter resource is addressed by
-# peering id, not by VPC. What it needs is the local VPC's CIDR, and only for the
-# overlap guard below — which is reason enough, because without the module there
-# is nothing to compare var.peer_cidr against and the guard could not exist.
+# Neither the accepter resource nor the routes address the local VPC: one is
+# addressed by peering id, the others by route table id. The module is here for
+# the two guards, and they are what makes it load-bearing — the CIDR feeds the
+# overlap test below, and the VPC id is what the provenance precondition compares
+# the request's target against. Without the module there is nothing to compare
+# either value with and neither guard could exist.
+#
 # Resolution is by tag:Name = "lerian-{environment}-vpc", so there is no new
 # input to keep in sync with infra-base/vpc.
 #
@@ -76,6 +89,30 @@ module "network" {
 
   allow_private_subnet_cidr_ingress      = false
   eks_node_security_group_lookup_enabled = false
+}
+
+################################################################################
+# The request, read back from the API
+#
+# var.pcx_id arrives as a hand-copied string, and the accepter resource does not
+# check where it came from: it accepts. This data source is what turns the id
+# into facts that can be compared with what the tfvars claims — who opened the
+# request (owner_id), from which block (cidr_block), and at which local VPC
+# (peer_vpc_id).
+#
+# Reading it costs one DescribeVpcPeeringConnections call and no permission this
+# root does not already need. A pending-acceptance connection IS returned to the
+# accepter account, which is the state this runs in; an expired or mistyped id
+# fails the data source itself, before anything is accepted.
+#
+# ORIENTATION, because the field names are only obvious once: from either side,
+# `owner_id`/`vpc_id`/`cidr_block` describe the REQUESTER (the control plane) and
+# `peer_*` describe the ACCEPTER (this stack). So owner_id is compared with
+# var.peer_account_id and peer_vpc_id with the LOCAL vpc id — not the reverse.
+################################################################################
+
+data "aws_vpc_peering_connection" "requested" {
+  id = var.pcx_id
 }
 
 locals {
@@ -125,6 +162,36 @@ resource "aws_vpc_peering_connection_accepter" "this" {
   auto_accept               = true
 
   tags = merge(module.naming.tags, { Name = module.naming.name })
+
+  lifecycle {
+    # PROVENANCE. auto_accept accepts whatever id it is handed, and a peering
+    # request can be opened by ANY AWS account against a VPC in this one — it
+    # arrives silently, costs the opener nothing, and sits in pending-acceptance
+    # until somebody accepts it. Accepting the wrong pcx- and then routing
+    # 10.59.0.0/16 into it does not fail: from inside this VPC it looks exactly
+    # like a working control plane, while the traffic goes somewhere else.
+    #
+    # A typo in the tfvars produces the same outcome by accident: the two ids in
+    # pcx_ids differ by a few hex characters, and swapping stg for prd accepts a
+    # real connection aimed at the wrong VPC.
+    #
+    # These three checks are the whole answer, and each names a different lie the
+    # id could be telling.
+    precondition {
+      condition     = data.aws_vpc_peering_connection.requested.owner_id == var.peer_account_id
+      error_message = "pcx_id ${var.pcx_id} was opened by account ${data.aws_vpc_peering_connection.requested.owner_id}, not by peer_account_id ${var.peer_account_id}. Any AWS account can open a peering request against a VPC in this one; accepting it and routing peer_cidr into it points this stack's traffic at a VPC nobody here controls. Accept only the request opened by the control-plane account, and if that id looks wrong, do not widen peer_account_id — find out who opened the other one."
+    }
+
+    precondition {
+      condition     = data.aws_vpc_peering_connection.requested.cidr_block == var.peer_cidr
+      error_message = "pcx_id ${var.pcx_id} comes from a VPC whose CIDR is ${data.aws_vpc_peering_connection.requested.cidr_block}, but peer_cidr says ${var.peer_cidr}. The routes this root creates send that block over this connection, so a mismatch routes real traffic into a peering that cannot answer for those addresses. peer_cidr must be the CIDR of the VPC on the other end of THIS connection — the control plane, 10.59.0.0/16."
+    }
+
+    precondition {
+      condition     = data.aws_vpc_peering_connection.requested.peer_vpc_id == module.network.vpc_id
+      error_message = "pcx_id ${var.pcx_id} was requested against VPC ${data.aws_vpc_peering_connection.requested.peer_vpc_id}, but environment ${var.environment} resolves to ${module.network.vpc_id}. This is what swapping the stg and prd entries of pcx_ids looks like: a real connection, accepted in the wrong stack, where the acceptance succeeds and no route ever carries traffic. Take the entry of pcx_ids whose key matches this environment."
+    }
+  }
 }
 
 ################################################################################

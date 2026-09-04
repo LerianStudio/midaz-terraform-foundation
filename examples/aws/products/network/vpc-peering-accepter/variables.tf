@@ -52,6 +52,28 @@ variable "pcx_id" {
   }
 }
 
+variable "peer_account_id" {
+  description = <<-EOT
+    AWS account that OPENED this peering request — the control plane,
+    159142082896. It is not used to build anything: it is the value the request
+    read back from the API has to match before this stack accepts it.
+
+    It exists because a peering id proves nothing on its own. Any AWS account can
+    open a peering request against a VPC in this one; it arrives silently, costs
+    the opener nothing, and waits in pending-acceptance for somebody to accept
+    it. `auto_accept = true` accepts whichever id the tfvars names, and the
+    routes then send the whole peer_cidr block into it — which, from inside this
+    VPC, is indistinguishable from a working control plane.
+  EOT
+
+  type = string
+
+  validation {
+    condition     = can(regex("^[0-9]{12}$", var.peer_account_id))
+    error_message = "peer_account_id must be exactly 12 digits — an AWS account id, e.g. 159142082896. An id with a stray character would make the provenance precondition compare against something no account can equal, turning a guard into an unconditional failure."
+  }
+}
+
 variable "peer_cidr" {
   description = <<-EOT
     CIDR block of the REMOTE VPC — the control plane, 10.59.0.0/16. It becomes

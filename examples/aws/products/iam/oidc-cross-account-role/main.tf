@@ -67,9 +67,29 @@ locals {
   ##############################################################################
   # The custody guard, decided here and enforced on aws_iam_role_policy below
   #
-  # A statement counts as the custody Deny when all three hold: Effect is Deny,
-  # at least one Resource names the custody path, and the Action list carries
-  # BOTH the write verb and the read verb the gateway's immutability depends on.
+  # A statement counts as the custody Deny when all of these hold: Effect is
+  # Deny, at least one Resource names the custody path, the Action list carries
+  # BOTH the write verb and the read verb the gateway's immutability depends on,
+  # and the statement carries NO Condition, NotAction or NotResource.
+  #
+  # THOSE THREE ABSENCES ARE THE GUARD, NOT PEDANTRY. A Deny is only
+  # unconditional if nothing narrows it:
+  #
+  #   * Condition — a Deny with "Condition": {"StringEquals": {"aws:username":
+  #     "nobody"}} reads exactly like the real statement and denies nothing,
+  #     because the condition never matches. This is the cheapest way to
+  #     neutralise the custody Deny while leaving a document that still parses,
+  #     still lists eight verbs, and still passes a guard that only reads
+  #     Effect/Action/Resource.
+  #   * NotAction — "Deny" + NotAction denies everything EXCEPT the listed
+  #     verbs, which inverts the meaning of the same verb list.
+  #   * NotResource — "Deny" + NotResource denies on every ARN except the
+  #     custody path, i.e. the opposite of the intent, while the custody path
+  #     still appears in the document.
+  #
+  # The measured document (products/tenant-manager/secrets, deny_actions +
+  # deny_secret_path_patterns) has none of the three, so demanding their absence
+  # costs the transcription nothing and refuses every narrowed lookalike.
   #
   # Both directions, deliberately. A Deny on writes alone would leave the control
   # plane able to read a client's Dataprev credential out of the vault, which is
@@ -98,7 +118,10 @@ locals {
         length(regexall(local.custody_resource_pattern, tostring(r))) > 0
       ])
       && contains(flatten([try(s.Action, [])]), "secretsmanager:PutSecretValue")
-    && contains(flatten([try(s.Action, [])]), "secretsmanager:GetSecretValue"))
+      && contains(flatten([try(s.Action, [])]), "secretsmanager:GetSecretValue")
+      && !can(s.Condition)
+      && !can(s.NotAction)
+    && !can(s.NotResource))
   ]
 
   custody_deny_present = anytrue(local.custody_deny_matches)
@@ -218,7 +241,7 @@ resource "aws_iam_role_policy" "this" {
     # rewrite a client's credential.
     precondition {
       condition     = local.custody_deny_present
-      error_message = "policy_json carries no custody Deny. It must contain a statement with \"Effect\": \"Deny\", a Resource matching secret:tenants/*/*/*/external/ and an Action list including BOTH secretsmanager:PutSecretValue and secretsmanager:GetSecretValue (the measured document lists eight verbs there; a bare secretsmanager:* is not accepted, write the verbs). That path holds the client's Dataprev credential: the gateway makes it immutable by refusing PutSecretValue in its own validation, and this control-plane role must be refused both the rewrite and the read or the immutability is worth nothing. Transcribe the deny_actions/deny_secret_path_patterns block from products/tenant-manager/secrets rather than weakening this guard."
+      error_message = "policy_json carries no unconditional custody Deny. It must contain a statement with \"Effect\": \"Deny\", a Resource matching secret:tenants/*/*/*/external/, an Action list including BOTH secretsmanager:PutSecretValue and secretsmanager:GetSecretValue (the measured document lists eight verbs there; a bare secretsmanager:* is not accepted, write the verbs), and NO Condition, NotAction or NotResource on that statement — each of those narrows or inverts the Deny while leaving a document that still reads like the real one: a Condition that never matches denies nothing, NotAction denies every verb except the listed ones, NotResource denies every ARN except the custody path. That path holds the client's Dataprev credential: the gateway makes it immutable by refusing PutSecretValue in its own validation, and this control-plane role must be refused both the rewrite and the read or the immutability is worth nothing. Transcribe the deny_actions/deny_secret_path_patterns block from products/tenant-manager/secrets rather than weakening this guard."
     }
   }
 }

@@ -57,7 +57,7 @@ diffed against its source and argued with in review.
 
 ## The custody guard
 
-**The plan fails when `policy_json` carries no custody Deny.**
+**The plan fails when `policy_json` carries no unconditional custody Deny.**
 
 `tenants/{env}/{org}/{app}/external/` holds a client's Dataprev credential. The
 gateway pays real cost for that path to be immutable: a variable validation
@@ -66,29 +66,46 @@ audit trail cannot be rewritten. That is a property of one role unless the role
 next door is refused too — and this role's Allow over `tenants/` necessarily
 covers the custody ARNs.
 
-The guard accepts a statement only when all three hold:
+The guard accepts a statement only when all four hold:
 
 - `"Effect": "Deny"`,
 - a `Resource` matching `secret:tenants/*/*/*/external/`,
 - an `Action` list carrying **both** `secretsmanager:PutSecretValue` and
-  `secretsmanager:GetSecretValue`.
+  `secretsmanager:GetSecretValue`,
+- **no `Condition`, `NotAction` or `NotResource`** on that statement.
 
 Both directions, deliberately: a Deny on writes alone would still let the control
 plane read a client's credential out of the vault. A bare `secretsmanager:*` is
 **not** accepted — the measured document lists eight verbs there nominally, and
 the guard demands the verbs rather than guessing which wildcards subsume them.
 
+The fourth condition is the one that catches the lookalike. A `Deny` is only
+unconditional when nothing narrows it, and each of the three forbidden keys
+narrows it while leaving a document that still reads correct in review:
+
+| Key | What it does to the Deny |
+|---|---|
+| `Condition` | AWS evaluates the Deny only when the condition matches. `"aws:PrincipalTag/never": "matches"` denies nobody, and the statement is otherwise identical to the real one. |
+| `NotAction` | Denies every verb **except** the eight listed — the inverse of the intent. |
+| `NotResource` | Denies every ARN **except** the custody path — the inverse again. |
+
+The measured document (`deny_actions` + `deny_secret_path_patterns` in
+`products/tenant-manager/secrets`) carries none of the three, so demanding their
+absence costs the transcription nothing.
+
 It is a `precondition` and not a variable `validation` because the check decodes
 the document and walks its statements, and locals are not reachable from a
 validation block on every version this repository supports. Same mechanism
 `_modules/irsa-secretsmanager` already uses (`main.tf:103,111`).
 
-`tests/custody_deny.tftest.hcl` proves it in both directions with
-`mock_provider "aws" {}` — no credential, no AWS call:
+`tests/custody_deny.tftest.hcl` proves it in three directions with
+`mock_provider "aws" {}` — no credential, no AWS call: the Deny present (plans
+clean), the Deny deleted (refused), and the Deny narrowed by a `Condition`
+(refused).
 
 ```
 terraform init -backend=false && terraform test
-# Success! 2 passed, 0 failed.
+# Success! 3 passed, 0 failed.
 ```
 
 The foundation's CI does not run `terraform test` today, so this proof is local.

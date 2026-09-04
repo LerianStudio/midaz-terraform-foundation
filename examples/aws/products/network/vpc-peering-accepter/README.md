@@ -28,6 +28,9 @@ crosses as a reviewable value instead:
 
 A pending request **expires after 7 days**. Step 4 is not optional homework.
 
+The id is a hand-copied string, so this root does not take it on trust — see
+[the provenance guard](#the-provenance-guard) below.
+
 ## One directory, two states
 
 This root is applied twice in the same AWS account and the state key carries no
@@ -46,12 +49,40 @@ other.
 | | |
 |---|---|
 | In | `pcx_id` — one value of `pcx_ids` from the requester, for this stack |
+| In | `peer_account_id` — the control-plane account, `159142082896`; what the request has to have been opened by |
 | In | `peer_cidr` — the control plane block, `10.59.0.0/16` |
 | In | `route_table_ids` — `terraform output private_route_table_ids` of `infra-base/vpc`, this environment |
 | Out | `accepted_pcx_id`, `peer_cidr` — evidence of what was accepted and routed |
 
 The local VPC is resolved by `tag:Name = "lerian-{environment}-vpc"`, so it takes
 no input of its own.
+
+## The provenance guard
+
+**The plan fails when `pcx_id` is not the request this tfvars describes.**
+
+A peering id is an opaque handle and `auto_accept = true` accepts whatever it is
+handed. Any AWS account can open a peering request against a VPC in this one — it
+arrives silently, costs the opener nothing, and waits in `pending-acceptance`.
+Accepting the wrong one and routing `peer_cidr` into it points this stack's
+10.59.0.0/16 traffic at a VPC nobody here controls, and from inside the VPC that
+is indistinguishable from a working control plane.
+
+So the root reads the connection back (`data "aws_vpc_peering_connection"`) and
+compares three facts with what the tfvars claims:
+
+| Fact | Must equal | What it catches |
+|---|---|---|
+| `owner_id` | `peer_account_id` | a request opened by somebody else |
+| `cidr_block` | `peer_cidr` | routes sent to a peering that cannot answer for that block |
+| `peer_vpc_id` | the local VPC | the `stg`/`prd` entries of `pcx_ids` swapped — a real connection accepted in the wrong stack |
+
+Field orientation, since it reads backwards once: from either side, `owner_id` /
+`vpc_id` / `cidr_block` describe the **requester** (the control plane), and
+`peer_*` describe the **accepter** (this stack).
+
+Like the overlap guard, this evaluates against a data source: a plan without
+credentials defers it to apply, and it still runs before anything is accepted.
 
 ## The overlap guard
 
