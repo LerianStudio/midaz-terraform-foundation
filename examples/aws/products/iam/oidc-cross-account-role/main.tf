@@ -55,117 +55,81 @@ locals {
   #
   # The condition keys of a web-identity trust policy are named after the issuer
   # WITHOUT the scheme. Leaving "https://" in place produces a condition on a key
-  # no token ever carries, which does not fail the apply: it silently admits every
-  # token the provider will sign, because a condition on an absent key is not
-  # evaluated. var.oidc_issuer_url is validated to start with the scheme, so this
-  # trim always has something to remove.
+  # no token ever carries, and IAM evaluates a StringEquals on an absent key as
+  # FALSE — so the trust policy would admit NOBODY and every AssumeRoleWithWebIdentity
+  # would fail closed. The apply still succeeds, and the failure surfaces later as
+  # the pod getting AccessDenied on every call. var.oidc_issuer_url is validated to
+  # start with the scheme, so this trim always has something to remove.
   oidc_host = trimprefix(var.oidc_issuer_url, "https://")
 
   service_account_namespace = split(":", var.sa_subject)[0]
   service_account_name      = split(":", var.sa_subject)[1]
 
   ##############################################################################
-  # The custody guard, decided here and enforced on aws_iam_role_policy below
+  # The custody Deny — BUILT HERE, appended to whatever policy_json carries
   #
-  # A statement counts as the custody Deny when all FIVE of these hold: Effect
-  # is Deny; at least one Resource is the custody ARN OF THIS ACCOUNT, IN THIS
-  # REGION, ending in the trailing wildcard AND NOTHING AFTER IT; the Action list
-  # carries ALL EIGHT measured verbs; and the statement carries NO Condition, NO
-  # NotAction and NO NotResource.
+  # MONEY PATH. tenants/{env}/{org}/{app}/external/ holds a client's Dataprev
+  # credential, and the gateway pays real cost for it to be immutable: a variable
+  # validation refuses PutSecretValue there, so rotation writes a NEW version path
+  # and the audit trail cannot be rewritten. That is a property of ONE role unless
+  # the role next door is refused too — and this role's Allow over tenants/
+  # necessarily covers the custody ARNs. A Deny on writes alone would leave the
+  # control plane able to READ the credential out of the vault, which is the
+  # exfiltration half of the same problem, so both directions are denied.
   #
-  # THOSE THREE ABSENCES ARE THE GUARD, NOT PEDANTRY. A Deny is only
-  # unconditional if nothing narrows it:
+  # THE ROOT BUILDS IT INSTEAD OF DEMANDING IT. An earlier cut required the tfvars
+  # to carry this statement and refused the plan when it did not, which meant
+  # recognising the statement: pattern-matching an ARN, a verb list and the
+  # absence of Condition/NotAction/NotResource — a hunt for lookalikes that each
+  # round of review kept finding one more of (wrong account, missing trailing
+  # wildcard, segment appended after it, verbs dropped, Deny neutralised by a
+  # Condition). Building the statement here makes the invariant true BY
+  # CONSTRUCTION: there is no document this root can attach without it, no regex,
+  # and no error message that has to describe the ARN correctly to be useful.
   #
-  #   * Condition — a Deny with "Condition": {"StringEquals": {"aws:username":
-  #     "nobody"}} reads exactly like the real statement and denies nothing,
-  #     because the condition never matches. This is the cheapest way to
-  #     neutralise the custody Deny while leaving a document that still parses,
-  #     still lists eight verbs, and still passes a guard that only reads
-  #     Effect/Action/Resource.
-  #   * NotAction — "Deny" + NotAction denies everything EXCEPT the listed
-  #     verbs, which inverts the meaning of the same verb list.
-  #   * NotResource — "Deny" + NotResource denies on every ARN except the
-  #     custody path, i.e. the opposite of the intent, while the custody path
-  #     still appears in the document.
-  #
-  # The measured document (products/tenant-manager/secrets, deny_actions +
-  # deny_secret_path_patterns) has none of the three, so demanding their absence
-  # costs the transcription nothing and refuses every narrowed lookalike.
-  #
-  # Both directions, deliberately. A Deny on writes alone would leave the control
-  # plane able to read a client's Dataprev credential out of the vault, which is
-  # the exfiltration half of the same problem.
-  #
-  # THE PATTERN IS ANCHORED TO THIS APPLY AND AT BOTH ENDS, NOT TO A SUBSTRING.
-  # Four transcription lookalikes read correct in review and deny nothing here:
-  #
-  #   * WRONG ACCOUNT OR REGION — an ARN carrying 123456789012 or us-east-1 is a
-  #     Deny on secrets that do not exist in this account. IAM evaluates it and
-  #     it never matches a request, so the custody path in THIS account stays
-  #     writable and readable. The account and region slots therefore come from
-  #     the apply itself (aws_caller_identity / var.region), with a literal \*
-  #     accepted in either slot because an ARN wildcarded there still covers
-  #     this account.
-  #   * MISSING TRAILING WILDCARD — Secrets Manager suffixes six random
-  #     characters onto every secret ARN, so ".../external/" with no trailing
-  #     wildcard matches NO real secret. It is the single most plausible slip
-  #     when hand-copying the path, and it produces a Deny that denies nothing.
-  #   * SUFFIX AFTER THE WILDCARD — ".../external/*/nothing-real/*" still ends
-  #     in a wildcard, still names this account and this region, still carries
-  #     eight verbs, and still survives every check that only asks whether the
-  #     custody path appears somewhere in the string. It denies nothing: a real
-  #     custody ARN is tenants/{env}/{org}/{app}/external/{name}-AbCdEf, which
-  #     has no further path segment. Narrowing by APPENDING is why the pattern
-  #     is anchored with $ and not merely with ^.
-  #   * PARTIAL VERB LIST — Put+Get alone leaves CreateSecret, UpdateSecret,
-  #     DeleteSecret, RestoreSecret, BatchGetSecretValue and DescribeSecret
-  #     allowed on the custody ARNs: the credential can still be overwritten
-  #     (Create/Update) and still be enumerated. The guard demands all EIGHT
-  #     verbs the measured deny_actions carries.
-  #
-  # The escaped \* in the pattern is literal: the resource ARN really contains
-  # asterisks (tenants/*/*/*/external/*), and an unescaped regex would match
-  # "tenants///external/" as happily as the real thing. regexall rather than
-  # strcontains keeps this root inside the required_version floor of 1.5.0 that
-  # every root here declares.
-  #
-  # Statement is normalised through flatten() because IAM accepts a single
-  # statement object as well as a list, and Action/Resource each accept a bare
-  # string as well as a list. A guard that only understood the list form would
-  # pass a document written in the other legal shape without reading it.
+  # A Deny in policy_json on top of this one is additive — IAM takes the union of
+  # denies — so a tfvars that also carries one is accepted rather than detected.
   ##############################################################################
-  custody_resource_pattern = "^arn:${data.aws_partition.current.partition}:secretsmanager:(${var.region}|\\*):(${data.aws_caller_identity.current.account_id}|\\*):secret:tenants/\\*/\\*/\\*/external/\\*$"
+  custody_deny_statement = {
+    Sid    = "DenyDataprevCustodyPaths"
+    Effect = "Deny"
 
-  # deny_actions of products/tenant-manager/secrets, verbatim: five writes and
-  # three reads. Nominal and not a wildcard, because the guard has to refuse a
-  # transcription that keeps the shape and drops verbs.
-  custody_required_actions = toset([
-    "secretsmanager:CreateSecret",
-    "secretsmanager:PutSecretValue",
-    "secretsmanager:UpdateSecret",
-    "secretsmanager:RestoreSecret",
-    "secretsmanager:DeleteSecret",
-    "secretsmanager:GetSecretValue",
-    "secretsmanager:BatchGetSecretValue",
-    "secretsmanager:DescribeSecret",
-  ])
+    # deny_actions of products/tenant-manager/secrets, verbatim: five writes and
+    # three reads. Nominal rather than secretsmanager:*, so widening the Allow
+    # later cannot quietly outgrow the Deny.
+    Action = [
+      "secretsmanager:CreateSecret",
+      "secretsmanager:PutSecretValue",
+      "secretsmanager:UpdateSecret",
+      "secretsmanager:RestoreSecret",
+      "secretsmanager:DeleteSecret",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:BatchGetSecretValue",
+      "secretsmanager:DescribeSecret",
+    ]
 
-  policy_statements = flatten([try(jsondecode(var.policy_json).Statement, [])])
+    # The trailing * is one IAM wildcard and it crosses "/", so external/* already
+    # covers the measured custody path at any depth
+    # (external/{target}/credentials/versions/{uuid}, plus the six random
+    # characters Secrets Manager suffixes onto every secret ARN).
+    #
+    # Partition, region and account come from the apply itself: a hardcoded ARN
+    # copied between estates denies secrets that do not exist here.
+    Resource = "arn:${data.aws_partition.current.partition}:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:tenants/*/*/*/external/*"
+  }
 
-  custody_deny_matches = [
-    for s in local.policy_statements :
-    (try(s.Effect, "") == "Deny"
-      && anytrue([
-        for r in flatten([try(s.Resource, [])]) :
-        length(regexall(local.custody_resource_pattern, tostring(r))) > 0
-      ])
-      && length(setsubtract(local.custody_required_actions, toset(flatten([try(s.Action, [])])))) == 0
-      && !can(s.Condition)
-      && !can(s.NotAction)
-    && !can(s.NotResource))
-  ]
-
-  custody_deny_present = anytrue(local.custody_deny_matches)
+  # Statement is normalised through flatten() because IAM accepts a single
+  # statement object as well as a list; merge() keeps Version and any other
+  # top-level key of the transcribed document intact.
+  policy_with_custody_deny = jsonencode(merge(
+    jsondecode(var.policy_json),
+    {
+      Statement = concat(
+        flatten([try(jsondecode(var.policy_json).Statement, [])]),
+        [local.custody_deny_statement],
+      )
+    }
+  ))
 }
 
 ################################################################################
@@ -195,12 +159,15 @@ resource "aws_iam_openid_connect_provider" "peer_cluster" {
 # Copied deliberately from _modules/irsa-secretsmanager/main.tf so there is one
 # trust shape in this repository rather than two.
 #
-# BOTH CONDITIONS ARE LOAD-BEARING. :sub pins the exact ServiceAccount. :aud pins
-# sts.amazonaws.com — and without it ANY pod in the control-plane cluster can
-# mint a token for this role, because every projected ServiceAccount token in
-# that cluster is signed by the same issuer. The blast radius of dropping one
-# line here is "every workload in the control plane can write tenant secrets in
-# the application account".
+# :sub IS THE BOUNDARY, :aud IS THE BELT AND BRACES. :sub pins the exact
+# ServiceAccount, and it alone is what keeps every other pod in the control-plane
+# cluster out: every projected token in that cluster is signed by the same issuer,
+# so without :sub the role would be assumable by all of them. :aud pins
+# sts.amazonaws.com, which the OIDC provider's client_id_list already requires —
+# a token minted for another audience is refused before any condition is read. It
+# is written out because AWS documents pinning both for web-identity trust, and
+# because a future second audience in client_id_list would otherwise widen this
+# role silently.
 ################################################################################
 
 data "aws_iam_policy_document" "assume_role" {
@@ -253,38 +220,20 @@ resource "aws_iam_role" "this" {
 # from being held by something else. Deleting the role deletes it too, with no
 # orphan left behind to attach later.
 #
-# The content lives in the tfvars because it is a transcription of what the
-# in-account role emits today, and a transcription belongs where it can be
-# diffed against its source and argued with in review.
+# The ALLOW content lives in the tfvars because it is a transcription of what the
+# in-account role emits today, and a transcription belongs where it can be diffed
+# against its source and argued with in review. The custody Deny does NOT: this
+# root appends it to every document it attaches, so it cannot be dropped, narrowed
+# or mistyped in a tfvars.
 ################################################################################
 
 resource "aws_iam_role_policy" "this" {
-  name   = "${var.role_name}-policy"
-  role   = aws_iam_role.this.id
-  policy = var.policy_json
+  name = "${var.role_name}-policy"
+  role = aws_iam_role.this.id
 
-  lifecycle {
-    # MONEY PATH. tenants/{env}/{org}/{app}/external/ holds a client's Dataprev
-    # credential, and the gateway pays real cost for it to be immutable: a
-    # variable validation refuses PutSecretValue there, so rotation writes a NEW
-    # version path and the audit trail cannot be rewritten. That property is a
-    # property of ONE role unless the role next door is also refused — and this
-    # role's Allow over tenants/ necessarily covers the custody ARNs.
-    #
-    # A precondition and not a variable validation: the check has to decode the
-    # document and walk its statements, and locals are not reachable from a
-    # validation block on every version this repository supports. precondition is
-    # also the mechanism _modules/irsa-secretsmanager already uses for its own
-    # would-grant-nothing guards (main.tf:103,111).
-    #
-    # It refuses the PLAN, which is the only cheap place: a policy applied without
-    # the Deny leaves no error behind, only a control plane that can read and
-    # rewrite a client's credential.
-    precondition {
-      condition     = local.custody_deny_present
-      error_message = "policy_json carries no unconditional custody Deny. It must contain a statement where ALL FIVE hold: \"Effect\": \"Deny\"; a Resource naming the custody path OF THIS ACCOUNT AND REGION, with its trailing wildcard and NOTHING AFTER IT, i.e. matching arn:<partition>:secretsmanager:<this region or *>:<this account or *>:secret:tenants/*/*/*/external/* and ending there — an ARN scoped to another account or region, one ending in external/ with no trailing wildcard, or one carrying a further path segment after the wildcard (external/*/anything) all deny nothing here: Secrets Manager suffixes six random characters onto every ARN, and a real custody ARN is tenants/{env}/{org}/{app}/external/{name}-AbCdEf with no segment after it; an Action list carrying ALL EIGHT measured verbs (CreateSecret, PutSecretValue, UpdateSecret, RestoreSecret, DeleteSecret, GetSecretValue, BatchGetSecretValue, DescribeSecret — a bare secretsmanager:* is not accepted, write the verbs, and Put+Get alone still leaves the credential overwritable and enumerable); and NO Condition, NO NotAction and NO NotResource on that statement — each of those narrows or inverts the Deny while leaving a document that still reads like the real one: a Condition that never matches denies nothing, NotAction denies every verb except the listed ones, NotResource denies every ARN except the custody path. That path holds the client's Dataprev credential: the gateway makes it immutable by refusing PutSecretValue in its own validation, and this control-plane role must be refused both the rewrite and the read or the immutability is worth nothing. Transcribe the deny_actions/deny_secret_path_patterns block from products/tenant-manager/secrets rather than weakening this guard."
-    }
-  }
+  # Not var.policy_json: the transcribed Allow plus the custody Deny this root
+  # builds. See locals above — the Deny is not something the tfvars can forget.
+  policy = local.policy_with_custody_deny
 }
 
 ################################################################################

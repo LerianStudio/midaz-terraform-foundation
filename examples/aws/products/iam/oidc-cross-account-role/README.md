@@ -16,9 +16,12 @@ Applies in the application account, **once**, as environment `prd`.
    account. Without it, a token minted by the control-plane cluster is not a
    principal this account recognises and no trust policy can name it.
 2. **A trust policy pinning `:sub` and `:aud`.** `:sub` is the exact
-   ServiceAccount. `:aud` is `sts.amazonaws.com` — and without it *any* pod in
-   the control-plane cluster can assume the role, because every projected token
-   in that cluster is signed by the same issuer.
+   ServiceAccount, and it is the boundary: every projected token in that cluster
+   is signed by the same issuer, so without `:sub` any pod there could assume the
+   role. `:aud` pins `sts.amazonaws.com`, which the identity provider's
+   `client_id_list` already requires — belt and braces, written out because AWS
+   documents pinning both, and because a second audience added to `client_id_list`
+   later would otherwise widen this role silently.
 3. **The grants**, as one inline policy, transcribed from the in-account role
    this one replaces.
 
@@ -38,7 +41,7 @@ equal, which is one more than can be kept equal.
 | In | `oidc_thumbprint` — defaulted to the AWS-managed root CA; override only if AWS rotates it |
 | In | `sa_subject` — `platform:tenant-manager` |
 | In | `role_name` — copied verbatim into the ServiceAccount annotation in the control-plane chart |
-| In | `policy_json` — the transcription; see below |
+| In | `policy_json` — the transcribed **Allow** statements; the custody Deny is appended by this root, see below |
 | In | `additional_policy_names` — the two S3 policies `products/tenant-manager/s3` emits |
 | Out | `role_arn` (goes in the annotation), `oidc_provider_arn`, `sa_subject` |
 
@@ -55,80 +58,68 @@ one replaces. A knob-built policy would look tidier and would drift from the
 thing it is supposed to equal, so the content lives in the tfvars where it can be
 diffed against its source and argued with in review.
 
-## The custody guard
+That applies to the **Allow** half. The custody Deny is not transcribed at all —
+this root builds it, for the reason in the next section.
 
-**The plan fails when `policy_json` carries no unconditional custody Deny.**
+## The custody Deny is built here, not required from the tfvars
+
+**Every policy this root attaches carries the custody Deny, because the root
+appends it.**
 
 `tenants/{env}/{org}/{app}/external/` holds a client's Dataprev credential. The
 gateway pays real cost for that path to be immutable: a variable validation
 refuses `PutSecretValue` there, so rotation writes a *new* version path and the
 audit trail cannot be rewritten. That is a property of one role unless the role
 next door is refused too — and this role's Allow over `tenants/` necessarily
-covers the custody ARNs.
+covers the custody ARNs. Both directions are denied: a Deny on writes alone would
+still let the control plane read the credential out of the vault.
 
-The guard accepts a statement only when all five hold:
+The statement the root appends:
 
-- `"Effect": "Deny"`,
-- a `Resource` naming the custody path **of this account, in this region, with
-  its trailing wildcard and nothing after it** — matching
-  `arn:<partition>:secretsmanager:<this region or *>:<this account or *>:secret:tenants/*/*/*/external/*`
-  and ending there,
-- an `Action` list carrying **all eight** verbs of the measured `deny_actions`:
-  `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`,
-  `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret`,
-- **no `Condition`**, **no `NotAction`** and **no `NotResource`** on that
-  statement.
-
-Both directions, deliberately: a Deny on writes alone would still let the control
-plane read a client's credential out of the vault. A bare `secretsmanager:*` is
-**not** accepted — the measured document lists eight verbs there nominally, and
-the guard demands the verbs rather than guessing which wildcards subsume them.
-
-The ARN and the verb list are pinned that tightly because four transcriptions
-read correct in review and deny nothing:
-
-| Lookalike | Why it denies nothing |
+| | |
 |---|---|
-| ARN scoped to another account or region | IAM evaluates it against secrets that do not exist here. The custody path in *this* account stays writable and readable. A tfvars copied from another estate arrives exactly this way. |
-| ARN ending in `external/` with no trailing `*` | Secrets Manager suffixes six random characters onto every secret ARN, so the statement matches no real secret. The likeliest hand-copy slip on the page. |
-| ARN carrying a path segment *after* the wildcard (`external/*/nothing-real/*`) | It still ends in a wildcard, still names this account, still lists eight verbs — and a real custody ARN is `tenants/{env}/{org}/{app}/external/{name}-AbCdEf`, with no further segment. Narrowing by *appending* is why the pattern is anchored at both ends. |
-| `Action` narrowed to `PutSecretValue` + `GetSecretValue` | Leaves `CreateSecret`/`UpdateSecret` (overwrite the credential by another door), `DeleteSecret`/`RestoreSecret`, and `BatchGetSecretValue`/`DescribeSecret` (read and enumerate it) allowed on the custody ARNs. |
+| `Effect` | `Deny` |
+| `Action` | the eight measured `deny_actions` of `products/tenant-manager/secrets`: `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`, `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret` |
+| `Resource` | `arn:{partition}:secretsmanager:{region}:{this account}:secret:tenants/*/*/*/external/*` — partition, region and account come from the apply itself |
+| `Condition` | none |
 
-The fifth condition is the one that catches the subtlest lookalike. A `Deny` is
-only unconditional when nothing narrows it, and each of the three forbidden keys
-narrows it while leaving a document that still reads correct in review:
+One IAM wildcard, and it crosses `/`: `external/*` covers the measured custody
+path at any depth (`external/{target}/credentials/versions/{uuid}`, plus the six
+random characters Secrets Manager suffixes onto every secret ARN).
 
-| Key | What it does to the Deny |
-|---|---|
-| `Condition` | AWS evaluates the Deny only when the condition matches. `"aws:PrincipalTag/never": "matches"` denies nobody, and the statement is otherwise identical to the real one. |
-| `NotAction` | Denies every verb **except** the eight listed — the inverse of the intent. |
-| `NotResource` | Denies every ARN **except** the custody path — the inverse again. |
+### Why it is built and not demanded
 
-The measured document (`deny_actions` + `deny_secret_path_patterns` in
-`products/tenant-manager/secrets`) carries none of the three, so demanding their
-absence costs the transcription nothing.
+An earlier cut required `policy_json` to carry this statement and refused the
+plan when it did not. That meant *recognising* a Deny — matching an ARN, a verb
+list, and the absence of `Condition`/`NotAction`/`NotResource` — and every review
+round found one more lookalike that read correct and denied nothing: an ARN in
+another account, an ARN ending at `external/` with no trailing wildcard, a path
+segment appended after the wildcard, the verb list cut to `Put`+`Get`, the whole
+statement neutralised by a `Condition` that never matches.
 
-It is a `precondition` and not a variable `validation` because the check decodes
-the document and walks its statements, and locals are not reachable from a
-validation block on every version this repository supports. Same mechanism
-`_modules/irsa-secretsmanager` already uses (`main.tf:103,111`).
+Building the statement makes the invariant true by construction. There is no
+document this root can attach without it, no regex to get right, and no error
+message that has to describe the ARN correctly to be useful. A Deny of its own in
+`policy_json` is additive — IAM takes the union of denies — so a tfvars that also
+carries one is accepted rather than hunted for.
 
-`tests/custody_deny.tftest.hcl` proves it in seven directions with
-`mock_provider "aws" {}` — no credential, no AWS call: the Deny present (plans
-clean), and six refusals — the Deny deleted, the Deny narrowed by a
-`Condition`, the Deny scoped to another account, the Deny missing the trailing
-wildcard, the Deny carrying only `PutSecretValue` + `GetSecretValue`, and the
-Deny narrowed by a path segment appended after the wildcard. Two
-file-level `override_data` blocks pin `aws_caller_identity` and `aws_partition`,
-because the guard anchors the ARN to the account of the apply and a mocked data
-source would otherwise decide the fixtures for the wrong reason.
+`tests/custody_deny.tftest.hcl` proves the construction with `mock_provider "aws"
+{}` — no credential, no AWS call. It feeds a `policy_json` with **no Deny at
+all** (the Allow half of the real transcription) and asserts the rendered policy
+carries exactly one Deny, with those eight verbs and that ARN. Two file-level
+`override_data` blocks pin `aws_caller_identity` and `aws_partition`, because the
+ARN is built from the account of the apply and a mocked data source would
+otherwise decide the assertion for the wrong reason.
 
 ```
 terraform init -backend=false && terraform test
-# Success! 7 passed, 0 failed.
+# Success! 1 passed, 0 failed.
 ```
 
-The foundation's CI does not run `terraform test` today, so this proof is local.
+`terraform test` with `mock_provider` needs Terraform **>= 1.7** locally. The
+root's own `required_version` floor stays `>= 1.5.0`: the floor is what the roots
+apply under, and this file is a local proof — the foundation's CI does not run
+`terraform test` today.
 
 ## Why it lives under `products/` when it is not a product
 

@@ -97,8 +97,10 @@ variable "policy_json" {
     when the service moves to the control-plane account. A knob-built policy
     would look tidier and would drift from the thing it is supposed to equal.
 
-    IT MUST CARRY THE CUSTODY DENY. See the precondition in main.tf: a document
-    without it is refused at plan time.
+    IT DOES NOT CARRY THE CUSTODY DENY, and must not have to: main.tf appends
+    that statement to whatever this document holds, on every apply. Transcribe
+    the Allow statements here and nothing else — a Deny written here as well is
+    accepted (IAM takes the union of denies), it is simply redundant.
   EOT
 
   type = string
