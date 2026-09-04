@@ -79,13 +79,40 @@ The statement the root appends:
 | | |
 |---|---|
 | `Effect` | `Deny` |
-| `Action` | the eight `deny_actions` measured on this estate — the consignado `prd.tfvars` for `products/tenant-manager/secrets`, not that root's own default, which stops at the five writes: `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`, `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret` |
+| `Action` | `secretsmanager:*` — every action, not a verb list |
 | `Resource` | `arn:{partition}:secretsmanager:{region}:{this account}:secret:tenants/*/*/*/external/*` — partition, region and account come from the apply itself |
 | `Condition` | none |
 
-One IAM wildcard, and it crosses `/`: `external/*` covers the measured custody
-path at any depth (`external/{target}/credentials/versions/{uuid}`, plus the six
-random characters Secrets Manager suffixes onto every secret ARN).
+One IAM wildcard in the ARN, and it crosses `/`: `external/*` covers the measured
+custody path at any depth (`external/{target}/credentials/versions/{uuid}`, plus
+the six random characters Secrets Manager suffixes onto every secret ARN).
+
+### Why the action is a wildcard
+
+A Deny only matters where an Allow reaches, so what it has to cover is not the
+verbs somebody thought of but whatever the Allow grows into. An earlier cut
+listed the eight `deny_actions` measured on this estate (the consignado
+`prd.tfvars` for `products/tenant-manager/secrets`: five writes and three reads).
+They covered today's transcribed Allow exactly — six verbs, all eight-listed —
+and covered nothing beyond it. The actions immediately outside the list are the
+ones that matter:
+
+| | |
+|---|---|
+| `PutResourcePolicy` | grants access to the custody secret **by delegation**, to any principal, without touching this role |
+| `ReplicateSecretToRegions` | produces a replica whose ARN carries a different region, which this region-bound Deny does not match at all |
+| `UpdateSecretVersionStage` | moves `AWSCURRENT` back onto an old version, changing the credential in use with no write to the path — the immutable trail stops describing what is live |
+| `RotateSecret` | hands the write to a Lambda, which performs it under its own identity |
+
+Each is a way to defeat custody while an eight-verb Deny still reads correct, and
+each becomes reachable the moment the Allow is widened and the Deny is not
+widened in the same change. `secretsmanager:*` removes the coupling: there is
+nothing left to remember.
+
+Readiness is unaffected. The two actions the service needs account-wide,
+`ListSecrets` and `GetRandomPassword`, are not evaluated against a resource — AWS
+matches them on `*` only — so a Deny scoped to a custody ARN never applies to
+them.
 
 ### Why it is built and not demanded
 
@@ -94,7 +121,7 @@ plan when it did not. That meant *recognising* a Deny — matching an ARN, a ver
 list, and the absence of `Condition`/`NotAction`/`NotResource` — and every review
 round found one more lookalike that read correct and denied nothing: an ARN in
 another account, an ARN ending at `external/` with no trailing wildcard, a path
-segment appended after the wildcard, the verb list cut to `Put`+`Get`, the whole
+segment appended after the wildcard, an action list cut to `Put`+`Get`, the whole
 statement neutralised by a `Condition` that never matches.
 
 Building the statement makes the invariant true by construction. There is no
@@ -108,7 +135,7 @@ apply, and the test below counts exactly one Deny either way.
 `tests/custody_deny.tftest.hcl` proves the construction with `mock_provider "aws"
 {}` — no credential, no AWS call. It feeds a `policy_json` with **no Deny at
 all** (the Allow half of the real transcription) and asserts the rendered policy
-carries exactly one Deny, with those eight verbs and that ARN. Two file-level
+carries exactly one Deny, over `secretsmanager:*` on that ARN. Two file-level
 `override_data` blocks pin `aws_caller_identity` and `aws_partition`, because the
 ARN is built from the account of the apply and a mocked data source would
 otherwise decide the assertion for the wrong reason.

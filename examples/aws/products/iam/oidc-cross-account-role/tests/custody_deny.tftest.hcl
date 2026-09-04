@@ -16,8 +16,16 @@
 #
 # ONE RUN, and it feeds a document with NO Deny in it at all: the Allow half of
 # the real transcription and nothing else. If the rendered policy still carries
-# exactly one Deny, with the eight measured verbs and the custody ARN of this
-# account, then no tfvars can produce a role without it.
+# exactly one Deny, over secretsmanager:* on the custody ARN of this account,
+# then no tfvars can produce a role without it.
+#
+# The action is a WILDCARD and the assertion holds it to exactly that. A nominal
+# list is the thing that rots: it covers the Allow it was written against and
+# nothing the Allow grows into, and the verbs just outside it —
+# PutResourcePolicy, ReplicateSecretToRegions, UpdateSecretVersionStage,
+# RotateSecret — are each a way to defeat custody while the Deny still reads
+# correct. So "the list is complete" is not a property worth asserting; "there
+# is no list" is.
 #
 # mock_provider: no AWS call, no credential, no state. The two override_data
 # blocks pin the account and partition the ARN is built from, which under a mock
@@ -113,20 +121,11 @@ run "root_builds_the_custody_deny" {
   }
 
   assert {
-    condition = toset(one([
+    condition = one([
       for s in jsondecode(aws_iam_role_policy.this.policy).Statement : s
       if try(s.Effect, "") == "Deny"
-      ]).Action) == toset([
-      "secretsmanager:CreateSecret",
-      "secretsmanager:PutSecretValue",
-      "secretsmanager:UpdateSecret",
-      "secretsmanager:RestoreSecret",
-      "secretsmanager:DeleteSecret",
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:BatchGetSecretValue",
-      "secretsmanager:DescribeSecret",
-    ])
-    error_message = "The custody Deny does not carry the eight deny_actions measured on this estate — the consignado prd.tfvars for products/tenant-manager/secrets, not that root's own default, which stops at the five writes. Put+Get alone still leaves the credential overwritable (CreateSecret/UpdateSecret) and enumerable (BatchGetSecretValue/DescribeSecret)."
+    ]).Action == "secretsmanager:*"
+    error_message = "The custody Deny does not deny secretsmanager:* — it carries a narrower action, or a list where a single string is expected. A nominal verb list covers the Allow it was written against and nothing the Allow later grows into: PutResourcePolicy grants access to the custody secret by delegation, ReplicateSecretToRegions produces a replica ARN in another region that this region-bound Deny does not match, UpdateSecretVersionStage moves AWSCURRENT back onto an old credential without writing to the path, and RotateSecret performs the write under a Lambda's identity. The wildcard is what makes the invariant independent of whoever widens the Allow next."
   }
 
   # The Deny has to be BARE. Every lookalike above is a statement that still

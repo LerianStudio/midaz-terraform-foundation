@@ -97,28 +97,41 @@ locals {
     Sid    = "DenyDataprevCustodyPaths"
     Effect = "Deny"
 
-    # The eight verbs MEASURED on this estate — five writes and three reads —
-    # are deny_actions of infra/envs/prd/products/tenant-manager/secrets/
-    # prd.tfvars:95-103 in the consignado repo, not the default of
-    # products/tenant-manager/secrets, which stops at the five writes.
+    # EVERY secretsmanager action, and the wildcard is the cheap side of this
+    # statement. A Deny only ever matters where an Allow reaches, and this role's
+    # Allow reaches tenants/ — so what the Deny has to cover is not "the verbs
+    # somebody thought of" but "whatever the Allow grows into".
     #
-    # Nominal rather than secretsmanager:*, and the cost of that is on the
-    # Allow side, not this one: widening the Allow PAST these eight
-    # (UpdateSecretVersionStage, ReplicateSecretToRegions, TagResource and
-    # PutResourcePolicy are the reachable ones) outgrows the Deny, and has to
-    # widen it in the same change. Today it fits: the transcribed Allow is six
-    # verbs, all eight-listed, plus ListSecrets, which AWS never evaluates
-    # against a resource at all.
-    Action = [
-      "secretsmanager:CreateSecret",
-      "secretsmanager:PutSecretValue",
-      "secretsmanager:UpdateSecret",
-      "secretsmanager:RestoreSecret",
-      "secretsmanager:DeleteSecret",
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:BatchGetSecretValue",
-      "secretsmanager:DescribeSecret",
-    ]
+    # An earlier cut listed the eight verbs measured on this estate
+    # (infra/envs/prd/products/tenant-manager/secrets/prd.tfvars in the
+    # consignado repo: five writes and three reads). They covered today's
+    # transcribed Allow, which is six verbs, all eight-listed. They covered
+    # nothing beyond it, and the actions immediately outside the list are the
+    # interesting ones:
+    #
+    #   PutResourcePolicy         attaches a resource policy to the custody
+    #                             secret and grants access BY DELEGATION, to
+    #                             any principal, without touching this role
+    #   ReplicateSecretToRegions  makes a replica whose ARN carries a DIFFERENT
+    #                             region, which a region-bound Deny — this one —
+    #                             does not match at all
+    #   UpdateSecretVersionStage  moves AWSCURRENT back onto an old version, so
+    #                             the credential changes without a write to the
+    #                             path and the immutable audit trail stops
+    #                             describing what is in use
+    #   RotateSecret              hands the write to a Lambda, which performs it
+    #                             under its own identity
+    #
+    # Each of those is a way to defeat custody while the eight-verb Deny reads
+    # correct, and each becomes reachable the moment somebody widens the Allow
+    # and does not think to widen the Deny in the same change. secretsmanager:*
+    # removes that coupling: there is nothing left to remember.
+    #
+    # READINESS IS UNAFFECTED. The two actions the service needs account-wide,
+    # ListSecrets and GetRandomPassword, are not evaluated against a resource —
+    # AWS matches them on "*" only — so a Deny scoped to a custody ARN never
+    # applies to them.
+    Action = "secretsmanager:*"
 
     # The trailing * is one IAM wildcard and it crosses "/", so external/* already
     # covers the measured custody path at any depth
