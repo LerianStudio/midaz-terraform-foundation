@@ -51,6 +51,10 @@ variables {
   sa_subject      = "platform:tenant-manager"
   role_name       = "consignado-tenant-manager-cross-account"
 
+  # No default any more: every caller says what the role borrows, out loud. This
+  # proof is about the Deny, so it borrows nothing.
+  additional_policy_names = []
+
   # The transcription's Allow half, with the Deny deliberately absent. This is
   # the realistic accident the old guard existed to catch: somebody rewrites the
   # tfvars, keeps what makes the service work, and drops the statement that makes

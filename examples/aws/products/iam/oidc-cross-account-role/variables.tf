@@ -134,8 +134,22 @@ variable "additional_policy_names" {
 
     APPLY products/tenant-manager/s3 FIRST. Attaching a policy that does not exist
     fails with NoSuchEntity — loud, not silent.
+
+    NO DEFAULT, deliberately. An empty list is a legal answer and stays legal —
+    written out. What is not legal is omitting the input: a default of [] made
+    "the control plane needs both S3 policies" and "somebody forgot to say" the
+    same tfvars, and the second one applies cleanly and loses the Casdoor
+    templates. The names themselves are not checked against a list here — this is
+    a foundation example, and which policies a role borrows belongs in the tfvars.
   EOT
 
-  type    = list(string)
-  default = []
+  type = list(string)
+
+  validation {
+    condition = alltrue([
+      for name in var.additional_policy_names :
+      can(regex("^[A-Za-z0-9+=,.@_-]{1,128}$", name))
+    ])
+    error_message = "Every entry must be a managed policy NAME of 1-128 characters from the IAM name charset [A-Za-z0-9+=,.@_-] — not an ARN and not a path. main.tf builds arn:{partition}:iam::{this account}:policy/{name} from each entry, so an ARN pasted here becomes an ARN inside an ARN and fails at apply with NoSuchEntity, naming a policy nobody can find. For the control plane the expected content is the two policies products/tenant-manager/s3 emits: tenant-manager-prd-migrations-s3-access and tenant-manager-prd-casdoor-templates-s3-access."
+  }
 }
