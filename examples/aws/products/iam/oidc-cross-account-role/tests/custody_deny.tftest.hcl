@@ -8,14 +8,15 @@
 # plane next door can rewrite or read the same ARNs.
 #
 # So the policy this root attaches has to carry an UNCONDITIONAL Deny, and "has
-# to" is only true if something refuses the plan without it. These six runs are
-# that something: one policy with the real Deny plans clean, and five documents
-# that read correct in review fail at the precondition on
+# to" is only true if something refuses the plan without it. These seven runs
+# are that something: one policy with the real Deny plans clean, and six
+# documents that read correct in review fail at the precondition on
 # aws_iam_role_policy.this — the Deny deleted, the Deny neutralised by a
 # Condition, the Deny scoped to another account, the Deny with no trailing
-# wildcard on the ARN, and the Deny carrying only two of the eight verbs.
+# wildcard on the ARN, the Deny carrying only two of the eight verbs, and the
+# Deny narrowed by a path segment appended after the wildcard.
 #
-# THE LAST FOUR ARE THE ONES THAT MATTER, because each still looks right: the
+# THE LAST FIVE ARE THE ONES THAT MATTER, because each still looks right: the
 # statement is there, the word Deny is there, the custody path is there, and the
 # statement denies nothing that can actually happen in this account.
 #
@@ -338,6 +339,62 @@ run "partial_verbs_refused" {
               "secretsmanager:GetSecretValue"
             ],
             "Resource": "arn:aws:secretsmanager:sa-east-1:862902859103:secret:tenants/*/*/*/external/*"
+          }
+        ]
+      }
+    EOT
+  }
+
+  expect_failures = [aws_iam_role_policy.this]
+}
+
+run "suffix_after_wildcard_refused" {
+  command = plan
+
+  variables {
+    # The Deny with a path segment appended AFTER the trailing wildcard. It is
+    # verbatim on every other axis — eight verbs, this account, this region, no
+    # Condition — and it still ends in a `*`, so it survives the "missing
+    # wildcard" check above. It denies nothing: IAM reads the whole ARN, and a
+    # real custody secret is
+    # `tenants/{env}/{org}/{app}/external/{name}-AbCdEf`, which has no
+    # `/nothing-real/` segment in it. Narrowing by APPENDING is the lookalike
+    # that survives every check that only asks whether the custody path appears
+    # somewhere in the string.
+    policy_json = <<-EOT
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "ScopedSecretAccess",
+            "Effect": "Allow",
+            "Action": [
+              "secretsmanager:GetSecretValue",
+              "secretsmanager:DescribeSecret",
+              "secretsmanager:CreateSecret",
+              "secretsmanager:PutSecretValue",
+              "secretsmanager:RestoreSecret",
+              "secretsmanager:DeleteSecret"
+            ],
+            "Resource": [
+              "arn:aws:secretsmanager:sa-east-1:862902859103:secret:tenants/*",
+              "arn:aws:secretsmanager:sa-east-1:862902859103:secret:clusters/*"
+            ]
+          },
+          {
+            "Sid": "DenyScopedSecretPaths",
+            "Effect": "Deny",
+            "Action": [
+              "secretsmanager:CreateSecret",
+              "secretsmanager:PutSecretValue",
+              "secretsmanager:UpdateSecret",
+              "secretsmanager:RestoreSecret",
+              "secretsmanager:DeleteSecret",
+              "secretsmanager:GetSecretValue",
+              "secretsmanager:BatchGetSecretValue",
+              "secretsmanager:DescribeSecret"
+            ],
+            "Resource": "arn:aws:secretsmanager:sa-east-1:862902859103:secret:tenants/*/*/*/external/*/nothing-real/*"
           }
         ]
       }

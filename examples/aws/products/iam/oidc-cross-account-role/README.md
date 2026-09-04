@@ -70,8 +70,9 @@ The guard accepts a statement only when all five hold:
 
 - `"Effect": "Deny"`,
 - a `Resource` naming the custody path **of this account, in this region, with
-  its trailing wildcard** — matching
-  `arn:<partition>:secretsmanager:<this region or *>:<this account or *>:secret:tenants/*/*/*/external/*`,
+  its trailing wildcard and nothing after it** — matching
+  `arn:<partition>:secretsmanager:<this region or *>:<this account or *>:secret:tenants/*/*/*/external/*`
+  and ending there,
 - an `Action` list carrying **all eight** verbs of the measured `deny_actions`:
   `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`,
   `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret`,
@@ -83,13 +84,14 @@ plane read a client's credential out of the vault. A bare `secretsmanager:*` is
 **not** accepted — the measured document lists eight verbs there nominally, and
 the guard demands the verbs rather than guessing which wildcards subsume them.
 
-The ARN and the verb list are pinned that tightly because three transcriptions
+The ARN and the verb list are pinned that tightly because four transcriptions
 read correct in review and deny nothing:
 
 | Lookalike | Why it denies nothing |
 |---|---|
 | ARN scoped to another account or region | IAM evaluates it against secrets that do not exist here. The custody path in *this* account stays writable and readable. A tfvars copied from another estate arrives exactly this way. |
 | ARN ending in `external/` with no trailing `*` | Secrets Manager suffixes six random characters onto every secret ARN, so the statement matches no real secret. The likeliest hand-copy slip on the page. |
+| ARN carrying a path segment *after* the wildcard (`external/*/nothing-real/*`) | It still ends in a wildcard, still names this account, still lists eight verbs — and a real custody ARN is `tenants/{env}/{org}/{app}/external/{name}-AbCdEf`, with no further segment. Narrowing by *appending* is why the pattern is anchored at both ends. |
 | `Action` narrowed to `PutSecretValue` + `GetSecretValue` | Leaves `CreateSecret`/`UpdateSecret` (overwrite the credential by another door), `DeleteSecret`/`RestoreSecret`, and `BatchGetSecretValue`/`DescribeSecret` (read and enumerate it) allowed on the custody ARNs. |
 
 The fifth condition is the one that catches the subtlest lookalike. A `Deny` is
@@ -111,18 +113,19 @@ the document and walks its statements, and locals are not reachable from a
 validation block on every version this repository supports. Same mechanism
 `_modules/irsa-secretsmanager` already uses (`main.tf:103,111`).
 
-`tests/custody_deny.tftest.hcl` proves it in six directions with
+`tests/custody_deny.tftest.hcl` proves it in seven directions with
 `mock_provider "aws" {}` — no credential, no AWS call: the Deny present (plans
-clean), and five refusals — the Deny deleted, the Deny narrowed by a
+clean), and six refusals — the Deny deleted, the Deny narrowed by a
 `Condition`, the Deny scoped to another account, the Deny missing the trailing
-wildcard, and the Deny carrying only `PutSecretValue` + `GetSecretValue`. Two
+wildcard, the Deny carrying only `PutSecretValue` + `GetSecretValue`, and the
+Deny narrowed by a path segment appended after the wildcard. Two
 file-level `override_data` blocks pin `aws_caller_identity` and `aws_partition`,
 because the guard anchors the ARN to the account of the apply and a mocked data
 source would otherwise decide the fixtures for the wrong reason.
 
 ```
 terraform init -backend=false && terraform test
-# Success! 6 passed, 0 failed.
+# Success! 7 passed, 0 failed.
 ```
 
 The foundation's CI does not run `terraform test` today, so this proof is local.
