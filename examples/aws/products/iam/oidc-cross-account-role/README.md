@@ -66,21 +66,34 @@ audit trail cannot be rewritten. That is a property of one role unless the role
 next door is refused too — and this role's Allow over `tenants/` necessarily
 covers the custody ARNs.
 
-The guard accepts a statement only when all four hold:
+The guard accepts a statement only when all five hold:
 
 - `"Effect": "Deny"`,
-- a `Resource` matching `secret:tenants/*/*/*/external/`,
-- an `Action` list carrying **both** `secretsmanager:PutSecretValue` and
-  `secretsmanager:GetSecretValue`,
-- **no `Condition`, `NotAction` or `NotResource`** on that statement.
+- a `Resource` naming the custody path **of this account, in this region, with
+  its trailing wildcard** — matching
+  `arn:<partition>:secretsmanager:<this region or *>:<this account or *>:secret:tenants/*/*/*/external/*`,
+- an `Action` list carrying **all eight** verbs of the measured `deny_actions`:
+  `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`,
+  `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret`,
+- **no `Condition`**, **no `NotAction`** and **no `NotResource`** on that
+  statement.
 
 Both directions, deliberately: a Deny on writes alone would still let the control
 plane read a client's credential out of the vault. A bare `secretsmanager:*` is
 **not** accepted — the measured document lists eight verbs there nominally, and
 the guard demands the verbs rather than guessing which wildcards subsume them.
 
-The fourth condition is the one that catches the lookalike. A `Deny` is only
-unconditional when nothing narrows it, and each of the three forbidden keys
+The ARN and the verb list are pinned that tightly because three transcriptions
+read correct in review and deny nothing:
+
+| Lookalike | Why it denies nothing |
+|---|---|
+| ARN scoped to another account or region | IAM evaluates it against secrets that do not exist here. The custody path in *this* account stays writable and readable. A tfvars copied from another estate arrives exactly this way. |
+| ARN ending in `external/` with no trailing `*` | Secrets Manager suffixes six random characters onto every secret ARN, so the statement matches no real secret. The likeliest hand-copy slip on the page. |
+| `Action` narrowed to `PutSecretValue` + `GetSecretValue` | Leaves `CreateSecret`/`UpdateSecret` (overwrite the credential by another door), `DeleteSecret`/`RestoreSecret`, and `BatchGetSecretValue`/`DescribeSecret` (read and enumerate it) allowed on the custody ARNs. |
+
+The fifth condition is the one that catches the subtlest lookalike. A `Deny` is
+only unconditional when nothing narrows it, and each of the three forbidden keys
 narrows it while leaving a document that still reads correct in review:
 
 | Key | What it does to the Deny |
@@ -98,14 +111,18 @@ the document and walks its statements, and locals are not reachable from a
 validation block on every version this repository supports. Same mechanism
 `_modules/irsa-secretsmanager` already uses (`main.tf:103,111`).
 
-`tests/custody_deny.tftest.hcl` proves it in three directions with
+`tests/custody_deny.tftest.hcl` proves it in six directions with
 `mock_provider "aws" {}` — no credential, no AWS call: the Deny present (plans
-clean), the Deny deleted (refused), and the Deny narrowed by a `Condition`
-(refused).
+clean), and five refusals — the Deny deleted, the Deny narrowed by a
+`Condition`, the Deny scoped to another account, the Deny missing the trailing
+wildcard, and the Deny carrying only `PutSecretValue` + `GetSecretValue`. Two
+file-level `override_data` blocks pin `aws_caller_identity` and `aws_partition`,
+because the guard anchors the ARN to the account of the apply and a mocked data
+source would otherwise decide the fixtures for the wrong reason.
 
 ```
 terraform init -backend=false && terraform test
-# Success! 3 passed, 0 failed.
+# Success! 6 passed, 0 failed.
 ```
 
 The foundation's CI does not run `terraform test` today, so this proof is local.

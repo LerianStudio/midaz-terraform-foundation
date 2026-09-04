@@ -67,10 +67,11 @@ locals {
   ##############################################################################
   # The custody guard, decided here and enforced on aws_iam_role_policy below
   #
-  # A statement counts as the custody Deny when all of these hold: Effect is
-  # Deny, at least one Resource names the custody path, the Action list carries
-  # BOTH the write verb and the read verb the gateway's immutability depends on,
-  # and the statement carries NO Condition, NotAction or NotResource.
+  # A statement counts as the custody Deny when all FIVE of these hold: Effect
+  # is Deny; at least one Resource is the custody ARN OF THIS ACCOUNT, IN THIS
+  # REGION, ending in the trailing wildcard; the Action list carries ALL EIGHT
+  # measured verbs; and the statement carries NO Condition, NO NotAction and NO
+  # NotResource.
   #
   # THOSE THREE ABSENCES ARE THE GUARD, NOT PEDANTRY. A Deny is only
   # unconditional if nothing narrows it:
@@ -95,6 +96,26 @@ locals {
   # plane able to read a client's Dataprev credential out of the vault, which is
   # the exfiltration half of the same problem.
   #
+  # THE PATTERN IS ANCHORED TO THIS APPLY, NOT TO A SUBSTRING. Three
+  # transcription lookalikes read correct in review and deny nothing here:
+  #
+  #   * WRONG ACCOUNT OR REGION — an ARN carrying 123456789012 or us-east-1 is a
+  #     Deny on secrets that do not exist in this account. IAM evaluates it and
+  #     it never matches a request, so the custody path in THIS account stays
+  #     writable and readable. The account and region slots therefore come from
+  #     the apply itself (aws_caller_identity / var.region), with a literal \*
+  #     accepted in either slot because an ARN wildcarded there still covers
+  #     this account.
+  #   * MISSING TRAILING WILDCARD — Secrets Manager suffixes six random
+  #     characters onto every secret ARN, so ".../external/" with no trailing
+  #     wildcard matches NO real secret. It is the single most plausible slip
+  #     when hand-copying the path, and it produces a Deny that denies nothing.
+  #   * PARTIAL VERB LIST — Put+Get alone leaves CreateSecret, UpdateSecret,
+  #     DeleteSecret, RestoreSecret, BatchGetSecretValue and DescribeSecret
+  #     allowed on the custody ARNs: the credential can still be overwritten
+  #     (Create/Update) and still be enumerated. The guard demands all EIGHT
+  #     verbs the measured deny_actions carries.
+  #
   # The escaped \* in the pattern is literal: the resource ARN really contains
   # asterisks (tenants/*/*/*/external/*), and an unescaped regex would match
   # "tenants///external/" as happily as the real thing. regexall rather than
@@ -106,7 +127,21 @@ locals {
   # string as well as a list. A guard that only understood the list form would
   # pass a document written in the other legal shape without reading it.
   ##############################################################################
-  custody_resource_pattern = "secret:tenants/\\*/\\*/\\*/external/"
+  custody_resource_pattern = "^arn:${data.aws_partition.current.partition}:secretsmanager:(${var.region}|\\*):(${data.aws_caller_identity.current.account_id}|\\*):secret:tenants/\\*/\\*/\\*/external/\\*"
+
+  # deny_actions of products/tenant-manager/secrets, verbatim: five writes and
+  # three reads. Nominal and not a wildcard, because the guard has to refuse a
+  # transcription that keeps the shape and drops verbs.
+  custody_required_actions = toset([
+    "secretsmanager:CreateSecret",
+    "secretsmanager:PutSecretValue",
+    "secretsmanager:UpdateSecret",
+    "secretsmanager:RestoreSecret",
+    "secretsmanager:DeleteSecret",
+    "secretsmanager:GetSecretValue",
+    "secretsmanager:BatchGetSecretValue",
+    "secretsmanager:DescribeSecret",
+  ])
 
   policy_statements = flatten([try(jsondecode(var.policy_json).Statement, [])])
 
@@ -117,8 +152,7 @@ locals {
         for r in flatten([try(s.Resource, [])]) :
         length(regexall(local.custody_resource_pattern, tostring(r))) > 0
       ])
-      && contains(flatten([try(s.Action, [])]), "secretsmanager:PutSecretValue")
-      && contains(flatten([try(s.Action, [])]), "secretsmanager:GetSecretValue")
+      && length(setsubtract(local.custody_required_actions, toset(flatten([try(s.Action, [])])))) == 0
       && !can(s.Condition)
       && !can(s.NotAction)
     && !can(s.NotResource))
@@ -241,7 +275,7 @@ resource "aws_iam_role_policy" "this" {
     # rewrite a client's credential.
     precondition {
       condition     = local.custody_deny_present
-      error_message = "policy_json carries no unconditional custody Deny. It must contain a statement with \"Effect\": \"Deny\", a Resource matching secret:tenants/*/*/*/external/, an Action list including BOTH secretsmanager:PutSecretValue and secretsmanager:GetSecretValue (the measured document lists eight verbs there; a bare secretsmanager:* is not accepted, write the verbs), and NO Condition, NotAction or NotResource on that statement — each of those narrows or inverts the Deny while leaving a document that still reads like the real one: a Condition that never matches denies nothing, NotAction denies every verb except the listed ones, NotResource denies every ARN except the custody path. That path holds the client's Dataprev credential: the gateway makes it immutable by refusing PutSecretValue in its own validation, and this control-plane role must be refused both the rewrite and the read or the immutability is worth nothing. Transcribe the deny_actions/deny_secret_path_patterns block from products/tenant-manager/secrets rather than weakening this guard."
+      error_message = "policy_json carries no unconditional custody Deny. It must contain a statement where ALL FIVE hold: \"Effect\": \"Deny\"; a Resource naming the custody path OF THIS ACCOUNT AND REGION, with its trailing wildcard, i.e. matching arn:<partition>:secretsmanager:<this region or *>:<this account or *>:secret:tenants/*/*/*/external/* — an ARN scoped to another account or region, or one ending in external/ with no trailing wildcard, denies nothing here, because Secrets Manager suffixes six random characters onto every ARN; an Action list carrying ALL EIGHT measured verbs (CreateSecret, PutSecretValue, UpdateSecret, RestoreSecret, DeleteSecret, GetSecretValue, BatchGetSecretValue, DescribeSecret — a bare secretsmanager:* is not accepted, write the verbs, and Put+Get alone still leaves the credential overwritable and enumerable); and NO Condition, NO NotAction and NO NotResource on that statement — each of those narrows or inverts the Deny while leaving a document that still reads like the real one: a Condition that never matches denies nothing, NotAction denies every verb except the listed ones, NotResource denies every ARN except the custody path. That path holds the client's Dataprev credential: the gateway makes it immutable by refusing PutSecretValue in its own validation, and this control-plane role must be refused both the rewrite and the read or the immutability is worth nothing. Transcribe the deny_actions/deny_secret_path_patterns block from products/tenant-manager/secrets rather than weakening this guard."
     }
   }
 }
