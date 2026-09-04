@@ -157,10 +157,10 @@ resource "aws_vpc_peering_connection" "this" {
     # after that dead id has already been written to state, and a failed
     # connection can be neither accepted nor rejected while it lingers.
     #
-    # That is all this guard buys, and it is enough: the same refusal at PLAN
-    # time, before any API call, naming the peer key, both CIDRs and the blocks
-    # this estate actually uses — instead of a state-machine string that names
-    # neither the tfvars nor the value that was wrong.
+    # That is all this guard buys, and it is enough: the same refusal at plan
+    # time, before any resource is created, naming the peer key, both CIDRs and
+    # the blocks this estate actually uses — instead of a state-machine string
+    # that names neither the tfvars nor the value that was wrong.
     #
     # The guard is evaluated against a data source, so on a plan without
     # credentials the local CIDR is unknown and Terraform defers the check to
