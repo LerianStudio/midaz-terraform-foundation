@@ -173,6 +173,27 @@ resource "aws_vpc_peering_connection" "this" {
 }
 
 ################################################################################
+# The connections, read back from the API
+#
+# The same data source products/network/vpc-peering-accepter uses on the other
+# side, for the same reason: peers[*].cidr is a hand-written claim about a VPC in
+# another account, and no data source in THIS account can read that VPC. Reading
+# the CONNECTION can — once it exists, AWS reports the accepter's block on it.
+#
+# It reports it late. "CIDR block information is only returned when describing an
+# active VPC peering connection" (AWS CLI reference, describe-vpc-peering-
+# connections, AccepterVpcInfo), so between this apply and the acceptance over
+# there, peer_cidr_block is empty and there is nothing to compare. That is the
+# only window, and it closes for good on the first plan after acceptance.
+################################################################################
+
+data "aws_vpc_peering_connection" "this" {
+  for_each = aws_vpc_peering_connection.this
+
+  id = each.value.id
+}
+
+################################################################################
 # Local routes to each peer
 #
 # The peering connection alone carries no traffic. Without these routes the
@@ -186,4 +207,41 @@ resource "aws_route" "to_peer" {
   route_table_id            = each.value.route_table_id
   destination_cidr_block    = each.value.cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.this[each.value.peer].id
+
+  lifecycle {
+    # DECLARED vs REAL, and it is the requester-side mirror of the accepter's
+    # cidr_block provenance check. The overlap guard above only proves the
+    # declared block does not collide with this VPC; a declared block that is
+    # simply WRONG about the peer VPC — 10.61.0.0/16 written for a VPC that is
+    # really 10.62.0.0/16 — collides with nothing and applies cleanly. The route
+    # then sends that traffic into a peering whose other end does not own the
+    # addresses, and from inside this VPC the timeouts look like a firewall.
+    #
+    # SILENT ON THE FIRST APPLY, deliberately, and it cannot be otherwise: the
+    # connection is still pending-acceptance, and AWS returns no accepter CIDR
+    # for one — "CIDR block information is only returned when describing an
+    # active VPC peering connection" (AWS CLI reference, describe-vpc-peering-
+    # connections, AccepterVpcInfo). Nothing is lost by letting the route through
+    # then: "You can add a route for a VPC peering connection that's in the
+    # pending-acceptance state. However, the route has a state of blackhole, and
+    # has no effect until the VPC peering connection is in the active state" (VPC
+    # Peering Guide, "Update your route tables for a VPC peering connection").
+    # The route carries nothing until the other account accepts, which is exactly
+    # when the API starts answering and this check starts running — on every plan
+    # from then on, including the ones that only meant to add a route table.
+    precondition {
+      # NOT coalesce(peer_cidr_block, ""): coalesce returns the first argument
+      # that is neither null NOR an empty string, so with an empty block it has
+      # no argument left to return and fails the plan — in exactly the
+      # pending-acceptance case this branch exists to wave through. The null test
+      # is load-bearing too: null == "" is null, not false, and a condition that
+      # evaluates to null is an error rather than a pass.
+      condition = (
+        data.aws_vpc_peering_connection.this[each.value.peer].peer_cidr_block == null ||
+        data.aws_vpc_peering_connection.this[each.value.peer].peer_cidr_block == "" ||
+        data.aws_vpc_peering_connection.this[each.value.peer].peer_cidr_block == each.value.cidr
+      )
+      error_message = "Peer \"${each.value.peer}\" declares CIDR ${each.value.cidr} in peers, but the accepter VPC on the other end of this connection really has ${data.aws_vpc_peering_connection.this[each.value.peer].peer_cidr_block} — the API reports it now that the connection is active. This route sends ${each.value.cidr} into a peering whose far end does not own that block, so the traffic leaves and nothing answers. Fix peers[\"${each.value.peer}\"].cidr in the tfvars to the block that VPC actually has, rather than this guard."
+    }
+  }
 }

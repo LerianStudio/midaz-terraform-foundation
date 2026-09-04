@@ -55,15 +55,30 @@ nor the value that was wrong. (Not before any API call: resolving the local VPC 
 one, and it is where the local CIDR comes from.)
 
 It compares against the CIDR **declared** for each peer in `peers`, not the one
-its VPC really has — the real one lives in the other account and no data source
-here can read it. So the guard catches a declared block that overlaps this VPC;
-a declared block that is simply wrong about a VPC it does not overlap is caught on
-the other side instead, by the `cidr_block` provenance check in
-[`vpc-peering-accepter`](../vpc-peering-accepter), which reads the connection back
-from the API.
+its VPC really has. So it catches a declared block that overlaps this VPC, and it
+has nothing to say about one that is simply wrong about a VPC it does not overlap.
 
 Blocks on this estate: control plane `10.59.0.0/16`, staging `10.61.0.0/16`,
 production `10.60.0.0/16`.
+
+## Declared vs real, on the routes
+
+A block that is wrong but disjoint is caught by a second guard, a precondition on
+each route, which reads the connection back from the API. It has two moments,
+because AWS only answers in one of them:
+
+| | |
+|---|---|
+| First apply | **Declared value only.** The connection is still `pending-acceptance`, and "CIDR block information is only returned when describing an active VPC peering connection" (`describe-vpc-peering-connections`, `AccepterVpcInfo`) — there is nothing to compare with. Nothing is lost by letting the route through: a route to a pending connection "has a state of `blackhole`, and has no effect until the VPC peering connection is in the `active` state". |
+| Every plan after acceptance | **Declared vs real.** The API now reports the accepter's block, and a plan whose `peers[*].cidr` disagrees with it is refused — naming the peer key, both blocks, and the tfvars entry to fix. Including the plans that only meant to add a route table. |
+
+`destination_cidr_block` stays the **declared** value, so the first apply still
+creates the (blackhole) route and the acceptance turns it live with no second
+apply here.
+
+This is the requester-side mirror of the `cidr_block` provenance check in
+[`vpc-peering-accepter`](../vpc-peering-accepter), which reads the same
+connection from the other end.
 
 ## What it does not do
 
