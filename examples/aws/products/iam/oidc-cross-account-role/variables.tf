@@ -38,8 +38,8 @@ variable "oidc_issuer_url" {
   type = string
 
   validation {
-    condition     = startswith(var.oidc_issuer_url, "https://oidc.eks.")
-    error_message = "oidc_issuer_url must be an EKS issuer URL, starting with https://oidc.eks. — e.g. https://oidc.eks.sa-east-1.amazonaws.com/id/EXAMPLE. The unresolved placeholder this tfvars ships with is caught here as well as by lerian-infra."
+    condition     = can(regex("^https://oidc\\.eks\\.[a-z0-9-]+\\.amazonaws\\.com(\\.cn)?/id/[0-9A-F]{32}$", var.oidc_issuer_url))
+    error_message = "oidc_issuer_url must be a COMPLETE EKS issuer URL — https://oidc.eks.{region}.amazonaws.com/id/{32 uppercase hex}, e.g. https://oidc.eks.sa-east-1.amazonaws.com/id/0123456789ABCDEF0123456789ABCDEF; the .com.cn host is accepted for the China partitions, and aws-us-gov regions need no special case. The full hostname and the /id/ path are both required because this value is not merely recorded: it is registered as an identity provider in THIS account, and a host anyone can register under the prefix https://oidc.eks. — oidc.eks.attacker.example — would become a trusted issuer whose tokens the trust policy accepts. The unresolved placeholder this tfvars ships with is caught here as well as by lerian-infra."
   }
 }
 

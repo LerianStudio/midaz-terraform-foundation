@@ -47,7 +47,7 @@ override_data {
 variables {
   region          = "sa-east-1"
   environment     = "prd"
-  oidc_issuer_url = "https://oidc.eks.sa-east-1.amazonaws.com/id/EXAMPLE0123456789ABCDEF0123456789"
+  oidc_issuer_url = "https://oidc.eks.sa-east-1.amazonaws.com/id/0123456789ABCDEF0123456789ABCDEF"
   sa_subject      = "platform:tenant-manager"
   role_name       = "consignado-tenant-manager-cross-account"
 
