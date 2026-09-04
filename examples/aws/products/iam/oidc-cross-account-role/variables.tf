@@ -100,7 +100,9 @@ variable "policy_json" {
     IT DOES NOT CARRY THE CUSTODY DENY, and must not have to: main.tf appends
     that statement to whatever this document holds, on every apply. Transcribe
     the Allow statements here and nothing else — a Deny written here as well is
-    accepted (IAM takes the union of denies), it is simply redundant.
+    redundant, and accepted (IAM takes the union of denies) only under a Sid
+    other than DenyDataprevCustodyPaths. Reusing that Sid is a
+    MalformedPolicyDocument and fails the apply.
   EOT
 
   type = string

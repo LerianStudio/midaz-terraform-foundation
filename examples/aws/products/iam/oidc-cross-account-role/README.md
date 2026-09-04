@@ -79,7 +79,7 @@ The statement the root appends:
 | | |
 |---|---|
 | `Effect` | `Deny` |
-| `Action` | the eight measured `deny_actions` of `products/tenant-manager/secrets`: `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`, `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret` |
+| `Action` | the eight `deny_actions` measured on this estate — the consignado `prd.tfvars` for `products/tenant-manager/secrets`, not that root's own default, which stops at the five writes: `CreateSecret`, `PutSecretValue`, `UpdateSecret`, `RestoreSecret`, `DeleteSecret`, `GetSecretValue`, `BatchGetSecretValue`, `DescribeSecret` |
 | `Resource` | `arn:{partition}:secretsmanager:{region}:{this account}:secret:tenants/*/*/*/external/*` — partition, region and account come from the apply itself |
 | `Condition` | none |
 
@@ -101,7 +101,9 @@ Building the statement makes the invariant true by construction. There is no
 document this root can attach without it, no regex to get right, and no error
 message that has to describe the ARN correctly to be useful. A Deny of its own in
 `policy_json` is additive — IAM takes the union of denies — so a tfvars that also
-carries one is accepted rather than hunted for.
+carries one is accepted rather than hunted for, provided its `Sid` differs.
+Reusing `DenyDataprevCustodyPaths` is a `MalformedPolicyDocument` that fails the
+apply, and the test below counts exactly one Deny either way.
 
 `tests/custody_deny.tftest.hcl` proves the construction with `mock_provider "aws"
 {}` — no credential, no AWS call. It feeds a `policy_json` with **no Deny at

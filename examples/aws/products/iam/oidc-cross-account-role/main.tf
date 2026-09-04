@@ -88,15 +88,27 @@ locals {
   # and no error message that has to describe the ARN correctly to be useful.
   #
   # A Deny in policy_json on top of this one is additive — IAM takes the union of
-  # denies — so a tfvars that also carries one is accepted rather than detected.
+  # denies — so a tfvars that also carries one is accepted rather than detected,
+  # PROVIDED ITS Sid DIFFERS. Two statements sharing DenyDataprevCustodyPaths is
+  # a MalformedPolicyDocument, which fails the apply loudly; and either way
+  # tests/custody_deny.tftest.hcl counts exactly one Deny, not at least one.
   ##############################################################################
   custody_deny_statement = {
     Sid    = "DenyDataprevCustodyPaths"
     Effect = "Deny"
 
-    # deny_actions of products/tenant-manager/secrets, verbatim: five writes and
-    # three reads. Nominal rather than secretsmanager:*, so widening the Allow
-    # later cannot quietly outgrow the Deny.
+    # The eight verbs MEASURED on this estate — five writes and three reads —
+    # are deny_actions of infra/envs/prd/products/tenant-manager/secrets/
+    # prd.tfvars:95-103 in the consignado repo, not the default of
+    # products/tenant-manager/secrets, which stops at the five writes.
+    #
+    # Nominal rather than secretsmanager:*, and the cost of that is on the
+    # Allow side, not this one: widening the Allow PAST these eight
+    # (UpdateSecretVersionStage, ReplicateSecretToRegions, TagResource and
+    # PutResourcePolicy are the reachable ones) outgrows the Deny, and has to
+    # widen it in the same change. Today it fits: the transcribed Allow is six
+    # verbs, all eight-listed, plus ListSecrets, which AWS never evaluates
+    # against a resource at all.
     Action = [
       "secretsmanager:CreateSecret",
       "secretsmanager:PutSecretValue",

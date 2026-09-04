@@ -122,6 +122,21 @@ run "root_builds_the_custody_deny" {
       "secretsmanager:BatchGetSecretValue",
       "secretsmanager:DescribeSecret",
     ])
-    error_message = "The custody Deny does not carry the eight measured deny_actions of products/tenant-manager/secrets. Put+Get alone still leaves the credential overwritable (CreateSecret/UpdateSecret) and enumerable (BatchGetSecretValue/DescribeSecret)."
+    error_message = "The custody Deny does not carry the eight deny_actions measured on this estate — the consignado prd.tfvars for products/tenant-manager/secrets, not that root's own default, which stops at the five writes. Put+Get alone still leaves the credential overwritable (CreateSecret/UpdateSecret) and enumerable (BatchGetSecretValue/DescribeSecret)."
+  }
+
+  # The Deny has to be BARE. Every lookalike above is a statement that still
+  # counts as one Deny, names the right ARN and the right verbs, and denies
+  # nothing: a Condition that never matches neutralises it, and NotAction /
+  # NotResource invert it into a Deny over everything EXCEPT the custody path.
+  # The three asserts above cannot see any of that, so this one reads the
+  # statement for the absence of all three keys.
+  assert {
+    condition = alltrue([
+      for s in jsondecode(aws_iam_role_policy.this.policy).Statement :
+      !can(s.Condition) && !can(s.NotAction) && !can(s.NotResource)
+      if try(s.Effect, "") == "Deny"
+    ])
+    error_message = "The custody Deny carries a Condition, a NotAction or a NotResource. Any of the three makes a statement that reads as a Deny over the custody path and denies nothing there: a Condition that never matches never fires, and NotAction/NotResource deny everything EXCEPT what they name."
   }
 }
