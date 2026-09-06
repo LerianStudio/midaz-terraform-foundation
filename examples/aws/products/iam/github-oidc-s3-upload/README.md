@@ -94,6 +94,24 @@ Until step 3 lands, nothing assumes this role.
 | `region`                 | no       | provider endpoint and tags only; S3 ARNs carry no region            |
 | `extra_tags`             | no       |                                                                     |
 
+## Rollback
+
+`terraform destroy` of this root is free **only while nothing else trusts the
+provider**. The role and its inline policy are this root's alone — destroying
+them breaks the one release pipeline that names the role, and nothing else.
+
+The identity provider is not. `token.actions.githubusercontent.com` is an
+**account singleton**: AWS refuses a second provider for the same URL, so every
+future GitHub-OIDC role in this account trusts *this* object. A destroy that
+takes it down invalidates their trust policies too — they keep referring to an
+ARN that no longer resolves, and every `AssumeRoleWithWebIdentity` against them
+fails, with nothing in their own Terraform state having changed to explain it.
+
+So before destroying this root once a second consumer exists, that consumer
+must own the provider first: `terraform state rm` it here and
+`terraform import` it there (or move it to a root of its own that both depend
+on). Until then, prefer reverting the tfvars and re-applying over a destroy.
+
 ## Verification after apply
 
 ```bash

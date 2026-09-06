@@ -43,7 +43,14 @@ variables {
 }
 
 run "every_release_channel_and_nothing_else" {
-  command = plan
+  # apply, not plan, and mock_provider is what makes that free: no AWS call, no
+  # credential, no state. It is required because assume_role_policy is built
+  # from aws_iam_openid_connect_provider.github.arn, which is unknown until
+  # apply — and asserting the trust document is the whole point of this run.
+  # The upside is that the Principal assert then compares two values the test
+  # did not pin, so it proves the document names THIS root's provider rather
+  # than matching a literal somebody could keep in sync by hand.
+  command = apply
 
   # Three, and the count is the assertion that catches a DROPPED channel — the
   # set-comparison below would also catch it, but the count says which failure it
@@ -80,9 +87,51 @@ run "every_release_channel_and_nothing_else" {
     error_message = "The inline policy is not exactly one Allow of s3:PutObject. A release pipeline only ever adds files: s3:DeleteObject would let it remove a migration a tenant already applied, and s3:ListBucket belongs to the reader, which is not this identity."
   }
 
+  ##############################################################################
+  # THE TRUST DOCUMENT ATTACHED TO THE ROLE, not the allowed_subject output.
+  #
+  # The output is an echo of a variable: it stays correct while the document
+  # says something else entirely, so a test that reads it proves the variable
+  # was interpolated somewhere and nothing about who can assume the role. These
+  # four asserts read aws_iam_role.this.assume_role_policy — the actual trust.
+  ##############################################################################
+
+  # ONE statement. A second Allow is how a trust policy gets widened without
+  # anything in the first one looking wrong.
   assert {
-    condition     = output.allowed_subject == "repo:LerianStudio/br-consignado-gw:ref:refs/tags/*"
-    error_message = "The trust subject is not repo:{owner}/{repo}:ref:refs/tags/*. The wildcard belongs on the TAG NAME and nowhere else: widened to refs/* it admits branch pushes, including a workflow edited in a fork's pull request; narrowed to a literal tag it admits exactly one release and no other."
+    condition     = length(jsondecode(aws_iam_role.this.assume_role_policy).Statement) == 1
+    error_message = "The trust policy does not hold exactly one statement. A second statement is how this boundary gets widened while the statement everybody reads still looks correct."
+  }
+
+  # The federated principal is THIS root's provider, not some other issuer
+  # already registered in the account — and there are three EKS issuers here to
+  # pick the wrong one from.
+  assert {
+    condition     = jsondecode(aws_iam_role.this.assume_role_policy).Statement[0].Principal.Federated == aws_iam_openid_connect_provider.github.arn
+    error_message = "The trust policy's federated principal is not the GitHub identity provider this root registers. The account also holds three EKS issuers; trusting one of those would admit cluster workloads instead of a release pipeline."
+  }
+
+  # The subject, and the operator it is tested under. StringLike is required
+  # because the tag name is part of the subject and changes every release;
+  # StringEquals here would admit exactly one tag and nothing after it.
+  assert {
+    condition = (
+      jsondecode(aws_iam_role.this.assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"]
+      == "repo:LerianStudio/br-consignado-gw:ref:refs/tags/*"
+    )
+    error_message = "The trust policy does not admit repo:LerianStudio/br-consignado-gw:ref:refs/tags/* under StringLike. The wildcard belongs on the TAG NAME and nowhere else: widened to refs/* it admits branch pushes, including a workflow edited in a fork's pull request; moved onto the repository it admits other repositories; dropped for StringEquals it admits one release and nothing after it."
+  }
+
+  # :aud, and it must be StringEquals. The provider's client_id_list already
+  # requires this audience, so this condition is belt and braces — but a second
+  # audience added to client_id_list later would widen the role silently, and
+  # this is what stops that.
+  assert {
+    condition = (
+      jsondecode(aws_iam_role.this.assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:aud"]
+      == "sts.amazonaws.com"
+    )
+    error_message = "The trust policy does not pin :aud to sts.amazonaws.com under StringEquals — the audience go-release requests. Without it, a second audience added to the provider's client_id_list would widen this role with no change to this file."
   }
 }
 

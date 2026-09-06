@@ -9,8 +9,8 @@ output "oidc_provider_arn" {
 }
 
 output "allowed_subject" {
-  description = "The :sub pattern the trust policy admits. Echoed back so an apply's evidence names WHAT can assume the role, rather than asserting that a role exists."
-  value       = "repo:${var.github_repository}:ref:refs/tags/*"
+  description = "The :sub pattern the trust policy admits. Echoed back so an apply's evidence names WHAT can assume the role, rather than asserting that a role exists. Read off the SAME local the trust document is built from, so it cannot report a boundary the role does not have."
+  value       = local.trust_subject
 }
 
 output "object_prefix_arns" {

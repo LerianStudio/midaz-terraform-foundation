@@ -89,6 +89,45 @@ locals {
       Resource = local.object_prefix_arns
     }]
   })
+
+  # ONE definition of the subject, read by the trust policy AND by the output
+  # that reports it. Two copies would be two things to keep equal, and the
+  # output is what an apply's evidence gets read off: an output that has drifted
+  # from the document reports a boundary the role does not have.
+  trust_subject = "repo:${var.github_repository}:ref:refs/tags/*"
+
+  ##############################################################################
+  # The trust policy itself — the commentary is above resource aws_iam_role.this
+  #
+  # jsonencode rather than aws_iam_policy_document, for the same reason as
+  # upload_policy above: a data source is a provider round trip, so under
+  # mock_provider the rendered document is generated noise and the trust — the
+  # whole security boundary of this root — cannot be asserted in a test at all.
+  # An earlier cut of the test worked around that by asserting the
+  # allowed_subject OUTPUT, which is an echo of a variable and passes happily
+  # while the attached document says something else.
+  ##############################################################################
+  trust_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid    = "AllowRepositoryTagPushToAssumeRole"
+      Effect = "Allow"
+      Action = "sts:AssumeRoleWithWebIdentity"
+
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.github.arn
+      }
+
+      Condition = {
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = local.trust_subject
+        }
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
 }
 
 ################################################################################
@@ -137,35 +176,10 @@ resource "aws_iam_openid_connect_provider" "github" {
 # client_id_list later would otherwise widen this role silently.
 ################################################################################
 
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    sid     = "AllowRepositoryTagPushToAssumeRole"
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
-    principals {
-      type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
-    }
-
-    condition {
-      test     = "StringLike"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/tags/*"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-  }
-}
-
 resource "aws_iam_role" "this" {
   name                  = var.role_name
   description           = "Release pipeline of ${var.github_repository} publishing migrations to s3://${var.migrations_bucket_name}"
-  assume_role_policy    = data.aws_iam_policy_document.assume_role.json
+  assume_role_policy    = local.trust_policy
   force_detach_policies = true
 
   # The AWS default (1 hour), written out because it is the ceiling on a
