@@ -86,6 +86,16 @@ run "every_release_channel_and_nothing_else" {
   }
 }
 
+run "non_prd_environment_refused" {
+  command = plan
+
+  variables {
+    environment = "stg"
+  }
+
+  expect_failures = [var.environment]
+}
+
 run "owner_without_repository_refused" {
   command = plan
 
@@ -107,6 +117,26 @@ run "bucket_arn_instead_of_name_refused" {
   # the apply succeeds and every upload is denied.
   variables {
     migrations_bucket_name = "arn:aws:s3:::tenant-manager-prd-migrations-862902859103"
+  }
+
+  expect_failures = [var.migrations_bucket_name]
+}
+
+run "bucket_name_with_adjacent_periods_refused" {
+  command = plan
+
+  variables {
+    migrations_bucket_name = "tenant-manager..migrations"
+  }
+
+  expect_failures = [var.migrations_bucket_name]
+}
+
+run "bucket_name_formatted_as_ipv4_refused" {
+  command = plan
+
+  variables {
+    migrations_bucket_name = "192.168.5.4"
   }
 
   expect_failures = [var.migrations_bucket_name]

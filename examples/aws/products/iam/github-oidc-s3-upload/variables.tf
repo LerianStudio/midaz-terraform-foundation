@@ -12,6 +12,11 @@ variable "region" {
 variable "environment" {
   description = "Deployment environment this apply belongs to. One of dev, stg or prd; it feeds tags and the state key's backend config. ONE role serves EVERY release channel, so this root is applied only as \"prd\" — the role is a property of the account that owns the bucket, not of a stack. The channel (development/staging/production) is a FOLDER inside the bucket, chosen by the release pipeline from the tag, never by a second apply."
   type        = string
+
+  validation {
+    condition     = var.environment == "prd"
+    error_message = "environment must be prd because this account-level role is deployed once."
+  }
 }
 
 variable "extra_tags" {
@@ -81,7 +86,11 @@ variable "migrations_bucket_name" {
   type = string
 
   validation {
-    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.migrations_bucket_name))
-    error_message = "migrations_bucket_name must be a bucket NAME (3-63 characters, lowercase alphanumerics, dots and hyphens) — not an ARN and not a URL. An ARN pasted here becomes an ARN inside an ARN and grants nothing, silently."
+    condition = (
+      can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.migrations_bucket_name)) &&
+      !strcontains(var.migrations_bucket_name, "..") &&
+      !can(regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", var.migrations_bucket_name))
+    )
+    error_message = "migrations_bucket_name must be a valid S3 bucket NAME (3-63 characters, lowercase alphanumerics, dots and hyphens), without adjacent periods and not formatted as an IPv4 address — not an ARN or URL."
   }
 }
