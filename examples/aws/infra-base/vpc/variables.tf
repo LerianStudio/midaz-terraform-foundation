@@ -173,6 +173,16 @@ variable "database_nacl_peer_cidrs" {
     condition     = length(var.database_nacl_peer_cidrs) <= 14
     error_message = "database_nacl_peer_cidrs takes at most 14 entries: the database network ACL already holds six rules per direction and AWS allows 20 by default."
   }
+
+  # Each entry lands in cidr_block, which is IPv4 only -- an IPv6 prefix needs
+  # ipv6_cidr_block instead, and the rules here do not set it. cidrnetmask is
+  # the shortest total test: it is defined for IPv4 and errors on IPv6, on a
+  # null element and on anything that is not a prefix at all, so `can` around it
+  # refuses all three at plan time rather than midway through the apply.
+  validation {
+    condition     = alltrue([for cidr in var.database_nacl_peer_cidrs : can(cidrnetmask(cidr))])
+    error_message = "Every entry in database_nacl_peer_cidrs must be an IPv4 CIDR block, such as 10.59.0.0/16."
+  }
 }
 
 variable "cluster_name" {
