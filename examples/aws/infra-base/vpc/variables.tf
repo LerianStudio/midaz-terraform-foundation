@@ -161,6 +161,18 @@ variable "database_nacl_peer_cidrs" {
   EOT
   type        = list(string)
   default     = []
+
+  # The database ACL already carries six fixed rules in each direction (100-120
+  # for the private subnets, 200-220 for the database ones) and each peer adds
+  # one more per direction. AWS allows 20 entries per direction by default, so
+  # fourteen peers is the last count that applies. Past it the apply fails
+  # partway through, with some rules created and the ACL in neither the old
+  # shape nor the new one. The quota is adjustable to 40 on request; raise this
+  # bound together with it.
+  validation {
+    condition     = length(var.database_nacl_peer_cidrs) <= 14
+    error_message = "database_nacl_peer_cidrs takes at most 14 entries: the database network ACL already holds six rules per direction and AWS allows 20 by default."
+  }
 }
 
 variable "cluster_name" {
