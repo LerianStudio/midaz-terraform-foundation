@@ -145,6 +145,24 @@ variable "enable_s3_gateway_endpoint" {
   default     = true
 }
 
+variable "database_nacl_peer_cidrs" {
+  description = <<-EOT
+    Extra CIDR blocks allowed through the database subnet network ACL, on top of
+    this VPC's own private and database subnets.
+
+    For peered VPCs whose workloads read a datastore here. The datastore's
+    security group is not enough on its own: a network ACL is evaluated on every
+    packet that crosses the subnet boundary, so a peer the security group admits
+    is still dropped at this layer. The symptom is a connection timeout while
+    peering is active, routes exist on both sides and the security group already
+    names the peer CIDR -- which reads as a routing fault and is not one.
+
+    Network ACLs are stateless, so each block is opened in both directions.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "cluster_name" {
   description = "EKS cluster name used in the kubernetes.io/cluster/<name> subnet tags. Leave empty (the default) to DERIVE \"{product}-{environment}-eks\", which is exactly the name the infra-base/eks stack derives for itself. Only override it when pointing these subnets at a cluster that was not created by infra-base/eks — an override that does not match the real cluster name leaves the cluster unable to discover its own subnets."
   type        = string
