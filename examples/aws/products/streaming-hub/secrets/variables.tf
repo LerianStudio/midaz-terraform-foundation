@@ -83,6 +83,36 @@ variable "write_actions" {
   default     = []
 }
 
+variable "deny_secret_path_patterns" {
+  description = <<-EOT
+    Paths this role may NOT touch, whatever the Allow says.
+
+    THE CUSTODY PATH BELONGS HERE. secret_path_prefixes names an ENVIRONMENT, not a
+    component, because the tenant roster is the listing of that whole environment.
+    An environment prefix swallows
+    tenants/{env}/{org}/{app}/external/{target}/credentials/versions/{uuid}, which
+    is a tenant's Dataprev credential — and unlike tenant-manager, this role holds
+    GetSecretValue over what it reaches.
+
+    Only the gateway reads a custody credential. A narrower Allow is not the
+    instrument: the roster needs the broad prefix. A Deny is what carves a hole out
+    of a broad Allow, and in IAM it beats every Allow, including one attached to
+    this role later by somebody else.
+
+    The hub loses no function. It reads a VALUE only for its own M2M manifest
+    credential under m2m/, and builds the roster from NAMES alone.
+  EOT
+
+  type    = list(string)
+  default = []
+}
+
+variable "deny_actions" {
+  description = "Actions denied on deny_secret_path_patterns. Every secretsmanager action, not a nominal list: this role's exposure is READ, so a Deny covering only the mutating set would leave the custody credential readable, and a list of verbs goes stale the next time AWS adds one. Ignored when deny_secret_path_patterns is empty."
+  type        = list(string)
+  default     = ["secretsmanager:*"]
+}
+
 variable "allow_list_secrets" {
   description = "Grant account-wide secretsmanager:ListSecrets. TRUE, and it is not optional in multi-tenant mode: the tenant roster IS the listing, and an empty listing makes the hub refuse to boot rather than serve zero tenants. AWS does not evaluate ListSecrets against a resource, so this necessarily carries Resource \"*\" and the hub learns every secret NAME in the account (never a value). Set false only for single-tenant BYOC, which makes no AWS call at all."
   type        = bool

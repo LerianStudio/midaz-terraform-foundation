@@ -87,6 +87,9 @@ module "secrets" {
   secret_path_prefixes = var.secret_path_prefixes
   read_actions         = var.read_actions
   write_actions        = var.write_actions
-  allow_list_secrets   = var.allow_list_secrets
-  kms_key_arns         = var.kms_key_arns
+
+  deny_secret_path_patterns = var.deny_secret_path_patterns
+  deny_actions              = var.deny_actions
+  allow_list_secrets        = var.allow_list_secrets
+  kms_key_arns              = var.kms_key_arns
 }
