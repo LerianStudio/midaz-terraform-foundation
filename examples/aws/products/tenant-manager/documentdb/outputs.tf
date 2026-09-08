@@ -2,36 +2,19 @@
 # Outputs
 #
 ################################################################################
-# helm_values IS EMPTY, ON PURPOSE. IT IS NOT AN OVERSIGHT.
-#
-# Every other product root in this repository ends in a helm_values map holding
-# the exact environment variable names its chart reads. This one cannot, because
-# tenant-manager has no readable chart:
-# infrastructure/K8S/helm/charts/tenant-manager/ contains two vendored tarballs
+# helm_values IS NOT DERIVED FROM A CHART, because tenant-manager has no readable
+# one: infrastructure/K8S/helm/charts/tenant-manager/ holds two vendored tarballs
 # (mongodb-16.4.0.tgz, valkey-0.7.4.tgz) and nothing else — no Chart.yaml, no
-# values.yaml, no templates/.
+# values.yaml, no templates/. Both were extracted and read: the only environment
+# variables inside them are the Bitnami MONGODB_* family that configures the
+# MongoDB POD, plus VALKEY_LOGLEVEL. Those name what the datastore containers
+# read, not what tenant-manager reads, and they are irrelevant the moment the
+# datastore is DocumentDB instead of a pod.
 #
-# Both tarballs were extracted and read. They are unmodified upstream charts:
-# the only literal environment variables inside them are the Bitnami MONGODB_*
-# family that configures the MongoDB POD (MONGODB_ROOT_USER, MONGODB_PORT_NUMBER,
-# MONGODB_REPLICA_SET_MODE and so on) and a single VALKEY_LOGLEVEL. Those name
-# what the datastore containers read, not what tenant-manager reads, and they are
-# irrelevant the moment the datastore is DocumentDB instead of a pod. Searching
-# the extracted trees for MONGO_ (single word), REDIS_, POSTGRES, RABBIT, AMQP,
-# STREAMING_, KAFKA and BROKER returns zero matches.
-#
-# Guessing MONGO_HOST / MONGO_URI here because three sibling charts use them
-# would be the single most damaging thing this file could do: it looks verified,
-# it reviews clean, and it silently produces a release that never connects. The
-# three charts read for this batch use three DIFFERENT spellings — plugin-fees
-# MONGO_HOST, product-console MONGODB_DB_NAME/MONGO_HOST, midaz
-# MONGO_ONBOARDING_HOST — which is exactly the evidence that there is no
-# convention to fall back on.
-#
-# WHAT TO DO INSTEAD. The endpoint, port, secret name and master username are
-# all published as ordinary outputs below and are correct. Hand them to the team
-# that owns tenant-manager, and once the chart lands in this monorepo, add the
-# helm_values map here from ITS values.yaml, not from a sibling's.
+# Guessing MONGO_HOST / MONGO_URI from a sibling chart would look verified, review
+# clean, and silently produce a release that never connects — the three charts read
+# for this batch use three DIFFERENT spellings. The keys emitted below come from
+# the service's own configuration struct instead; see the Helm handoff header.
 #
 ################################################################################
 #
@@ -174,7 +157,7 @@ output "tls_enabled" {
 output "helm_values" {
   description = "tenant-manager env vars this datastore fills in. MONGODB_URI is deliberately absent: it contains the password AND must carry retryWrites=false, which DocumentDB requires and the service does not add to its own URI. Compose it in an ExternalSecret template — see mongodb_uri_template_hint."
   value = {
-    MONGODB_DATABASE = var.master_username != "" ? "tenant_manager" : "tenant_manager"
+    MONGODB_DATABASE = "tenant_manager"
     MONGODB_TLS      = var.documentdb_tls == "enabled" ? "true" : "false"
   }
 }
