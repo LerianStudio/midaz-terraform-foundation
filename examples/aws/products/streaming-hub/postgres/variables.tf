@@ -142,6 +142,12 @@ variable "family" {
   description = "PostgreSQL parameter group family, e.g. postgres16. Must agree with engine_version."
   type        = string
   default     = "postgres16"
+
+  validation {
+    condition     = can(regex("^postgres(1[5-9]|[2-9][0-9])$", var.family))
+    error_message = "family must be postgres15 or newer. AWS ships rds.force_ssl = 0 on postgres14 and older and 1 from postgres15 on, so an older family creates a server that accepts plaintext connections unless parameters sets rds.force_ssl explicitly."
+  }
+
 }
 
 variable "major_engine_version" {
@@ -288,4 +294,12 @@ variable "parameters" {
     ])
     error_message = "Each parameters[*].apply_method must be \"immediate\" or \"pending-reboot\" — the only two the AWS provider accepts. Omit it to take the provider default (\"immediate\"); use \"pending-reboot\" for a static parameter such as rds.force_ssl."
   }
+
+  validation {
+    condition = alltrue([
+      for p in var.parameters : p.value == "1" if p.name == "rds.force_ssl"
+    ])
+    error_message = "rds.force_ssl cannot be set to anything but \"1\": the server has to refuse non-TLS connections. Omit the entry to inherit the family default, which is 1 from postgres15 on."
+  }
+
 }
