@@ -145,6 +145,46 @@ variable "enable_s3_gateway_endpoint" {
   default     = true
 }
 
+variable "database_nacl_peer_cidrs" {
+  description = <<-EOT
+    Extra CIDR blocks allowed through the database subnet network ACL, on top of
+    this VPC's own private and database subnets.
+
+    For peered VPCs whose workloads read a datastore here. The datastore's
+    security group is not enough on its own: a network ACL is evaluated on every
+    packet that crosses the subnet boundary, so a peer the security group admits
+    is still dropped at this layer. The symptom is a connection timeout while
+    peering is active, routes exist on both sides and the security group already
+    names the peer CIDR -- which reads as a routing fault and is not one.
+
+    Network ACLs are stateless, so each block is opened in both directions.
+  EOT
+  type        = list(string)
+  default     = []
+
+  # The database ACL already carries six fixed rules in each direction (100-120
+  # for the private subnets, 200-220 for the database ones) and each peer adds
+  # one more per direction. AWS allows 20 entries per direction by default, so
+  # fourteen peers is the last count that applies. Past it the apply fails
+  # partway through, with some rules created and the ACL in neither the old
+  # shape nor the new one. The quota is adjustable to 40 on request; raise this
+  # bound together with it.
+  validation {
+    condition     = length(var.database_nacl_peer_cidrs) <= 14
+    error_message = "database_nacl_peer_cidrs takes at most 14 entries: the database network ACL already holds six rules per direction and AWS allows 20 by default."
+  }
+
+  # Each entry lands in cidr_block, which is IPv4 only -- an IPv6 prefix needs
+  # ipv6_cidr_block instead, and the rules here do not set it. cidrnetmask is
+  # the shortest total test: it is defined for IPv4 and errors on IPv6, on a
+  # null element and on anything that is not a prefix at all, so `can` around it
+  # refuses all three at plan time rather than midway through the apply.
+  validation {
+    condition     = alltrue([for cidr in var.database_nacl_peer_cidrs : can(cidrnetmask(cidr))])
+    error_message = "Every entry in database_nacl_peer_cidrs must be an IPv4 CIDR block, such as 10.59.0.0/16."
+  }
+}
+
 variable "cluster_name" {
   description = "EKS cluster name used in the kubernetes.io/cluster/<name> subnet tags. Leave empty (the default) to DERIVE \"{product}-{environment}-eks\", which is exactly the name the infra-base/eks stack derives for itself. Only override it when pointing these subnets at a cluster that was not created by infra-base/eks — an override that does not match the real cluster name leaves the cluster unable to discover its own subnets."
   type        = string
