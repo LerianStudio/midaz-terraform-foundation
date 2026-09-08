@@ -31,9 +31,10 @@
 # blocks pin the account and partition the ARN is built from, which under a mock
 # provider would otherwise be generated values.
 #
-# terraform test needs Terraform >= 1.7 (mock_provider). The root's own floor
-# stays required_version >= 1.5.0 — the floor is what the roots APPLY under, and
-# this file is a local proof, not a step of the foundation's CI.
+# terraform test needs Terraform >= 1.7 (mock_provider), and so does plain
+# `terraform validate`: it PARSES tests/*.tftest.hcl rather than skipping them,
+# and validate IS a CI step. So the root's floor is >= 1.7.0, not the 1.5.0 the
+# rest of the tree carries — an older CLI fails here on an unsupported block.
 ################################################################################
 
 mock_provider "aws" {}
