@@ -112,6 +112,17 @@ resource "aws_iam_role" "this" {
       condition     = length(local.scoped_actions) == 0 || length(var.secret_path_prefixes) > 0
       error_message = "read_actions/write_actions were given but secret_path_prefixes is empty, so the statement would have no resource. ListSecrets is the only unscopeable action and it has its own variable (allow_list_secrets)."
     }
+
+    # Same trap on the Deny side, and it must fail HERE rather than be gated away.
+    # A statement with no actions renders with no Action key at all, and AWS rejects
+    # the document mid-apply with a MalformedPolicyDocument naming neither variable.
+    # Skipping the statement instead would be worse: a caller that asked for the
+    # custody Deny would get NO Deny and a clean plan. deny_actions has a non-empty
+    # default, so an empty list is always explicit.
+    precondition {
+      condition     = length(var.deny_secret_path_patterns) == 0 || length(var.deny_actions) > 0
+      error_message = "deny_secret_path_patterns was given but deny_actions is empty, so the Deny statement would carry no action and AWS would reject the policy at apply time. Leave deny_secret_path_patterns empty to emit no Deny at all."
+    }
   }
 }
 
