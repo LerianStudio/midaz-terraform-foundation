@@ -1,5 +1,34 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.8.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.8.0)
+
+- **Features**
+  - Added consignado product roots, including Secrets Manager IRSA and the public edge.
+  - Introduced the vpc-peering-requester root for the control plane.
+  - Added the vpc-peering-accepter root for the app stacks.
+  - Implemented the route53-delegation root for the child zones.
+  - Added the oidc-cross-account-role root for the control plane.
+
+- **Fixes**
+  - Ensured the ESO role has access to the installation/ prefix where the KEK resides.
+  - Corrected the custody Deny to be anchored at both ends and to this account with its eight verbs.
+  - Made the borrowed S3 policies an explicit input to ensure clarity and correctness.
+  - Refused narrowed custody Deny and unverified peering requests to improve security.
+  - Rejected invalid apply_method at plan time to prevent runtime errors.
+
+- **Improvements**
+  - Renamed the underwriter product root to lender for better clarity.
+  - Published iam_policy_names from the tenant-manager S3 root to enhance visibility.
+  - Collapsed a tautological conditional in an output for code simplification.
+  - Corrected documentation to accurately describe mechanisms and outputs.
+  - Made TLS an invariant of every postgres root to ensure consistent security.
+
+Contributors: @fred, @lerian-studio-midaz-push-bot[bot], @radagast-lerian[bot]
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.7.0...v1.8.0)
+
+---
+
 ## [1.7.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.7.0)
 
 - **Features:**
