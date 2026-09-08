@@ -18,6 +18,12 @@ variable "product" {
 variable "environment" {
   description = "Deployment environment. One of dev, stg or prd. Tags only: the zone name carries the environment distinction itself, because the two accounts of this estate hold DIFFERENT domains rather than the same domain twice."
   type        = string
+
+  validation {
+    condition     = contains(["dev", "stg", "prd"], var.environment)
+    error_message = "environment must be dev, stg or prd. It feeds resource names, tags and the backend state key, so a value like \"prod\" applies cleanly and produces resources no other stack resolves."
+  }
+
 }
 
 variable "extra_tags" {

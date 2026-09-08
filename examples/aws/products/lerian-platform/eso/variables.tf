@@ -18,6 +18,12 @@ variable "product" {
 variable "environment" {
   description = "Deployment environment. One of dev, stg or prd."
   type        = string
+
+  validation {
+    condition     = contains(["dev", "stg", "prd"], var.environment)
+    error_message = "environment must be dev, stg or prd. It feeds resource names, tags and the backend state key, so a value like \"prod\" applies cleanly and produces resources no other stack resolves."
+  }
+
 }
 
 variable "component" {
@@ -110,16 +116,18 @@ variable "deny_secret_path_patterns" {
 
   type    = list(string)
   default = []
+
+  validation {
+    condition     = contains(var.deny_secret_path_patterns, "tenants/*/*/*/external/")
+    error_message = "tenants/*/*/*/external/ must be in deny_secret_path_patterns. This role's Allow reaches the Dataprev custody credential, which only the gateway may touch, and the module emits no Deny at all for an empty list — so omitting it plans cleanly and silently drops the carve-out. That is not hypothetical: streaming-hub/secrets shipped without it and its production role held GetSecretValue over every custody secret in the account. The gateway root is the one place this rule does not apply."
+  }
+
 }
 
 variable "deny_actions" {
   description = "Actions denied on deny_secret_path_patterns. For ESO the denial that matters is the READ — it has no write actions to deny. GetSecretValue alone would leave DescribeSecret and BatchGetSecretValue open, and BatchGetSecretValue returns values."
   type        = list(string)
-  default = [
-    "secretsmanager:GetSecretValue",
-    "secretsmanager:BatchGetSecretValue",
-    "secretsmanager:DescribeSecret",
-  ]
+  default     = ["secretsmanager:*"]
 }
 
 variable "allow_list_secrets" {

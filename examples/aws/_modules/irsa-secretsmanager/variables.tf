@@ -169,17 +169,9 @@ variable "deny_secret_path_patterns" {
 }
 
 variable "deny_actions" {
-  description = "Actions denied on deny_secret_path_patterns. Defaults to every mutating action: a Deny that only covered reads would leave the path writable, which is the property that matters for a custody trail. Narrow it to the read actions instead for a role that must not READ the path (External Secrets), or list both."
+  description = "Actions denied on deny_secret_path_patterns. Defaults to secretsmanager:*, the whole service. A nominal list of verbs is what this default used to be, and it omitted RotateSecret, PutResourcePolicy, ReplicateSecretToRegions and five others — so a caller taking the default could still rotate a denied secret or delegate access to it, and the list would go stale the next time AWS adds an action. Narrow it to the read actions only for a role that must not READ the path but legitimately writes it: a Deny that only covered reads would leave the path writable, which is the property that matters for a custody trail. Narrow it to the read actions instead for a role that must not READ the path (External Secrets), or list both."
   type        = list(string)
-  default = [
-    "secretsmanager:CreateSecret",
-    "secretsmanager:PutSecretValue",
-    "secretsmanager:UpdateSecret",
-    "secretsmanager:RestoreSecret",
-    "secretsmanager:DeleteSecret",
-    "secretsmanager:TagResource",
-    "secretsmanager:UntagResource",
-  ]
+  default     = ["secretsmanager:*"]
 
   validation {
     condition = alltrue([

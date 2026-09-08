@@ -87,11 +87,11 @@ read_actions = [
 
 deny_secret_path_patterns = ["tenants/*/*/*/external/"]
 
-deny_actions = [
-  "secretsmanager:GetSecretValue",
-  "secretsmanager:BatchGetSecretValue",
-  "secretsmanager:DescribeSecret",
-]
+# The whole service, not the three read verbs this used to list. External Secrets
+# passes write_actions = [], so denying the mutating half costs it nothing, and a
+# nominal list leaves RotateSecret, PutResourcePolicy and six others unblocked on a
+# credential whose immutability is the point.
+deny_actions = ["secretsmanager:*"]
 
 allow_list_secrets = true
 
