@@ -3,10 +3,12 @@
 # the streaming-hub backing store of the streaming-hub product
 #
 # ONE ROOT STACK PER SERVICE. This directory owns exactly one datastore and one
-# state file (aws/products/streaming-hub/postgres/terraform.tfstate). Its sibling —
-# valkey — is an independent root with independent state, so a change to
-# one can never queue behind an apply of the other and a corrupt state takes
-# down one datastore instead of two.
+# state file (aws/products/streaming-hub/postgres/terraform.tfstate). It is also the
+# ONLY datastore root the hub has — its siblings here are msk and secrets, which are
+# independent roots with independent state, so a change to one can never queue behind
+# an apply of another and a corrupt state takes down one stack instead of three. The
+# hub runs no Valkey: it uses pg_try_advisory_xact_lock and a Postgres idempotency
+# store instead, so a BYOC deployment need not run Redis (see envs/prd.tfvars-example).
 #
 #   mode = "dedicated"  -> creates streaming-hub-{env}-postgres, its security group, its
 #                          Secrets Manager entry. This is the default.

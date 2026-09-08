@@ -82,12 +82,12 @@ output "identifier" {
 ################################################################################
 
 output "database_name" {
-  description = "Name of the initial database RDS created. MUST be \"streaminghub\": templates/auth-backend/configmap.yaml:10 hard-codes dbName: streaminghub as a literal streaming-hub Beego setting, not templated from any values key."
+  description = "Name of the initial database RDS created. Set to \"streaminghub\" in envs/prd.tfvars-example. streaming-hub ships no chart, so no manifest pins this name: it reaches the service only as {{ .dbname }} inside STREAMING_HUB_POSTGRES_DSN, which External Secrets templates from the JSON RDS secret. Change it here and the DSN follows it; nothing else has to agree."
   value       = module.postgres.database_name
 }
 
 output "username" {
-  description = "Master username of the instance. Feeds DB_USER. The chart's own default is \"auth\" (values.yaml:284), the role the bundled Bitnami subchart creates and which does not exist on a fresh RDS instance."
+  description = "Master username of the instance — the only role a freshly provisioned RDS instance has. There is no DB_USER on this service: the value reaches it only as {{ .username }} inside STREAMING_HUB_POSTGRES_DSN, templated from the JSON RDS secret. The service configuration loader (internal/bootstrap/config_load.go:21-24) is the authority for that key name, as the Helm handoff note below states."
   value       = module.postgres.username
 }
 
