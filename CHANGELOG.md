@@ -1,5 +1,20 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.7.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.7.0)
+
+- **Features:**
+  - Allow peered CIDRs through the database network ACL.
+
+- **Fixes:**
+  - Refuse a non-IPv4 peer CIDR at plan time.
+  - Bound the peer CIDR list to the network ACL quota.
+
+Contributors: @fred, @lerian-studio-midaz-push-bot[bot],
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.6.0...v1.7.0)
+
+---
+
 ## [1.6.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.6.0)
 
 - **Features:**
