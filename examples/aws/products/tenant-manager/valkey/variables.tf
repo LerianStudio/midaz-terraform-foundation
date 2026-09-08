@@ -195,7 +195,7 @@ variable "transit_encryption_enabled" {
 }
 
 variable "transit_encryption_mode" {
-  description = "Transit encryption mode: \"preferred\" accepts both TLS and plaintext clients, \"required\" accepts TLS only. The chart does expose a REDIS_TLS key on both the auth and the identity ConfigMap, so this value has somewhere to land; it is kept \"preferred\" because REDIS_CA_CERT also exists and nothing in this repository distributes the ElastiCache CA bundle into the pods."
+  description = "Transit encryption mode: \"preferred\" accepts both TLS and plaintext clients, \"required\" accepts TLS only. The default is the permissive one this repository ships for every other product, but THIS ESTATE SETS \"required\" — see the tfvars. tenant-manager reads REDIS_TLS and REDIS_CA_CERT, and the CA arrives as BASE64-ENCODED PEM delivered by External Secrets as a value (wire_infra_redis.go:237-239), so nothing has to distribute a CA bundle into the pods. \"preferred\" is optional TLS, not weaker TLS, and this store caches admin credential lookups for the whole estate."
   type        = string
   default     = "preferred"
 
@@ -206,7 +206,7 @@ variable "transit_encryption_mode" {
 }
 
 variable "auth_token_enabled" {
-  description = "Make ElastiCache ENFORCE the auth token. The token is generated and stored in Secrets Manager either way; this only decides whether the server requires it. Kept false, and here there is a concrete blocker beyond the usual one: the chart sends a Redis USERNAME (REDIS_USER, default \"auth\" on the auth component and \"identity\" on the identity component). ElastiCache auth tokens are the legacy password-only AUTH, with no username; a client that sends AUTH <user> <token> against a token-protected group is rejected. Enforcing the token therefore requires ElastiCache RBAC users, which this module does not create."
+  description = "Make ElastiCache ENFORCE the auth token. The token is generated and stored in Secrets Manager either way; this only decides whether the server requires it. The default is false, matching every other product root, but THIS ESTATE SETS TRUE — see the tfvars. tenant-manager reads REDIS_PASSWORD and sends NO Redis username: helm_values omits REDIS_USERNAME deliberately, and the service branches on it being non-empty (wire_infra_redis.go:41). That is exactly what the legacy password-only AUTH of ElastiCache expects, so the blocker that keeps other roots at false — a chart that sends AUTH <user> <token>, which a token-protected group rejects — does not apply here."
   type        = bool
   default     = false
 }

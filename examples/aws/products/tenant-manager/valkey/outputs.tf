@@ -141,12 +141,14 @@ output "subnet_group_name" {
 # the path produces a TLS handshake failure that reads like a certificate problem.
 # It is a value from External Secrets, not a volume.
 #
-# THE TLS POSTURE OF THIS TIER IS WEAKER THAN THE SERVICE SUPPORTS. The module
-# defaults to transit_encryption_mode = "preferred", which ACCEPTS A PLAINTEXT
-# CLIENT, and auth_token_enabled = false. tenant-manager reads REDIS_TLS,
-# REDIS_PASSWORD and REDIS_CA_CERT, so it can speak to a "required" tier with an
-# auth token — this is one of the few places where the known-gap posture is a
-# tfvars decision rather than a chart limitation. See the tfvars.
+# THIS TIER IS TIGHTER THAN THE REST OF THE REPOSITORY, AND THE TFVARS IS WHERE
+# THAT HAPPENS. The variable defaults are the permissive ones every other product
+# ships — transit_encryption_mode = "preferred", which ACCEPTS A PLAINTEXT CLIENT,
+# and auth_token_enabled = false — and this estate's tfvars sets "required" and
+# true over them. tenant-manager reads REDIS_TLS, REDIS_PASSWORD and REDIS_CA_CERT,
+# so it can speak to a required tier with an enforced token: one of the few places
+# where the loose posture was a tfvars decision rather than a chart limitation, and
+# therefore one of the few places it was reversed. See the tfvars.
 ################################################################################
 
 output "helm_values" {
