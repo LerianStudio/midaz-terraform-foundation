@@ -288,7 +288,7 @@ variable "parameters" {
 
   validation {
     condition = alltrue([
-      for p in var.parameters : contains(["immediate", "pending-reboot"], coalesce(p.apply_method, "immediate"))
+      for p in var.parameters : contains(["immediate", "pending-reboot"], p.apply_method == null ? "immediate" : p.apply_method)
     ])
     error_message = "Each parameters[*].apply_method must be \"immediate\" or \"pending-reboot\" — the only two the AWS provider accepts. Omit it to take the provider default (\"immediate\"); use \"pending-reboot\" for a static parameter such as rds.force_ssl."
   }
