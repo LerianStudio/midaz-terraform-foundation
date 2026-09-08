@@ -7,7 +7,7 @@
 # the resulting secrets in the vault. MongoDB holds only the REFERENCE; the secret
 # itself never leaves Secrets Manager.
 #
-# WHAT IT DOES TO THE VAULT — five actions, not two, and all of them measured:
+# WHAT IT DOES TO THE VAULT — seven actions, not two, and all of them measured:
 #
 #   GetSecretValue    reads back admin credentials it wrote earlier
 #   CreateSecret      first write of a tenant credential
