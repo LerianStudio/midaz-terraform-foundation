@@ -24,9 +24,11 @@
 # state would put staging and production routing in a single blast radius, which
 # is exactly the coupling the two stacks exist to avoid.
 #
-# Do NOT add placeholder values (<PUT-YOUR-BUCKET-NAME-HERE> and friends). The
-# placeholder check in lerian-infra greps for "<...>" in backend files and
-# aborts the run when it finds one.
+# Do NOT commit placeholder values here, of the PUT-YOUR-BUCKET-NAME-HERE kind.
+# Nothing in this tree would catch them: the lerian-infra placeholder check reads
+# the env tfvars, and the only check that greps backend.tf is deploy-legacy.sh,
+# which covers the legacy providers and says so in its own comment. A placeholder
+# committed here reaches an init unnoticed.
 ################################################################################
 
 terraform {

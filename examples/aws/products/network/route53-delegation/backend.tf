@@ -22,9 +22,11 @@
 # internet while the other state still reported them present. The precondition in
 # main.tf refuses any environment but the one the parent zone lives in.
 #
-# Do NOT add placeholder values (<PUT-YOUR-BUCKET-NAME-HERE> and friends). The
-# placeholder check in lerian-infra greps for "<...>" in backend files and
-# aborts the run when it finds one.
+# Do NOT commit placeholder values here, of the PUT-YOUR-BUCKET-NAME-HERE kind.
+# Nothing in this tree would catch them: the lerian-infra placeholder check reads
+# the env tfvars, and the only check that greps backend.tf is deploy-legacy.sh,
+# which covers the legacy providers and says so in its own comment. A placeholder
+# committed here reaches an init unnoticed.
 ################################################################################
 
 terraform {
