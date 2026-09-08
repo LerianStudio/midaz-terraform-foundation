@@ -82,6 +82,11 @@ output "iam_policy_arns" {
   value       = module.storage.iam_policy_arns
 }
 
+output "iam_policy_names" {
+  description = "Map of logical bucket name to the NAME of its access policy. These are the values products/tenant-manager/secrets takes in additional_policy_names — that root attaches by name, not by ARN, so publishing only the ARNs forces the operator to derive these by hand."
+  value       = module.storage.iam_policy_names
+}
+
 output "oidc_provider_arn" {
   description = "OIDC provider ARN the IRSA trust policy was written against, as derived from the cluster or as overridden. Empty when irsa_enabled is false. Should equal the oidc_provider_arn output of infra-base/eks — comparing the two is the cheapest way to confirm the derivation found the right cluster."
   value       = local.oidc_provider_arn
