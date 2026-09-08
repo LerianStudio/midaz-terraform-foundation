@@ -1,0 +1,78 @@
+################################################################################
+# products/tenant-manager/valkey — prd
+#
+# Cache and idempotency store for the control plane.
+#
+# transit_encryption_mode = "required" AND auth_token_enabled = true, WHICH IS A
+# DEPARTURE FROM EVERY OTHER VALKEY TFVARS IN THIS REPOSITORY.
+#
+# The foundation ships "preferred" with no auth token in all three environments,
+# labelled a KNOWN GAP, and the reason is real: most Lerian charts have nowhere to
+# put a Redis password or a CA bundle, so tightening the tier would lock the
+# service out.
+#
+# tenant-manager is the exception, and the exception is measured, not assumed:
+#
+#   REDIS_TLS        internal/bootstrap/config.go:93
+#   REDIS_PASSWORD   config.go:91
+#   REDIS_CA_CERT    config.go:94 — and it is BASE64-ENCODED PEM, not a file path
+#                    (wire_infra_redis.go:237-239), so External Secrets can deliver
+#                    it as a value with nothing mounted
+#
+# "preferred" ACCEPTS A PLAINTEXT CLIENT. It is not a weaker TLS, it is optional
+# TLS, and on a store that caches admin credential lookups for the whole estate
+# that is not the posture to inherit by default.
+#
+# LEAVE REDIS_USERNAME UNSET IN THE CHART. ElastiCache auth tokens are the legacy
+# password-only AUTH, which has no username. tenant-manager branches on
+# REDIS_USERNAME being non-empty (wire_infra_redis.go:41) onto a direct go-redis
+# ACL client that sends AUTH <user> <token>, and the server rejects it. Setting the
+# variable "for completeness" breaks the connection.
+#
+# THESE SIZES ARE A STARTING POINT, NOT A RECOMMENDATION.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "tenant-manager"
+environment = "prd"
+
+mode = "dedicated"
+
+allow_private_subnet_cidr_ingress      = true
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+engine_version         = "7.2"
+parameter_group_family = "valkey7"
+port                   = 6379
+
+################################################################################
+# Sizing
+################################################################################
+
+node_type                  = "cache.m7g.large"
+num_cache_clusters         = 3
+automatic_failover_enabled = true
+multi_az_enabled           = true
+snapshot_retention_limit   = 7
+
+################################################################################
+# Security — the departure. See the header.
+################################################################################
+
+transit_encryption_enabled = true
+transit_encryption_mode    = "required"
+auth_token_enabled         = true
+
+maintenance_window = "mon:00:00-mon:03:00"
+apply_immediately  = false
+
+extra_tags = {
+  Owner      = "consignado"
+  CostCenter = "consignado-prd"
+}

@@ -1,0 +1,82 @@
+################################################################################
+# products/tenant-manager/s3 — prd
+#
+# Two buckets, a few dollars a month.
+#
+# NEITHER IS ON A MONEY PATH, AND NEITHER IS WORM. They hold operational artefacts
+# the control plane reads: the per-tenant migration SQL, and the Casdoor
+# application templates used during onboarding. Both are versioned so a bad
+# migration file can be traced, but only migrations expires — casdoor-templates
+# is kept indefinitely.
+#
+# THE FAILURE MODE WORTH KNOWING. MIGRATIONS_S3_BUCKET left EMPTY does not fail the
+# boot — it DISABLES the migration handler silently
+# (internal/bootstrap/wire_handlers_infra.go:135). A control plane that onboards
+# tenants and never migrates them looks healthy in every probe.
+#
+# A THIRD BUCKET VARIABLE EXISTS AND IS NOT CREATED HERE ON PURPOSE.
+# CFN_TEMPLATE_S3_BUCKET buys exactly one readiness HeadBucket. The actual
+# CloudFormation templates are fetched over plain HTTPS from a hardcoded PUBLIC url
+# in sa-east-1 (internal/pkg/cftemplate/url.go:23), bypassing the S3 SDK and IAM
+# entirely. Creating a bucket for it would give a green probe and change nothing.
+#
+# WHETHER THIS ROOT IS NEEDED ON DAY ONE IS A PRODUCT QUESTION, not an
+# infrastructure one: it depends on whether the estate runs per-tenant migrations
+# through tenant-manager, or lets each service run its own migration Job. Applying
+# it costs almost nothing and skipping it is safe — the handler simply stays off.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "tenant-manager"
+environment = "prd"
+
+################################################################################
+# IRSA
+#
+# irsa_enabled = false: THIS ROOT CREATES NO ROLE, only the attachable policies.
+#
+# Same decision as the gateway: a ServiceAccount carries exactly ONE role-arn
+# annotation, so the bucket grant is attached to the vault role rather than living
+# on a second role nobody can annotate. products/tenant-manager/secrets takes the
+# policy NAMES in additional_policy_names.
+#
+# Apply this root BEFORE the secrets root — an attachment to a policy that does not
+# exist yet fails with NoSuchEntity.
+################################################################################
+
+irsa_enabled    = false
+service_account = "platform:tenant-manager"
+
+################################################################################
+# Buckets
+#
+# migrations         SQL pulled per tenant. Seven-year expiry so an audit can
+#                    reconstruct which DDL a tenant actually received.
+# casdoor-templates  application templates read during onboarding. Small, rarely
+#                    changed, kept indefinitely — a template that expired while a
+#                    tenant was mid-onboarding would fail in a confusing place.
+################################################################################
+
+buckets = {
+  "migrations" = {
+    versioning_enabled         = true
+    force_destroy              = false
+    transition_ia_days         = 90
+    expiration_days            = 2555
+    noncurrent_expiration_days = 365
+  }
+  "casdoor-templates" = {
+    versioning_enabled = true
+    force_destroy      = false
+    lifecycle_enabled  = false
+  }
+}
+
+require_latest_tls_policy = true
+
+extra_tags = {
+  Owner      = "consignado"
+  CostCenter = "consignado-prd"
+}

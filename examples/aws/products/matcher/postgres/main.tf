@@ -92,6 +92,7 @@ module "postgres" {
   engine_version       = var.engine_version
   family               = var.family
   major_engine_version = var.major_engine_version
+  parameters           = var.parameters
   database_name        = var.database_name
   username             = var.username
 

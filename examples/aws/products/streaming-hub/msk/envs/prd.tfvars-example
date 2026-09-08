@@ -1,0 +1,65 @@
+################################################################################
+# products/streaming-hub/msk — prd
+#
+# COSTS NOTHING IN THIS CONFIGURATION. mode = "shared" plans zero resources: it
+# resolves shared-{env}-msk, which products/shared-resources/msk owns and pays for.
+#
+# SHARED IS CORRECTNESS HERE, NOT THRIFT. The hub consumes what br-consignado-gw
+# produces. Two clusters means the hub subscribes successfully, reports healthy and
+# consumes nothing — an empty regex match is not a failure condition anywhere in
+# Kafka, so nothing on either side raises an error. Do not flip this to "dedicated"
+# to "isolate" the hub.
+#
+# Every sizing variable below is therefore inert. They are left in place because
+# flipping to dedicated for an isolated test should not require reconstructing the
+# file, and because they document what the shared tier is expected to look like.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "streaming-hub"
+environment = "prd"
+
+mode = "shared"
+
+################################################################################
+# Everything below is IGNORED while mode = "shared"
+################################################################################
+
+allow_private_subnet_cidr_ingress      = false
+eks_node_security_group_lookup_enabled = true
+allow_vpc_cidr_ingress                 = false
+
+allowed_security_group_ids = []
+allowed_cidr_blocks        = []
+
+kafka_version          = "3.6.0"
+number_of_broker_nodes = 3
+broker_instance_type   = "kafka.m7g.large"
+broker_ebs_volume_size = 500
+storage_mode           = "TIERED"
+
+enable_storage_autoscaling       = true
+storage_autoscaling_max_capacity = 2000
+
+encryption_in_transit_client_broker = "TLS"
+
+# Both consignado services refuse to boot in a managed deployment without SCRAM+TLS.
+enable_sasl_scram      = true
+scram_username         = "lerian"
+enable_unauthenticated = false
+
+# The consignado topics are created by an rpk Job in the helmfile phase. Auto-create
+# stays off so a typo fails loudly instead of producing a live topic nobody reads.
+auto_create_topics_enable  = false
+default_replication_factor = 3
+
+enhanced_monitoring                    = "PER_BROKER"
+cloudwatch_logs_enabled                = true
+cloudwatch_log_group_retention_in_days = 90
+
+extra_tags = {
+  Owner      = "consignado"
+  CostCenter = "consignado-prd"
+}

@@ -12,9 +12,11 @@
 # examples/aws/products/notifications/rabbitmq, so ../../../ lands on examples/aws,
 # where both backend/ and _modules/ live.
 #
-# Do NOT add placeholder values (<PUT-YOUR-BUCKET-NAME-HERE> and friends). The
-# placeholder check in lerian-infra greps for "<...>" in backend files and
-# aborts the run when it finds one.
+# Do NOT commit placeholder values here, of the PUT-YOUR-BUCKET-NAME-HERE kind.
+# Nothing in this tree would catch them: the lerian-infra placeholder check reads
+# the env tfvars, and the only check that greps backend.tf is deploy-legacy.sh,
+# which covers the legacy providers and says so in its own comment. A placeholder
+# committed here reaches an init unnoticed.
 ################################################################################
 
 terraform {

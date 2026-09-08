@@ -45,20 +45,84 @@ data "aws_iam_policy_document" "bucket_access" {
     resources = [module.buckets[each.key].s3_bucket_arn]
   }
 
+  dynamic "statement" {
+    for_each = each.value.object_lock_enabled ? [1] : []
+
+    content {
+      sid    = "ObjectLockBucketLevel"
+      effect = "Allow"
+
+      actions = [
+        # A writer that cannot read the lock configuration cannot tell whether the
+        # object it just wrote is actually retained, which on a custody bucket is the
+        # only fact that matters. br-consignado-gw refuses to boot without this call:
+        # it asserts the bucket carries a COMPLIANCE default of at least 1827 days.
+        "s3:GetBucketObjectLockConfiguration",
+        # ListObjectVersions. NOT covered by s3:ListBucket — a versioned custody
+        # bucket is enumerated by version, and the retained-storage client does
+        # exactly that when recovering a partially written artefact.
+        "s3:ListBucketVersions",
+      ]
+
+      resources = [module.buckets[each.key].s3_bucket_arn]
+    }
+  }
+
+  # s3:DeleteObject is withheld on a WORM bucket. COMPLIANCE protects the object
+  # VERSIONS — nobody can remove them — but DeleteObject on a versioned bucket
+  # still writes a DELETE MARKER, and a delete marker hides the artefact from an
+  # unversioned GET and from a plain ListObjectsV2. The bytes survive; the evidence
+  # stops being findable by anyone who does not know to look at versions. No Lerian
+  # retained-storage caller invokes DeleteObject, so nothing legitimate loses a
+  # capability here.
   statement {
     sid    = "ObjectLevelAccess"
     effect = "Allow"
 
-    actions = [
-      "s3:GetObject",
-      "s3:GetObjectVersion",
-      "s3:PutObject",
-      "s3:DeleteObject",
-      "s3:AbortMultipartUpload",
-      "s3:ListMultipartUploadParts",
-    ]
+    actions = concat(
+      [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject",
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts",
+      ],
+      each.value.object_lock_enabled ? [] : ["s3:DeleteObject"],
+    )
 
     resources = ["${module.buckets[each.key].s3_bucket_arn}/*"]
+  }
+
+  # s3:PutObjectRetention IS REQUIRED even though no caller invokes an API by that
+  # name. AWS evaluates it on any PutObject that carries ObjectLockRetainUntilDate,
+  # which is exactly how br-consignado-gw writes an averbação artefact
+  # (ObjectLockMode: COMPLIANCE + ObjectLockRetainUntilDate, inline on the write).
+  # Omit it and every custody write fails with AccessDenied naming an action the
+  # code never calls — an hour of confusion at the worst possible moment.
+  #
+  # s3:BypassGovernanceRetention is DELIBERATELY ABSENT and must stay absent. It is
+  # the one permission that lets a principal delete a GOVERNANCE-retained object
+  # early: granting it to the application that writes the custody artefacts turns
+  # WORM back into ordinary storage while still looking like WORM in the console.
+  # (It has no effect on COMPLIANCE, which nobody can bypass — but a bucket that
+  # starts GOVERNANCE and a policy that carries the bypass is a real hole.)
+  #
+  # Legal hold is not granted: no Lerian service places one today, and it is the
+  # one Object Lock control that can be toggled off again by whoever holds it.
+  dynamic "statement" {
+    for_each = each.value.object_lock_enabled ? [1] : []
+
+    content {
+      sid    = "ObjectRetention"
+      effect = "Allow"
+
+      actions = [
+        "s3:GetObjectRetention",
+        "s3:PutObjectRetention",
+      ]
+
+      resources = ["${module.buckets[each.key].s3_bucket_arn}/*"]
+    }
   }
 
   # Without this the application can write to an SSE-KMS bucket but never read

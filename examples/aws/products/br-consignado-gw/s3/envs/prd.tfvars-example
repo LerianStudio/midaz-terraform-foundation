@@ -1,0 +1,86 @@
+################################################################################
+# products/br-consignado-gw/s3 — prd
+#
+# A few dollars a month plus storage. The cost is not the point of this file.
+#
+# READ THIS BEFORE THE FIRST APPLY. Object Lock is settable ONLY at bucket
+# creation. It cannot be turned on afterwards and cannot be turned off once on.
+# Apply this wrong and the fix is a new bucket — and the objects already written
+# under COMPLIANCE cannot be deleted by anyone, including the account root, so the
+# wrong bucket cannot even be cleaned up. It just sits there, paid for, for five
+# years.
+#
+# The gateway checks the same three facts at boot and refuses to start if they do
+# not hold, so a mistake here is a service that never comes up rather than a
+# custody trail that quietly is not one. The variable validations make the plan
+# fail earlier still.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "br-consignado-gw"
+environment = "prd"
+
+# eks_cluster_name is derived -> lerian-prd-eks
+
+################################################################################
+# The custody bucket
+#
+#   object_lock_enabled = true      cannot be added later, ever
+#   object_lock_mode    = COMPLIANCE  nobody can delete early, including root
+#   object_lock_days    = 1827      five years, the floor the gateway asserts.
+#                                   DAYS, not years: the boot check reads days.
+#   lifecycle_enabled   = false     an expiry rule cannot delete a locked object;
+#                                   it only produces silent repeated failures
+#   versioning          left true (the module default) — Object Lock requires it,
+#                                   and a retained object is a retained VERSION
+#
+# Raise object_lock_days if the retention obligation for payroll-deduction
+# evidence is longer than five years where this deployment operates. LOWERING IT
+# LATER DOES NOT RELEASE ANYTHING already written: each object carries the
+# retain-until date it was written with.
+################################################################################
+
+buckets = {
+  "averbacao-artifacts" = {
+    object_lock_enabled = true
+    object_lock_mode    = "COMPLIANCE"
+    object_lock_days    = 1827
+    lifecycle_enabled   = false
+  }
+}
+
+################################################################################
+# IRSA
+#
+# CONFIRM service_account AGAINST THE CHART. A published chart exists
+# (br-consignado-gw-helm 1.0.1, ghcr helm-internal) and was not read here, so this
+# is the intended convention, not a measured fact.
+################################################################################
+
+# irsa_enabled = false: THIS ROOT CREATES NO ROLE, only the attachable policy.
+#
+# A ServiceAccount carries exactly ONE eks.amazonaws.com/role-arn annotation, so a
+# service that needs both the vault and this bucket cannot have a role per concern
+# — one of the two grants would be unreachable, and the symptom is an AccessDenied
+# on whichever path nobody exercised first. The bucket policy is therefore attached
+# to the vault role instead: products/br-consignado-gw/secrets takes its NAME in
+# additional_policy_names.
+#
+# Side effect worth knowing: with no role to create there is no OIDC lookup, so this
+# root no longer depends on infra-base/eks existing. It does have to be applied
+# BEFORE the secrets root, which attaches a policy that must already exist.
+#
+# service_account is left set, unused, so flipping irsa_enabled back to true does
+# not require rediscovering the value.
+irsa_enabled    = false
+service_account = "consignado:br-consignado-gw"
+
+require_latest_tls_policy = true
+
+extra_tags = {
+  Owner      = "consignado"
+  CostCenter = "consignado-prd"
+  Compliance = "bacen"
+}

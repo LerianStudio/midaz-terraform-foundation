@@ -125,6 +125,22 @@ variable "family" {
   description = "PostgreSQL parameter group family, e.g. postgres16. Must agree with engine_version."
   type        = string
   default     = "postgres16"
+
+  validation {
+    condition     = can(regex("^postgres(1[5-9]|[2-9][0-9])$", var.family))
+    error_message = "family must be postgres15 or newer. AWS ships rds.force_ssl = 0 on postgres14 and older and 1 from postgres15 on, so an older family creates a server that accepts plaintext connections unless parameters sets rds.force_ssl explicitly."
+  }
+
+
+  validation {
+    condition = (
+      var.family == "postgres${var.major_engine_version}" &&
+      (var.engine_version == var.major_engine_version ||
+      startswith(var.engine_version, "${var.major_engine_version}."))
+    )
+    error_message = "family, major_engine_version and engine_version have to name the same PostgreSQL major. Both descriptions said \"must agree with engine_version\" and nothing checked it, so family = \"postgres15\" with engine_version = \"17\" planned cleanly and RDS refused the combination at apply."
+  }
+
 }
 
 variable "major_engine_version" {
@@ -236,4 +252,29 @@ variable "enabled_cloudwatch_logs_exports" {
   description = "PostgreSQL log types exported to CloudWatch Logs. An empty list also skips the log groups."
   type        = list(string)
   default     = ["postgresql", "upgrade"]
+}
+
+variable "parameters" {
+  description = "DB parameters applied to the parameter group, as a list of {name, value} (and optionally apply_method for a static parameter that needs a reboot). THIS IS WHERE TLS IS ENFORCED: rds.force_ssl = \"1\" makes the server REFUSE any non-TLS connection, and until this variable existed no root wrapper could state it at all — the module ships an empty parameter list and nothing populated it. Set it EXPLICITLY rather than inheriting: the RDS default for force_ssl varies by engine major (0 on the older postgres families, 1 from postgres15 on), so a database with no entry here has a posture that depends on which version it happened to be created at, and silently loosens on a downgrade or a restore into an older family. Encryption in transit is a client policy decision everywhere else in this repo; on a money path it is not."
+  type = list(object({
+    name         = string
+    value        = string
+    apply_method = optional(string)
+  }))
+  default = []
+
+  validation {
+    condition = alltrue([
+      for p in var.parameters : contains(["immediate", "pending-reboot"], p.apply_method == null ? "immediate" : p.apply_method)
+    ])
+    error_message = "Each parameters[*].apply_method must be \"immediate\" or \"pending-reboot\" — the only two the AWS provider accepts. Omit it to take the provider default (\"immediate\"); use \"pending-reboot\" for a static parameter such as rds.force_ssl."
+  }
+
+  validation {
+    condition = alltrue([
+      for p in var.parameters : p.value == "1" if p.name == "rds.force_ssl"
+    ])
+    error_message = "rds.force_ssl cannot be set to anything but \"1\": the server has to refuse non-TLS connections. Omit the entry to inherit the family default, which is 1 from postgres15 on."
+  }
+
 }
