@@ -252,6 +252,11 @@ module "vpc_endpoints" {
 #
 # Network ACLs are stateless, so each direction is declared explicitly, and
 # protocol "-1" covers the ephemeral return ports.
+#
+# `database_nacl_peer_cidrs` opens the same door for a PEERED VPC. Nothing else in
+# this stack knows about peers, so without it a datastore here is unreachable from
+# a peered workload even when peering, routes and the security group are all
+# correct -- and the failure is a timeout, which points at routing.
 ################################################################################
 
 resource "aws_network_acl" "database" {
@@ -284,6 +289,19 @@ resource "aws_network_acl" "database" {
     }
   }
 
+  dynamic "ingress" {
+    for_each = var.database_nacl_peer_cidrs
+
+    content {
+      rule_no    = 300 + ingress.key * 10
+      action     = "allow"
+      cidr_block = ingress.value
+      protocol   = "-1"
+      from_port  = 0
+      to_port    = 0
+    }
+  }
+
   dynamic "egress" {
     for_each = local.private_subnet_cidrs
 
@@ -302,6 +320,19 @@ resource "aws_network_acl" "database" {
 
     content {
       rule_no    = 200 + egress.key * 10
+      action     = "allow"
+      cidr_block = egress.value
+      protocol   = "-1"
+      from_port  = 0
+      to_port    = 0
+    }
+  }
+
+  dynamic "egress" {
+    for_each = var.database_nacl_peer_cidrs
+
+    content {
+      rule_no    = 300 + egress.key * 10
       action     = "allow"
       cidr_block = egress.value
       protocol   = "-1"
