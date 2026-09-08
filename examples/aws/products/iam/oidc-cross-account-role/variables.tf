@@ -10,8 +10,13 @@ variable "region" {
 }
 
 variable "environment" {
-  description = "Deployment environment this apply belongs to. One of dev, stg or prd; it feeds tags and the state key's backend config. ONE role serves BOTH application stacks, so this root is applied only as \"prd\" — the role is a property of the account, not of a stack, and a second copy in \"stg\" would be a second identity with the same trust and the same reach."
+  description = "Deployment environment this apply belongs to. Always \"prd\", which the validation below enforces; it feeds tags and the state key's backend config. ONE role serves BOTH application stacks, so this root is applied only as \"prd\" — the role is a property of the account, not of a stack, and a second copy in \"stg\" would be a second identity with the same trust and the same reach."
   type        = string
+
+  validation {
+    condition     = var.environment == "prd"
+    error_message = "environment must be prd. This root is applied ONCE, in the application account, and the same reasoning is written into main.tf and the README: staging and production share that account, so one role reaches both and the isolation between the stacks is the Secrets Manager path grammar the policy scopes to, not a second role. An apply as \"stg\" or \"dev\" is not a mislabelled copy, it is a SECOND identity carrying the same trust and the same reach — two things to keep equal, which is one more than can be kept equal. The sibling account-level root products/iam/github-oidc-s3-upload pins the same value for the same reason. A list of dev/stg/prd here would catch \"prod\" and \"production\" and still wave through the copy this root exists to prevent."
+  }
 }
 
 variable "extra_tags" {

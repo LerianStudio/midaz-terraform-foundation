@@ -89,8 +89,11 @@ variable "peer_cidr" {
   type = string
 
   validation {
-    condition     = can(cidrhost(var.peer_cidr, 0))
-    error_message = "peer_cidr must be a valid CIDR block, e.g. 10.59.0.0/16."
+    condition = (
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$", var.peer_cidr)) &&
+      can(cidrhost(var.peer_cidr, 0))
+    )
+    error_message = "peer_cidr must be a valid IPv4 CIDR block, e.g. 10.59.0.0/16. main.tf writes it to destination_cidr_block, which is aws_route's IPv4 attribute; an IPv6 block belongs in destination_ipv6_cidr_block, an argument this root does not set. cidrhost accepts fd00::/8 and would wave it through, so the regex is what refuses it — and the requester side of this same peering (products/network/vpc-peering-requester, peers[*].cidr) already refuses it, pinned by tests/validation.tftest.hcl. The two sides of one peering apply the same rule."
   }
 }
 

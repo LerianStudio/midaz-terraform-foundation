@@ -87,4 +87,18 @@ variable "peers" {
     ])
     error_message = "Every peer cidr must be a valid IPv4 CIDR block, e.g. 10.61.0.0/16. It becomes the destination_cidr_block of a route in this VPC, so a malformed or wrong value here routes real traffic into a black hole. IPv6 is refused rather than passed through: aws_route writes destination_cidr_block, which is the IPv4 attribute, and an IPv6 block belongs in destination_ipv6_cidr_block — a resource argument this root does not set. cidrhost accepts fd00::/8 and every route built from it would fail at apply, or worse, be written as a v4 destination nobody meant."
   }
+
+  validation {
+    # NORMALISED, not the raw strings: AWS masks destination_cidr_block to its
+    # network address, so 10.61.0.0/16 and 10.61.1.0/16 are the same destination
+    # over there and distinct() on what was typed would not see it. try() falls
+    # back to the raw value when the block is malformed — that case belongs to
+    # the validation above, and a cidrhost error here would replace its message
+    # with an evaluation failure.
+    condition = length(distinct([
+      for peer in var.peers :
+      try("${cidrhost(peer.cidr, 0)}/${split("/", peer.cidr)[1]}", peer.cidr)
+    ])) == length(var.peers)
+    error_message = "Every peer cidr must be a DISTINCT block. Two peers sharing one produce two aws_route instances with the same route_table_id and the same destination_cidr_block: the for_each keys differ, so the plan succeeds and says nothing. AWS then refuses the second route with RouteAlreadyExists mid-apply, after both peering connections have already been created — and a half-applied peering pair is the state this root's other guards exist to avoid. The overlap guard in main.tf does not cover this: it compares each peer against the LOCAL VPC, never the peers against each other."
+  }
 }
