@@ -140,9 +140,20 @@ resource "aws_route53_record" "validation" {
   records = [each.value.record]
   ttl     = 60
 
-  # The apex and the wildcard produce the SAME validation record, so the map above
-  # collapses to one entry. allow_overwrite keeps a re-apply after a certificate
-  # replacement from failing on a record that already exists.
+  # The apex and the wildcard produce the SAME validation record, and the map above
+  # does NOT collapse to one entry: its key is option.domain_name, which differs
+  # ("consignado.lerian.dev" and "*.consignado.lerian.dev") while resource_record_name,
+  # _type and _value are identical. So two Terraform instances own one Route 53
+  # record. allow_overwrite is what keeps that applying — both write the same UPSERT,
+  # and it also keeps a re-apply after a certificate replacement from failing on a
+  # record that already exists.
+  #
+  # Keying by resource_record_name/_type instead would collapse the pair to the one
+  # instance that should exist, and it is the right shape. It is NOT a free edit here:
+  # the estate has already applied this root, so changing the for_each key renames both
+  # instances and the plan reads destroy-both-then-create-one on the live ACM validation
+  # CNAME — which is also what ACM re-reads at renewal. It needs `moved` blocks (or a
+  # state mv) and a plan reviewed per environment, not a drive-by rekey.
   allow_overwrite = true
 }
 
