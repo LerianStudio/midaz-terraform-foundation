@@ -75,8 +75,6 @@ create_cert_manager_role             = true
 # hostname verification. The zone here is whichever public zone the client owns
 # and wants ExternalDNS / cert-manager to write into.
 #
-# Narrow the wildcard to that zone's ID before prd, e.g.
-# ["arn:aws:route53:::hostedzone/Z0123456789ABCDEFGHIJ"].
 # NARROW THESE. They used to ship as ["arn:aws:route53:::hostedzone/*"] — a
 # wildcard over every hosted zone in the account, in the ONE environment where both
 # controllers are enabled. Everywhere else in this repository a value that must be

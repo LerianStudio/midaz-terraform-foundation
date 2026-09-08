@@ -108,16 +108,16 @@ data "aws_iam_openid_connect_provider" "cluster" {
 }
 
 ################################################################################
-# Object storage — tenant-manager-{environment}-migrations-{account_id}
+# Object storage — tenant-manager-{environment}-{logical}-{account_id}
 #
 # The account id suffix is the documented naming exception: S3 bucket names are
 # globally unique across every AWS account, so tenant-manager-{env}-migrations alone
 # would collide with any other AWS customer that picked the same words. The
 # prefix still comes from the naming module, inside the s3-bucket module.
 #
-# migrations holds the generated regulatory reports. It is the only
-# bucket this product needs; the lifecycle tiering that makes it cheap lives in
-# the tfvars, not here.
+# migrations holds the per-tenant migration SQL; casdoor-templates holds the
+# Casdoor application templates read during onboarding. var.buckets requires both
+# keys; the lifecycle tiering that makes them cheap lives in the tfvars, not here.
 ################################################################################
 
 module "storage" {

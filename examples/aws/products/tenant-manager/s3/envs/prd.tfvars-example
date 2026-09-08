@@ -6,8 +6,8 @@
 # NEITHER IS ON A MONEY PATH, AND NEITHER IS WORM. They hold operational artefacts
 # the control plane reads: the per-tenant migration SQL, and the Casdoor
 # application templates used during onboarding. Both are versioned so a bad
-# migration file can be traced, and both expire, unlike the gateway's custody
-# bucket next door.
+# migration file can be traced, but only migrations expires — casdoor-templates
+# is kept indefinitely.
 #
 # THE FAILURE MODE WORTH KNOWING. MIGRATIONS_S3_BUCKET left EMPTY does not fail the
 # boot — it DISABLES the migration handler silently

@@ -24,7 +24,7 @@ of private DNS, and why `endpoint` is always the raw AWS host.
 vendored dependency tarballs and an empty `tmpcharts-*` leftover:
 
 ```
-lender/
+underwriter/
 ├── charts/
 │   ├── postgresql-16.3.5.tgz     Bitnami postgresql, appVersion 17.2.0
 │   └── valkey-2.4.7.tgz          Bitnami valkey,     appVersion 8.0.2

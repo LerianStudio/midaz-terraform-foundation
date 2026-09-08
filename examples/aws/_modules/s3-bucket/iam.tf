@@ -45,9 +45,6 @@ data "aws_iam_policy_document" "bucket_access" {
     resources = [module.buckets[each.key].s3_bucket_arn]
   }
 
-  # A writer that cannot read the lock configuration cannot tell whether the object
-  # it just wrote is actually retained, which on a custody bucket is the only fact
-  # that matters.
   dynamic "statement" {
     for_each = each.value.object_lock_enabled ? [1] : []
 
