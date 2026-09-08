@@ -198,13 +198,13 @@ variable "storage_autoscaling_target_percent" {
 ################################################################################
 
 variable "encryption_in_transit_client_broker" {
-  description = "Client-to-broker encryption. TLS is mandatory when SASL/SCRAM is enabled."
+  description = "Client-to-broker encryption. NARROWED TO TLS IN THIS ROOT, where the module also accepts TLS_PLAINTEXT and PLAINTEXT. helm_values hands the gateway STREAMING_KAFKA_TLS_ENABLED = true and STREAMING_KAFKA_ALLOW_PLAINTEXT = false unconditionally, and a managed deployment REFUSES TO BOOT without TLS plus SCRAM, so any other value produces a broker list the gateway cannot use while the handoff claims otherwise. On the cluster carrying the Dataprev fact stream a plaintext listener is also a second door into the money path."
   type        = string
   default     = "TLS"
 
   validation {
-    condition     = contains(["TLS", "TLS_PLAINTEXT", "PLAINTEXT"], var.encryption_in_transit_client_broker)
-    error_message = "The encryption_in_transit_client_broker must be one of: TLS, TLS_PLAINTEXT, PLAINTEXT."
+    condition     = var.encryption_in_transit_client_broker == "TLS"
+    error_message = "The encryption_in_transit_client_broker must be TLS on the gateway cluster. TLS_PLAINTEXT and PLAINTEXT open a plaintext listener the gateway cannot use and helm_values already denies."
   }
 }
 
@@ -212,6 +212,11 @@ variable "enable_sasl_scram" {
   description = "Enable SASL/SCRAM authentication. KEEP IT TRUE: both consignado services REFUSE TO BOOT in a managed deployment without SCRAM plus TLS. In dedicated mode the credentials land in Secrets Manager under the AWS-mandated AmazonMSK_ prefix with a customer managed CMK — the one Lerian datastore whose secret is not named {name}/password — and that CMK must also appear in the ESO role's kms_key_arns or the password never reaches a pod. In shared mode this decides whether the shared cluster's secret is resolved at all. MSK offers SCRAM-SHA-512 ONLY, so the mechanism value is scram-sha-512, never the SCRAM-SHA-256 most examples show."
   type        = bool
   default     = true
+
+  validation {
+    condition     = var.enable_sasl_scram
+    error_message = "The enable_sasl_scram must be true on the gateway cluster. Without SCRAM the endpoint output falls back to a TLS or plaintext broker list and helm_values omits STREAMING_KAFKA_SASL_MECHANISM, which a managed gateway deployment refuses to boot without."
+  }
 }
 
 variable "scram_username" {
@@ -221,9 +226,14 @@ variable "scram_username" {
 }
 
 variable "enable_unauthenticated" {
-  description = "Allow unauthenticated Kafka access. Throwaway environments only. On a cluster carrying RSFN rail traffic this removes the only application-level boundary there is, leaving the security group as the sole control."
+  description = "Allow unauthenticated Kafka access. PINNED FALSE BY VALIDATION IN THIS ROOT. On the cluster carrying RSFN rail traffic this removes the only application-level boundary there is, leaving the security group as the sole control — and it is what opens the plaintext 9092 and unauthenticated 9094 listeners in the module. A throwaway cluster that wants it gets its own root, not a different value here."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.enable_unauthenticated
+    error_message = "The enable_unauthenticated must be false on the gateway cluster. Unauthenticated access removes the only application-level boundary in front of the consignado fact stream."
+  }
 }
 
 ################################################################################
