@@ -159,6 +159,16 @@ variable "family" {
     error_message = "family must be postgres15 or newer. AWS ships rds.force_ssl = 0 on postgres14 and older and 1 from postgres15 on, so an older family creates a server that accepts plaintext connections unless parameters sets rds.force_ssl explicitly."
   }
 
+
+  validation {
+    condition = (
+      var.family == "postgres${var.major_engine_version}" &&
+      (var.engine_version == var.major_engine_version ||
+      startswith(var.engine_version, "${var.major_engine_version}."))
+    )
+    error_message = "family, major_engine_version and engine_version have to name the same PostgreSQL major. Both descriptions said \"must agree with engine_version\" and nothing checked it, so family = \"postgres15\" with engine_version = \"17\" planned cleanly and RDS refused the combination at apply."
+  }
+
 }
 
 variable "major_engine_version" {
