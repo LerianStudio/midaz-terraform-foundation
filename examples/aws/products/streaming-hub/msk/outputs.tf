@@ -152,8 +152,19 @@ output "helm_values" {
   description = "Chart env vars this cluster fills in. Verified against streaming-hub's configuration loader, not against a chart — the service has none. Note the STREAMING_HUB_ prefix: the unprefixed STREAMING_* names are lib-streaming's producer surface and the hub does not read them. The SCRAM username and password are omitted on purpose; they are required together and both arrive from the vault via External Secrets."
   value = merge(
     {
-      STREAMING_HUB_KAFKA_BROKERS     = module.msk.endpoint
-      STREAMING_HUB_KAFKA_TLS_ENABLED = "true"
+      STREAMING_HUB_KAFKA_BROKERS = module.msk.endpoint
+
+      # DERIVED, NOT HARDCODED. The module hands out the broker list of the
+      # strongest enabled mode: SCRAM (9096, TLS) when SCRAM is on, else the TLS
+      # list (9094) when transit encryption allows TLS, else the plaintext list
+      # (9092). Announcing TLS over a plaintext bootstrap list makes the hub fail
+      # the handshake against the broker, and the error names the broker rather
+      # than this configuration. The condition mirrors that selection exactly.
+      STREAMING_HUB_KAFKA_TLS_ENABLED = (
+        var.enable_sasl_scram || contains(["TLS", "TLS_PLAINTEXT"], var.encryption_in_transit_client_broker)
+        ? "true"
+        : "false"
+      )
     },
     # OMITTED, NOT EMPTIED, when SCRAM is off. The hub reads an empty mechanism as
     # "no SASL" and then fails authentication against a broker that requires it —
