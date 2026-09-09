@@ -220,10 +220,13 @@ data "aws_iam_policy_document" "cert_manager_dns01" {
     # here are NORMALISED by Route 53 -- lowercase, no trailing dot -- which is
     # why the pattern is lowercase and dotless at the end.
     #
-    # THIS FORBIDS CNAME DELEGATION OF THE CHALLENGE. If an Issuer is ever
-    # configured to follow _acme-challenge to a name outside this pattern, or
-    # into a delegated zone, issuance fails with AccessDenied and this condition
-    # is the reason. That is a visible failure at issuance time, not a silent one.
+    # WHAT THIS DOES TO CNAME DELEGATION OF THE CHALLENGE, stated precisely:
+    # a delegated target is allowed when it is still named _acme-challenge.*
+    # AND still lives in a zone listed in cert_manager_hosted_zone_arns. It is
+    # refused when the target leaves either fence -- a different name shape, or
+    # a zone this role was not granted. So delegation WITHIN the granted zones
+    # keeps working, and delegation OUT of them fails with AccessDenied at
+    # issuance, which is a visible failure rather than a silent one.
     condition {
       test     = "ForAllValues:StringLike"
       variable = "route53:ChangeResourceRecordSetsNormalizedRecordNames"
