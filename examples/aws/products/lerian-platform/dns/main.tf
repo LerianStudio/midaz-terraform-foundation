@@ -80,7 +80,17 @@ resource "aws_route53_zone" "this" {
     # that no plan output makes obvious: the NS record keeps pointing at name
     # servers that no longer answer, and the failure is NXDOMAIN for every name in
     # the domain until somebody notices the delegation is dangling.
-    prevent_destroy = true
+    #
+    # OFF IN THIS RELEASE, so a destroy of this root runs through the instrument
+    # instead of around it. The three zones the consignado estate created here
+    # (consignado.lerian.dev and its stg. and devops. children) hold no record of
+    # that estate any more: every name moved to <environment>.lerian.dev, created
+    # by products/network/lerian-dev-zones. What keeps the delegation from dangling
+    # is the order of the destroy, not this flag: the NS record in the parent goes
+    # first (products/network/route53-delegation for the children, the apex for
+    # the parent), this root second. The guard returns to true in the release
+    # that follows the retirement.
+    prevent_destroy = false
 
     # The dot matters. endswith(zone, parent) alone accepts "xlerian.dev" against
     # parent "lerian.dev", because it has no notion of a label boundary; requiring
