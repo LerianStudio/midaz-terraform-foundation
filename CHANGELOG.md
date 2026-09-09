@@ -1,5 +1,20 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.9.1](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.1)
+
+- Fixes:
+  - Restrict the cert-manager role to TXT challenge records.
+  - Fence the challenge name and refuse any wildcard ARN.
+  
+- Improvements:
+  - Document what the challenge-name fence does to CNAME delegation.
+
+Contributors: @fred, @lerian-studio-midaz-push-bot[bot]
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.9.0...v1.9.1)
+
+---
+
 ## [1.9.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.0)
 
 Features:
