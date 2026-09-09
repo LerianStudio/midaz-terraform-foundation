@@ -1,0 +1,62 @@
+################################################################################
+# products/network/lerian-dev-zones — prd
+#
+# Roughly USD 0.50/month for the zone plus query charges; ACM certificates are free.
+#
+# ONE ZONE PER FILE, AND THE THREE FILES ARE NOT INTERCHANGEABLE. This root creates
+# a single zone per apply, and which zone belongs to which Terraform environment is
+# fixed in main.tf:
+#
+#   prd.tfvars  ->  prd.lerian.dev     account 862902859103, environment prd
+#   stg.tfvars  ->  stg.lerian.dev     account 862902859103, environment stg
+#   dev.tfvars  ->  devops.lerian.dev  account 159142082896, environment dev
+#
+# Pairing a zone with the wrong environment applies cleanly on AWS and puts that
+# zone in the wrong state, where a destroy of one environment removes DNS another
+# environment believes it owns. main.tf refuses the mismatch at plan time; this
+# header exists so nobody has to discover the rule from a failed plan.
+#
+# THIS APPLY DOES NOT FINISH THE JOB. The zone is a direct child of the lerian.dev
+# apex, which lives in the organisation's management account. After the apply:
+#
+#   1. terraform output delegation_lines
+#   2. in the management account, create an NS record for that zone with the four
+#      values and TTL 300
+#   3. ACM validates on its own within 72 hours — no second apply
+#
+# `wait_for_validation` is false by default for exactly that reason: the delegation
+# is somebody else's step, in another account, and a blocking wait would time out
+# on a step that had not started.
+#
+# Copy to prd.tfvars before use.
+################################################################################
+
+region      = "sa-east-1"
+product     = "network"
+environment = "prd"
+
+################################################################################
+# The zone
+#
+# One of exactly three permitted names. The list is closed in variables.tf: this
+# root creates the three environment zones of the `<service>.<environment>.lerian.dev`
+# scheme, and everything below one of them is a DNS record written by external-dns,
+# not a zone.
+################################################################################
+
+zone_name = "prd.lerian.dev"
+
+################################################################################
+# Tags
+#
+# Account and CostCenter are this estate's convention, not the foundation's, and
+# they answer different questions: Account names the AWS account that pays,
+# CostCenter names the slice of the programme that consumed it. Staging and
+# production share an account and must NOT share a cost centre.
+################################################################################
+
+extra_tags = {
+  Owner      = "consignado"
+  Account    = "saas"
+  CostCenter = "consignado-prd"
+}
