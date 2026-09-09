@@ -119,6 +119,33 @@ resource "aws_acm_certificate" "this" {
     # it, and a replace that deletes before it creates takes the ALB listener
     # referencing it down in between.
     create_before_destroy = true
+
+    # THE VALIDATION RECORD'S OWN GUARD CANNOT CATCH ITS OWN ABSENCE, so this one
+    # lives here.
+    #
+    # aws_route53_record.validation filters domain_validation_options down to the
+    # element whose domain_name is the zone apex. If that filter ever matches
+    # NOTHING -- ACM normalising the name differently, returning a trailing dot,
+    # anything -- the for_each map is empty, the resource gets zero instances, and
+    # Terraform reports no error at all: measured, the plan reads "2 to add" and
+    # succeeds. A precondition inside that resource never runs, because a resource
+    # with no instances evaluates no lifecycle block.
+    #
+    # The failure would then be silent and slow in the worst way: the zone and the
+    # certificate both exist, nothing validates it, ACM retries for 72 hours and
+    # gives up. No apply ever failed, and the first symptom is an ALB that will not
+    # serve TLS.
+    #
+    # A postcondition on the certificate runs whether or not the record resource
+    # has instances, and it reads self.domain_validation_options after creation,
+    # when the values are known.
+    postcondition {
+      condition = length([
+        for option in self.domain_validation_options :
+        option if option.domain_name == var.zone_name
+      ]) == 1
+      error_message = "ACM returned no validation option whose domain_name is exactly \"${var.zone_name}\", or more than one. aws_route53_record.validation selects that single element, so an empty match creates NO validation record and fails no apply — the certificate would sit unvalidated until ACM gives up after 72 hours. Compare this certificate's domain_validation_options against the filter in that resource before applying again."
+    }
   }
 }
 
