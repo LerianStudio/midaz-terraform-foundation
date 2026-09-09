@@ -57,12 +57,19 @@ Adding a zone is a deliberate edit of `variables.tf` and of the environment map 
 ## Running it
 
 ```bash
+cp envs/prd.tfvars-example envs/prd.tfvars   # then fill it in
 terraform init \
   -backend-config=../../../backend/prd.hcl \
   -backend-config="key=aws/products/network/lerian-dev-zones/terraform.tfstate"
 terraform apply -var-file=envs/prd.tfvars
 terraform output delegation_lines
 ```
+
+Only `envs/prd.tfvars-example` is committed, so the copy is the first step for
+anyone driving this root directly. Estates that keep their tfvars in their own
+repository — the consignado estate does, under `infra/envs/` — get the file
+installed by their sync script instead, and MUST NOT edit it inside the managed
+checkout: the next sync overwrites it and the change is invisible to review.
 
 The state key carries no environment because the backend bucket does
 (`lerian-tfstate-{environment}-{account_id}`), so the same key in two backends is

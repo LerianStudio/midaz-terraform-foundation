@@ -105,9 +105,22 @@ output "certificate_validated" {
 ################################################################################
 
 output "helm_values" {
-  description = "Values the ingress layer needs from this zone. The certificate ARN goes on the Ingress annotation; the domain filter is ADDED to external-dns's existing filters rather than replacing them, because the controller serves both zones until the cutover. No chart is installed by this root, and no txtOwnerId is published — see the comment above this output."
+  description = <<-EOT
+    Values the ingress layer needs from this zone. The certificate ARN goes on the
+    Ingress annotation. No chart is installed by this root, and no txtOwnerId is
+    published — see the comment above this output.
+
+    THE DOMAIN FILTER IS INDEX 1, NOT 0, AND THAT IS COEXISTENCE-SPECIFIC. A Helm
+    `--set` list key needs a zero-based index, and index 0 is already the old
+    zone's filter, published by products/lerian-platform/dns. external-dns still
+    has to write into that zone for the whole migration, so this value is ADDED
+    beside it — a `--set` on index 0 would silently replace the filter for the
+    zone that still carries every live record. At cutover, when the old zone's
+    filter goes, this one becomes index 0.
+  EOT
+
   value = {
-    "external-dns.domainFilters[]"                                        = aws_route53_zone.this.name
+    "external-dns.domainFilters[1]"                                       = aws_route53_zone.this.name
     "ingress.annotations.alb\\.ingress\\.kubernetes\\.io/certificate-arn" = aws_acm_certificate.this.arn
   }
 }
