@@ -171,10 +171,12 @@ module "external_dns_irsa_role" {
 # and there is no way to invoke it without them. Do not copy this operator onto
 # an action whose key can be missing.
 #
-# The two read statements are unrestricted on purpose. GetChange polls the status
-# of a change this role just made, and ListHostedZonesByName is how cert-manager
-# finds the zone when the Issuer does not name a hostedZoneID. Both are
-# read-only; the write is the one that needed a fence.
+# THREE read statements, and only one of them is unrestricted. GetChange is
+# scoped to change/* (it polls the status of a change this role just made) and
+# ListResourceRecordSets to the same zone list as the write. Only
+# ListHostedZonesByName uses "*", because it is how cert-manager finds the zone
+# when the Issuer names no hostedZoneID and the API takes no resource. All three
+# are read-only; the write is the one that needed a fence.
 data "aws_iam_policy_document" "cert_manager_dns01" {
   count = var.create_cert_manager_role ? 1 : 0
 
@@ -206,6 +208,27 @@ data "aws_iam_policy_document" "cert_manager_dns01" {
       variable = "route53:ChangeResourceRecordSetsRecordTypes"
       values   = ["TXT"]
     }
+
+    # AND THE NAME, NOT ONLY THE TYPE. TXT alone still leaves the apex, _dmarc,
+    # an SPF record and any domain-verification TXT writable -- all of which are
+    # TXT records that mean something to mail delivery or to a third party's
+    # proof of ownership. A DNS-01 challenge is always written at
+    # _acme-challenge.<name>, so the name is as narrow a fence as the type.
+    #
+    # StringLike, not StringEquals: the challenge name carries the domain being
+    # validated, so the pattern has to end in a wildcard. The values compared
+    # here are NORMALISED by Route 53 -- lowercase, no trailing dot -- which is
+    # why the pattern is lowercase and dotless at the end.
+    #
+    # THIS FORBIDS CNAME DELEGATION OF THE CHALLENGE. If an Issuer is ever
+    # configured to follow _acme-challenge to a name outside this pattern, or
+    # into a delegated zone, issuance fails with AccessDenied and this condition
+    # is the reason. That is a visible failure at issuance time, not a silent one.
+    condition {
+      test     = "ForAllValues:StringLike"
+      variable = "route53:ChangeResourceRecordSetsNormalizedRecordNames"
+      values   = ["_acme-challenge.*"]
+    }
   }
 }
 
@@ -235,9 +258,14 @@ resource "aws_iam_policy" "cert_manager_dns01" {
       error_message = "create_cert_manager_role is true but cert_manager_hosted_zone_arns is empty. An IAM policy statement with no resources is rejected by AWS mid-apply; name the hosted zone(s) cert-manager may write challenge records into."
     }
 
+    # ANY WILDCARD, IN ANY POSITION, NOT JUST THE VARIABLE'S OWN DEFAULT. IAM
+    # treats both * and ? as wildcards anywhere inside a Resource ARN, so
+    # "arn:aws:route53:::hostedzone/Z*" grants a whole prefix of zones while
+    # looking like a concrete id. A first version of this check tested only for
+    # the "hostedzone/*" suffix and let exactly that through.
     precondition {
-      condition     = !anytrue([for arn in var.cert_manager_hosted_zone_arns : endswith(arn, "hostedzone/*")])
-      error_message = "cert_manager_hosted_zone_arns still carries the wildcard arn:aws:route53:::hostedzone/* -- every hosted zone in the account. Name the specific zone(s): the record-type condition on this policy stops the role writing an A record, but not a TXT in a zone that serves another estate."
+      condition     = !anytrue([for arn in var.cert_manager_hosted_zone_arns : strcontains(arn, "*") || strcontains(arn, "?")])
+      error_message = "cert_manager_hosted_zone_arns contains a wildcard ARN (* or ?), which grants more than one hosted zone. Name each zone ARN explicitly: the conditions on this policy stop the role writing an A record or a non-challenge TXT, but they do not stop it writing a challenge TXT into a zone that serves another estate."
     }
   }
 }
