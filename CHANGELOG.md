@@ -1,5 +1,20 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.9.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.0)
+
+Features:
+- Added `products/network/lerian-dev-zones` to enhance network configurations.
+
+Fixes:
+- Resolved an issue in AWS where the apply process would fail if the certificate had no matching validation option.
+- Corrected the indexing of the `domainFilters` key and updated the `tfvars` example for clarity.
+
+Contributors: @fred, @lerian-studio-midaz-push-bot[bot],
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.8.0...v1.9.0)
+
+---
+
 ## [1.8.0](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.8.0)
 
 - **Features**
