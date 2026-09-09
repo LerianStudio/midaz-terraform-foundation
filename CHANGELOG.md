@@ -1,5 +1,16 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.9.2](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.2)
+
+- Fixes:
+  - Resolved an issue where the DNS root was incorrectly marked as destroyable, ensuring stability and preventing unintended deletions.
+  
+Contributors: @fred, @lerian-studio-midaz-push-bot[bot],
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.9.1...v1.9.2)
+
+---
+
 ## [1.9.1](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.1)
 
 - Fixes:
