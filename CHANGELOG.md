@@ -1,5 +1,16 @@
 # Lerian-terraform-foundation Changelog
 
+## [1.9.3](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.3)
+
+- Fixes:
+  - The hosted zone guard has been updated to return to `prevent_destroy = true`, ensuring better protection against accidental deletions.
+
+Contributors: @fred, @lerian-studio-midaz-push-bot[bot],
+
+[Compare changes](https://github.com/LerianStudio/lerian-terraform-foundation/compare/v1.9.2...v1.9.3)
+
+---
+
 ## [1.9.2](https://github.com/LerianStudio/lerian-terraform-foundation/releases/tag/v1.9.2)
 
 - Fixes:
