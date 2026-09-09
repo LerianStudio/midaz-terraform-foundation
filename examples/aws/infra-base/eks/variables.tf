@@ -243,7 +243,7 @@ variable "create_cert_manager_role" {
 }
 
 variable "cert_manager_hosted_zone_arns" {
-  description = "Route53 hosted zone ARNs cert-manager may write DNS-01 challenge records to."
+  description = "Route53 hosted zone ARNs cert-manager may write DNS-01 challenge records to. The attached policy allows TXT records ONLY, so this role cannot rewrite an A, AAAA or CNAME record even in a zone named here. The wildcard default is refused at plan time when create_cert_manager_role is true: name the specific zone(s), because a TXT in someone else's live zone is still a real write."
   type        = list(string)
   default     = ["arn:aws:route53:::hostedzone/*"]
 }
